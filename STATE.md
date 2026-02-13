@@ -61,6 +61,7 @@ For this project, simplicity is more important than efficiency.
 - Color-coded output for better readability
 - Command history for interactive sessions
 - Robust terminal input handling with readline (backspace, delete, Ctrl-C)
+- Proper conversation history management for multi-turn tool calls
 
 ### Usage
 ```bash
