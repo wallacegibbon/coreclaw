@@ -41,6 +41,43 @@ func yellow(text string) string {
 	return fmt.Sprintf("\x1b[38;2;249;226;175m%s\x1b[0m", text)
 }
 
+func cyan(text string) string {
+	return fmt.Sprintf("\x1b[38;2;137;220;235m%s\x1b[0m", text)
+}
+
+func green(text string) string {
+	return fmt.Sprintf("\x1b[38;2;166;227;161m%s\x1b[0m", text)
+}
+
+func magenta(text string) string {
+	return fmt.Sprintf("\x1b[38;2;245;194;231m%s\x1b[0m", text)
+}
+
+func getPrompt(_ string) string {
+	username := os.Getenv("USER")
+	if username == "" {
+		username = os.Getenv("USERNAME")
+	}
+	if username == "" {
+		username = "user"
+	}
+
+	prompt := fmt.Sprintf("%s@%s%s",
+		cyan(username),
+		green("coreclaw"),
+		bright("⟩ "),
+	)
+	return prompt
+}
+
+func getShortPath(path string) string {
+	home := os.Getenv("HOME")
+	if home != "" && strings.HasPrefix(path, home) {
+		return "~" + path[len(home):]
+	}
+	return path
+}
+
 func isTerminal() bool {
 	fileInfo, _ := os.Stdin.Stat()
 	return (fileInfo.Mode() & os.ModeCharDevice) != 0
@@ -50,6 +87,7 @@ func main() {
 	version := "0.1.0"
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
+	debug := flag.Bool("debug", false, "Show debug output")
 	quiet := flag.Bool("quiet", false, "Suppress debug output")
 	promptFile := flag.String("file", "", "Read prompt from file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
@@ -69,6 +107,11 @@ func main() {
 		fmt.Printf("  ZAI_API_KEY         ZAI API key (uses GPT-4o)\n\n")
 		fmt.Printf("Flags:\n")
 		flag.PrintDefaults()
+		fmt.Printf("\nExamples:\n")
+		fmt.Printf("  coreclaw                    Run in interactive mode\n")
+		fmt.Printf("  coreclaw \"list files\"        Execute a single prompt\n")
+		fmt.Printf("  coreclaw --debug \"list files\" Execute with debug output\n")
+		fmt.Printf("  coreclaw --quiet \"list files\" Execute without debug output\n")
 		os.Exit(0)
 	}
 
@@ -123,6 +166,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *debug && !*quiet {
+		fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("Using model: %s", config.modelName)))
+	}
+
 	bashTool := fantasy.NewAgentTool(
 		"bash",
 		"Execute a bash command in the shell",
@@ -153,63 +200,90 @@ func main() {
 	var messages []fantasy.Message
 
 	processPrompt := func(prompt string, includeMessages bool) (*fantasy.AgentResult, string) {
-		if !*quiet {
-			fmt.Fprintln(os.Stderr, dim("\n=== Sending to API ==="))
+		if *debug && !*quiet {
+			fmt.Fprintln(os.Stderr, dim("\n>>> Sending request to API server"))
 			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("System Prompt: %s", finalSystemPrompt)))
 			fmt.Fprintln(os.Stderr, blue(fmt.Sprintf("User Prompt: %s", prompt)))
 			fmt.Fprintln(os.Stderr, dim("Available Tools: bash"))
-			fmt.Fprintln(os.Stderr, dim("======================"))
 		}
 
-		agentCall := fantasy.AgentCall{Prompt: prompt}
+		streamCall := fantasy.AgentStreamCall{
+			Prompt: prompt,
+		}
 		if includeMessages {
-			agentCall.Messages = messages
+			streamCall.Messages = messages
 		}
 
-		result, err := agent.Generate(ctx, agentCall)
+		var responseText strings.Builder
+
+		streamCall.OnStepFinish = func(stepResult fantasy.StepResult) error {
+			fmt.Println()
+			if *debug && !*quiet {
+				fmt.Fprintln(os.Stderr, dim("<<< Step finished"))
+			}
+			return nil
+		}
+		streamCall.OnToolInputStart = func(id, toolName string) error {
+			fmt.Println()
+			if *debug && !*quiet {
+				fmt.Fprintln(os.Stderr, dim(fmt.Sprintf(">>> Tool invocation request: %s", toolName)))
+			}
+			return nil
+		}
+
+		if *debug && !*quiet {
+			streamCall.OnAgentStart = func() {
+				fmt.Fprintln(os.Stderr, dim(">>> Agent started"))
+			}
+			streamCall.OnStepStart = func(stepNumber int) error {
+				fmt.Fprintln(os.Stderr, dim(fmt.Sprintf(">>> Step %d started", stepNumber)))
+				return nil
+			}
+			streamCall.OnToolCall = func(toolCall fantasy.ToolCallContent) error {
+				var input map[string]any
+				json.Unmarshal([]byte(toolCall.Input), &input)
+				fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Input: %+v", input)))
+				return nil
+			}
+			streamCall.OnToolResult = func(result fantasy.ToolResultContent) error {
+				fmt.Fprintln(os.Stderr, dim("<<< Tool result received"))
+				switch p := result.Result.(type) {
+				case fantasy.ToolResultOutputContentText:
+					fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("  Output: %s", p.Text)))
+				case fantasy.ToolResultOutputContentError:
+					fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Error: %s", p.Error)))
+				}
+				return nil
+			}
+		}
+
+		streamCall.OnTextDelta = func(id, text string) error {
+			fmt.Print(bright(text))
+			responseText.WriteString(text)
+			return nil
+		}
+
+		agentResult, err := agent.Stream(ctx, streamCall)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("Error: %v", err)))
 			return nil, ""
 		}
 
-		var responseText string
-		for _, step := range result.Steps {
-			for _, content := range step.Content {
-				switch c := content.(type) {
-				case fantasy.TextContent:
-					fmt.Print(bright(c.Text))
-					responseText += c.Text
-				case fantasy.ToolCallContent:
-					if !*quiet {
-						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\n[Tool call: %s]", c.ToolName)))
-						var input map[string]any
-						json.Unmarshal([]byte(c.Input), &input)
-						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Input: %+v", input)))
-					}
-				case fantasy.ToolResultContent:
-					if !*quiet {
-						fmt.Fprintln(os.Stderr, dim("[Tool result]"))
-						switch p := c.Result.(type) {
-						case fantasy.ToolResultOutputContentText:
-							fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("  Output: %s", p.Text)))
-						case fantasy.ToolResultOutputContentError:
-							fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Error: %s", p.Error)))
-						}
-					}
-				}
-			}
+		if *debug && !*quiet {
+			fmt.Println()
+			fmt.Fprintln(os.Stderr, dim("<<< Agent finished"))
 		}
 
 		fmt.Println()
-		if !*quiet {
+		if *debug && !*quiet {
 			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\nUsage: %d input tokens, %d output tokens, %d total tokens",
-				result.TotalUsage.InputTokens,
-				result.TotalUsage.OutputTokens,
-				result.TotalUsage.TotalTokens,
+				agentResult.TotalUsage.InputTokens,
+				agentResult.TotalUsage.OutputTokens,
+				agentResult.TotalUsage.TotalTokens,
 			)))
 		}
 
-		return result, responseText
+		return agentResult, responseText.String()
 	}
 
 	var userPrompt string
@@ -238,7 +312,7 @@ func main() {
 	if isTTY {
 		var err error
 		rl, err = readline.NewEx(&readline.Config{
-			Prompt:          "Enter your prompt (Ctrl-C to exit): ",
+			Prompt:          getPrompt(""),
 			InterruptPrompt: "^C",
 			HistoryFile:     os.Getenv("HOME") + "/.coreclaw_history",
 			HistoryLimit:    1000,
@@ -255,6 +329,7 @@ func main() {
 		var err error
 
 		if isTTY {
+			rl.SetPrompt(getPrompt(""))
 			userPrompt, err = rl.Readline()
 			if err != nil {
 				if err == readline.ErrInterrupt {
@@ -264,7 +339,7 @@ func main() {
 			}
 			userPrompt = strings.TrimSpace(userPrompt)
 		} else {
-			fmt.Fprint(os.Stderr, "Enter your prompt (Ctrl-C to exit): ")
+			fmt.Fprint(os.Stderr, getPrompt(""))
 			reader := bufio.NewReader(os.Stdin)
 			input, _ := reader.ReadString('\n')
 			userPrompt = strings.TrimSpace(input)
