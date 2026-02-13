@@ -13,6 +13,7 @@ import (
 	"charm.land/catwalk/pkg/embedded"
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/openai"
+	"github.com/charmbracelet/glamour"
 	"github.com/chzyer/readline"
 )
 
@@ -90,6 +91,7 @@ func main() {
 	showHelp := flag.Bool("help", false, "Show help information")
 	debug := flag.Bool("debug", false, "Show debug output")
 	quiet := flag.Bool("quiet", false, "Suppress debug output")
+	noMarkdown := flag.Bool("no-markdown", false, "Disable markdown rendering")
 	promptFile := flag.String("file", "", "Read prompt from file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
 	flag.Parse()
@@ -109,10 +111,11 @@ func main() {
 		fmt.Printf("Flags:\n")
 		flag.PrintDefaults()
 		fmt.Printf("\nExamples:\n")
-		fmt.Printf("  coreclaw                    Run in interactive mode\n")
-		fmt.Printf("  coreclaw \"list files\"        Execute a single prompt\n")
-		fmt.Printf("  coreclaw --debug \"list files\" Execute with debug output\n")
-		fmt.Printf("  coreclaw --quiet \"list files\" Execute without debug output\n")
+		fmt.Printf("  coreclaw                        Run in interactive mode\n")
+		fmt.Printf("  coreclaw \"list files\"            Execute a single prompt\n")
+		fmt.Printf("  coreclaw --debug \"list files\"   Execute with debug output\n")
+		fmt.Printf("  coreclaw --quiet \"list files\"   Execute without debug output\n")
+		fmt.Printf("  coreclaw --no-markdown \"list\"   Disable markdown rendering\n")
 		os.Exit(0)
 	}
 
@@ -256,15 +259,15 @@ func main() {
 		var responseText strings.Builder
 
 		streamCall.OnStepFinish = func(stepResult fantasy.StepResult) error {
-			fmt.Println()
 			if *debug && !*quiet {
+				fmt.Println()
 				fmt.Fprintln(os.Stderr, dim("<<< Step finished"))
 			}
 			return nil
 		}
 		streamCall.OnToolInputStart = func(id, toolName string) error {
-			fmt.Println()
 			if *debug && !*quiet {
+				fmt.Println()
 				fmt.Fprintln(os.Stderr, dim(fmt.Sprintf(">>> Tool invocation request: %s", toolName)))
 			}
 			return nil
@@ -297,7 +300,9 @@ func main() {
 		}
 
 		streamCall.OnTextDelta = func(id, text string) error {
-			fmt.Print(bright(text))
+			if *noMarkdown {
+				fmt.Print(bright(text))
+			}
 			responseText.WriteString(text)
 			return nil
 		}
@@ -313,7 +318,28 @@ func main() {
 			fmt.Fprintln(os.Stderr, dim("<<< Agent finished"))
 		}
 
-		fmt.Println()
+		if !*noMarkdown {
+			renderer, err := glamour.NewTermRenderer(
+				glamour.WithAutoStyle(),
+				glamour.WithWordWrap(80),
+			)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("Failed to create markdown renderer: %v", err)))
+				fmt.Print(bright(responseText.String()))
+				fmt.Println()
+			} else {
+				rendered, err := renderer.Render(responseText.String())
+				if err != nil {
+					fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("Failed to render markdown: %v", err)))
+					fmt.Print(bright(responseText.String()))
+					fmt.Println()
+				} else {
+					fmt.Print(rendered)
+				}
+			}
+		} else {
+			fmt.Println()
+		}
 		if *debug && !*quiet {
 			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\nUsage: %d input tokens, %d output tokens, %d total tokens",
 				agentResult.TotalUsage.InputTokens,

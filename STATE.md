@@ -37,6 +37,9 @@ For this project, simplicity is more important than efficiency.
   - Command history support (~/.coreclaw_history, max 1000 entries)
   - Proper backspace/delete for all character encodings
   - Ctrl-C interruption support
+- ✅ Markdown rendering with glamour
+  - Renders AI responses with syntax highlighting and formatting
+  - Can be disabled with --no-markdown flag for streaming output
 
 ### Architecture
 - **Language Models**:
@@ -47,6 +50,7 @@ For this project, simplicity is more important than efficiency.
 - **Tool**: bash (executes shell commands)
 - **Framework**: charm.land/fantasy
 - **Provider Database**: charm.land/catwalk (embedded)
+- **Markdown Rendering**: github.com/charmbracelet/glamour
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 
 ### Features
@@ -74,11 +78,14 @@ export DEEPSEEK_API_KEY=your-deepseek-key
 # or
 export ZAI_API_KEY=your-zai-key
 
-# Run with prompt
+# Run with prompt (markdown rendering enabled by default)
 ./coreclaw "List files in current directory"
 
 # Run with quiet mode
 ./coreclaw --quiet "List files"
+
+# Run without markdown rendering (streaming output)
+./coreclaw --no-markdown "List files"
 
 # Run with prompt from file
 ./coreclaw --file prompt.txt
