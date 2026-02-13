@@ -25,6 +25,11 @@ For this project, simplicity is more important than efficiency.
   - Debug/info messages: dim gray (#6c7086)
   - Applied to both single-prompt and interactive modes
   - Uses raw ANSI codes for lightweight output without padding
+- ✅ CLI flags for version and help information
+- ✅ Quiet mode (--quiet) to suppress debug output
+- ✅ File-based prompts (--file) to read prompts from files
+- ✅ Custom system prompts (--system) to override default behavior
+- ✅ README.md with comprehensive documentation
 
 ### Architecture
 - **Language Models**:
@@ -44,6 +49,10 @@ For this project, simplicity is more important than efficiency.
 - Multi-provider support with automatic provider detection
 - Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - CLI flags for version and help information
+- Quiet mode to suppress debug output for scripting
+- Read prompts from files for batch processing
+- Custom system prompts for specialized behaviors
+- Color-coded output for better readability
 
 ### Usage
 ```bash
@@ -57,8 +66,23 @@ export ZAI_API_KEY=your-zai-key
 # Run with prompt
 ./coreclaw "List files in current directory"
 
+# Run with quiet mode
+./coreclaw --quiet "List files"
+
+# Run with prompt from file
+./coreclaw --file prompt.txt
+
+# Run with custom system prompt
+./coreclaw --system "You are a code reviewer" "Review this code"
+
 # Run interactively (no prompt provided)
 ./coreclaw
+
+# Show version
+./coreclaw --version
+
+# Show help
+./coreclaw --help
 ```
 
 ### Supported Providers
@@ -69,6 +93,8 @@ export ZAI_API_KEY=your-zai-key
 Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 
 ## Next Steps
-- Test the agent with various bash commands
-- Consider adding more skills based on bash tool
 - Explore streaming support for better UX
+- Add more sophisticated skills built on bash tool
+- Add config file support for persistent settings
+- Consider adding conversation history save/restore
+- Add markdown/formatted output mode
