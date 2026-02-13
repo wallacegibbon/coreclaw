@@ -106,7 +106,7 @@ func main() {
 		fmt.Printf("Usage:\n  coreclaw [prompt]    Execute a single prompt\n  coreclaw             Run in interactive mode\n\n")
 		fmt.Printf("Environment Variables:\n")
 		fmt.Printf("  OPENAI_API_KEY      OpenAI API key (uses GPT-5.1-codex)\n")
-		fmt.Printf("  DEEPSEEK_API_KEY    DeepSeek API key (uses deepseek-reasoner)\n")
+		fmt.Printf("  DEEPSEEK_API_KEY    DeepSeek API key (uses deepseek-chat)\n")
 		fmt.Printf("  ZAI_API_KEY         ZAI API key (uses GLM-4.7)\n\n")
 		fmt.Printf("Flags:\n")
 		flag.PrintDefaults()
@@ -160,12 +160,12 @@ func main() {
 		}
 		for _, p := range providers {
 			if p.ID == "deepseek" {
-				if p.DefaultLargeModelID != "" {
-					config.modelName = p.DefaultLargeModelID
-				} else if p.DefaultSmallModelID != "" {
+				config.baseURL = p.APIEndpoint
+				// Use small model as default since reasoning models
+				// require special handling for tool calls
+				if p.DefaultSmallModelID != "" {
 					config.modelName = p.DefaultSmallModelID
 				}
-				config.baseURL = p.APIEndpoint
 				break
 			}
 		}
