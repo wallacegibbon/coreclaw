@@ -12,6 +12,7 @@ import (
 
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/openai"
+	"github.com/chzyer/readline"
 )
 
 type BashInput struct {
@@ -38,6 +39,11 @@ func blue(text string) string {
 
 func yellow(text string) string {
 	return fmt.Sprintf("\x1b[38;2;249;226;175m%s\x1b[0m", text)
+}
+
+func isTerminal() bool {
+	fileInfo, _ := os.Stdin.Stat()
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
 
 func main() {
@@ -213,14 +219,47 @@ func main() {
 		os.Exit(0)
 	}
 
-	for {
-		fmt.Fprintln(os.Stderr, dim("Enter your prompt (Ctrl-C to exit):"))
-		reader := bufio.NewReader(os.Stdin)
-		userPrompt, err := reader.ReadString('\n')
+	isTTY := isTerminal()
+
+	var rl *readline.Instance
+	if isTTY {
+		var err error
+		rl, err = readline.NewEx(&readline.Config{
+			Prompt:          "Enter your prompt (Ctrl-C to exit): ",
+			InterruptPrompt: "^C",
+			HistoryFile:     os.Getenv("HOME") + "/.coreclaw_history",
+			HistoryLimit:    1000,
+		})
 		if err != nil {
-			return
+			fmt.Fprintf(os.Stderr, "Failed to initialize readline: %v\n", err)
+			os.Exit(1)
 		}
-		userPrompt = strings.TrimSpace(userPrompt)
+		defer rl.Close()
+	}
+
+	for {
+		var userPrompt string
+		var err error
+
+		if isTTY {
+			userPrompt, err = rl.Readline()
+			if err != nil {
+				if err == readline.ErrInterrupt {
+					continue
+				}
+				return
+			}
+			userPrompt = strings.TrimSpace(userPrompt)
+		} else {
+			fmt.Fprint(os.Stderr, "Enter your prompt (Ctrl-C to exit): ")
+			reader := bufio.NewReader(os.Stdin)
+			input, _ := reader.ReadString('\n')
+			userPrompt = strings.TrimSpace(input)
+			if userPrompt == "" {
+				return
+			}
+		}
+
 		if userPrompt == "" {
 			continue
 		}
