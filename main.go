@@ -152,41 +152,33 @@ func main() {
 
 	var messages []fantasy.Message
 
-
-	var userPrompt string
-	if *promptFile != "" {
-		content, err := os.ReadFile(*promptFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read prompt file: %v\n", err)
-			os.Exit(1)
-		}
-		userPrompt = strings.TrimSpace(string(content))
-	} else if flag.NArg() > 0 {
-		userPrompt = strings.Join(flag.Args(), " ")
-	}
-
-	if userPrompt != "" {
+	processPrompt := func(prompt string, includeMessages bool) (*fantasy.AgentResult, string) {
 		if !*quiet {
 			fmt.Fprintln(os.Stderr, dim("\n=== Sending to API ==="))
 			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("System Prompt: %s", finalSystemPrompt)))
-			fmt.Fprintln(os.Stderr, blue(fmt.Sprintf("User Prompt: %s", userPrompt)))
+			fmt.Fprintln(os.Stderr, blue(fmt.Sprintf("User Prompt: %s", prompt)))
 			fmt.Fprintln(os.Stderr, dim("Available Tools: bash"))
 			fmt.Fprintln(os.Stderr, dim("======================"))
 		}
 
-		result, err := agent.Generate(ctx, fantasy.AgentCall{
-			Prompt: userPrompt,
-		})
-		if err != nil {
-			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("Error: %v", err)))
-			os.Exit(1)
+		agentCall := fantasy.AgentCall{Prompt: prompt}
+		if includeMessages {
+			agentCall.Messages = messages
 		}
 
+		result, err := agent.Generate(ctx, agentCall)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("Error: %v", err)))
+			return nil, ""
+		}
+
+		var responseText string
 		for _, step := range result.Steps {
 			for _, content := range step.Content {
 				switch c := content.(type) {
 				case fantasy.TextContent:
 					fmt.Print(bright(c.Text))
+					responseText += c.Text
 				case fantasy.ToolCallContent:
 					if !*quiet {
 						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\n[Tool call: %s]", c.ToolName)))
@@ -215,6 +207,27 @@ func main() {
 				result.TotalUsage.OutputTokens,
 				result.TotalUsage.TotalTokens,
 			)))
+		}
+
+		return result, responseText
+	}
+
+	var userPrompt string
+	if *promptFile != "" {
+		content, err := os.ReadFile(*promptFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to read prompt file: %v\n", err)
+			os.Exit(1)
+		}
+		userPrompt = strings.TrimSpace(string(content))
+	} else if flag.NArg() > 0 {
+		userPrompt = strings.Join(flag.Args(), " ")
+	}
+
+	if userPrompt != "" {
+		result, _ := processPrompt(userPrompt, false)
+		if result == nil {
+			os.Exit(1)
 		}
 		os.Exit(0)
 	}
@@ -264,75 +277,18 @@ func main() {
 			continue
 		}
 
-		if !*quiet {
-			fmt.Fprintln(os.Stderr, dim("\n=== Sending to API ==="))
-			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("System Prompt: %s", finalSystemPrompt)))
-			fmt.Fprintln(os.Stderr, blue(fmt.Sprintf("User Prompt: %s", userPrompt)))
-			fmt.Fprintln(os.Stderr, dim("Available Tools: bash"))
-			fmt.Fprintln(os.Stderr, dim("======================"))
-		}
-
-		result, err := agent.Generate(ctx, fantasy.AgentCall{
-			Prompt:   userPrompt,
-			Messages: messages,
-		})
-		if err != nil {
-			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("Error: %v", err)))
+		result, responseText := processPrompt(userPrompt, true)
+		if result == nil {
 			continue
 		}
 
-		for _, step := range result.Steps {
-			for _, content := range step.Content {
-				switch c := content.(type) {
-				case fantasy.TextContent:
-					fmt.Print(bright(c.Text))
-				case fantasy.ToolCallContent:
-					if !*quiet {
-						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\n[Tool call: %s]", c.ToolName)))
-						var input map[string]any
-						json.Unmarshal([]byte(c.Input), &input)
-						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Input: %+v", input)))
-					}
-				case fantasy.ToolResultContent:
-					if !*quiet {
-						fmt.Fprintln(os.Stderr, dim("[Tool result]"))
-						switch p := c.Result.(type) {
-						case fantasy.ToolResultOutputContentText:
-							fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("  Output: %s", p.Text)))
-						case fantasy.ToolResultOutputContentError:
-							fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Error: %s", p.Error)))
-						}
-					}
-				}
-			}
-		}
-
 		messages = append(messages, fantasy.NewUserMessage(userPrompt))
-
-		// Build assistant message from result - only store text, not tool calls/results
-		var responseText string
-		for _, step := range result.Steps {
-			for _, content := range step.Content {
-				if c, ok := content.(fantasy.TextContent); ok {
-					responseText += c.Text
-				}
-			}
-		}
 
 		if responseText != "" {
 			messages = append(messages, fantasy.Message{
 				Role:    fantasy.MessageRoleAssistant,
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: responseText}},
 			})
-		}
-
-		fmt.Println()
-		if !*quiet {
-			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\nUsage: %d input tokens, %d output tokens, %d total tokens",
-				result.TotalUsage.InputTokens,
-				result.TotalUsage.OutputTokens,
-				result.TotalUsage.TotalTokens,
-			)))
 		}
 	}
 }
