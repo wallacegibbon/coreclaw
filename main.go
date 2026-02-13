@@ -144,8 +144,6 @@ func main() {
 
 	ctx := context.Background()
 
-	scanner := bufio.NewScanner(os.Stdin)
-
 	var messages []fantasy.Message
 
 
@@ -216,12 +214,13 @@ func main() {
 	}
 
 	for {
-		fmt.Fprint(os.Stderr, dim("Enter your prompt (Ctrl-C to exit): "))
-		if !scanner.Scan() {
+		fmt.Fprintln(os.Stderr, dim("Enter your prompt (Ctrl-C to exit):"))
+		reader := bufio.NewReader(os.Stdin)
+		userPrompt, err := reader.ReadString('\n')
+		if err != nil {
 			return
 		}
-
-		userPrompt := scanner.Text()
+		userPrompt = strings.TrimSpace(userPrompt)
 		if userPrompt == "" {
 			continue
 		}
