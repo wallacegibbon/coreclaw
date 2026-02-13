@@ -309,38 +309,20 @@ func main() {
 
 		messages = append(messages, fantasy.NewUserMessage(userPrompt))
 
-		var assistantParts []fantasy.MessagePart
-		var toolParts []fantasy.MessagePart
-
+		// Build assistant message from result - only store text, not tool calls/results
+		var responseText string
 		for _, step := range result.Steps {
 			for _, content := range step.Content {
-				// Convert content to MessagePart by marshaling and unmarshaling
-				data, err := json.Marshal(content)
-				if err != nil {
-					continue
-				}
-				if part, err := fantasy.UnmarshalMessagePart(data); err == nil {
-					switch part.GetType() {
-				case fantasy.ContentTypeToolResult:
-					toolParts = append(toolParts, part)
-				default:
-					assistantParts = append(assistantParts, part)
-				}
+				if c, ok := content.(fantasy.TextContent); ok {
+					responseText += c.Text
 				}
 			}
 		}
 
-		if len(assistantParts) > 0 {
+		if responseText != "" {
 			messages = append(messages, fantasy.Message{
 				Role:    fantasy.MessageRoleAssistant,
-				Content: assistantParts,
-			})
-		}
-
-		if len(toolParts) > 0 {
-			messages = append(messages, fantasy.Message{
-				Role:    fantasy.MessageRoleTool,
-				Content: toolParts,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: responseText}},
 			})
 		}
 
