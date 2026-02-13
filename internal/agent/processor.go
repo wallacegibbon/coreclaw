@@ -9,7 +9,7 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/charmbracelet/glamour"
-	"github.com/wallacegibbon/coreclaw/pkg/terminal"
+	"github.com/wallacegibbon/coreclaw/internal/terminal"
 )
 
 // Processor handles prompt processing with streaming and markdown rendering

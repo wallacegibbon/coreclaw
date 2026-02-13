@@ -10,10 +10,10 @@ import (
 
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/openai"
-	agentpkg "github.com/wallacegibbon/coreclaw/pkg/agent"
-	"github.com/wallacegibbon/coreclaw/pkg/provider"
-	"github.com/wallacegibbon/coreclaw/pkg/terminal"
-	"github.com/wallacegibbon/coreclaw/pkg/tools"
+	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
+	"github.com/wallacegibbon/coreclaw/internal/provider"
+	"github.com/wallacegibbon/coreclaw/internal/terminal"
+	"github.com/wallacegibbon/coreclaw/internal/tools"
 )
 
 func main() {
