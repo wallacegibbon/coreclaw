@@ -44,6 +44,9 @@ func main() {
 	version := "0.1.0"
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
+	quiet := flag.Bool("quiet", false, "Suppress debug output")
+	promptFile := flag.String("file", "", "Read prompt from file")
+	systemPrompt := flag.String("system", "", "Override system prompt")
 	flag.Parse()
 
 	if *showVersion {
@@ -61,6 +64,12 @@ func main() {
 		fmt.Printf("Flags:\n")
 		flag.PrintDefaults()
 		os.Exit(0)
+	}
+
+	// Determine the final system prompt
+	finalSystemPrompt := "You are a helpful AI assistant with access to a bash shell. Use bash tool to execute commands when needed. Be precise and careful with commands."
+	if *systemPrompt != "" {
+		finalSystemPrompt = *systemPrompt
 	}
 	openAIKey := os.Getenv("OPENAI_API_KEY")
 	deepSeekKey := os.Getenv("DEEPSEEK_API_KEY")
@@ -130,7 +139,7 @@ func main() {
 	agent := fantasy.NewAgent(
 		model,
 		fantasy.WithTools(bashTool),
-		fantasy.WithSystemPrompt("You are a helpful AI assistant with access to a bash shell. Use the bash tool to execute commands when needed. Be precise and careful with commands."),
+		fantasy.WithSystemPrompt(finalSystemPrompt),
 	)
 
 	ctx := context.Background()
@@ -140,13 +149,26 @@ func main() {
 	var messages []fantasy.Message
 
 
-	if len(os.Args) > 1 {
-		userPrompt := strings.Join(os.Args[1:], " ")
-		fmt.Fprintln(os.Stderr, dim("\n=== Sending to API ==="))
-		fmt.Fprintln(os.Stderr, dim("System Prompt: You are a helpful AI assistant with access to a bash shell. Use bash tool to execute commands when needed. Be precise and careful with commands."))
-		fmt.Fprintln(os.Stderr, blue(fmt.Sprintf("User Prompt: %s", userPrompt)))
-		fmt.Fprintln(os.Stderr, dim("Available Tools: bash"))
-		fmt.Fprintln(os.Stderr, dim("======================"))
+	var userPrompt string
+	if *promptFile != "" {
+		content, err := os.ReadFile(*promptFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to read prompt file: %v\n", err)
+			os.Exit(1)
+		}
+		userPrompt = strings.TrimSpace(string(content))
+	} else if flag.NArg() > 0 {
+		userPrompt = strings.Join(flag.Args(), " ")
+	}
+
+	if userPrompt != "" {
+		if !*quiet {
+			fmt.Fprintln(os.Stderr, dim("\n=== Sending to API ==="))
+			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("System Prompt: %s", finalSystemPrompt)))
+			fmt.Fprintln(os.Stderr, blue(fmt.Sprintf("User Prompt: %s", userPrompt)))
+			fmt.Fprintln(os.Stderr, dim("Available Tools: bash"))
+			fmt.Fprintln(os.Stderr, dim("======================"))
+		}
 
 		result, err := agent.Generate(ctx, fantasy.AgentCall{
 			Prompt: userPrompt,
@@ -156,34 +178,40 @@ func main() {
 			os.Exit(1)
 		}
 
-			for _, step := range result.Steps {
+		for _, step := range result.Steps {
 			for _, content := range step.Content {
 				switch c := content.(type) {
 				case fantasy.TextContent:
 					fmt.Print(bright(c.Text))
 				case fantasy.ToolCallContent:
-					fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\n[Tool call: %s]", c.ToolName)))
-					var input map[string]any
-					json.Unmarshal([]byte(c.Input), &input)
-					fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Input: %+v", input)))
+					if !*quiet {
+						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\n[Tool call: %s]", c.ToolName)))
+						var input map[string]any
+						json.Unmarshal([]byte(c.Input), &input)
+						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Input: %+v", input)))
+					}
 				case fantasy.ToolResultContent:
-					fmt.Fprintln(os.Stderr, dim("[Tool result]"))
-					switch p := c.Result.(type) {
-					case fantasy.ToolResultOutputContentText:
-						fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("  Output: %s", p.Text)))
-					case fantasy.ToolResultOutputContentError:
-						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Error: %s", p.Error)))
+					if !*quiet {
+						fmt.Fprintln(os.Stderr, dim("[Tool result]"))
+						switch p := c.Result.(type) {
+						case fantasy.ToolResultOutputContentText:
+							fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("  Output: %s", p.Text)))
+						case fantasy.ToolResultOutputContentError:
+							fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Error: %s", p.Error)))
+						}
 					}
 				}
 			}
 		}
 
 		fmt.Println()
-		fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\nUsage: %d input tokens, %d output tokens, %d total tokens",
-			result.TotalUsage.InputTokens,
-			result.TotalUsage.OutputTokens,
-			result.TotalUsage.TotalTokens,
-		)))
+		if !*quiet {
+			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\nUsage: %d input tokens, %d output tokens, %d total tokens",
+				result.TotalUsage.InputTokens,
+				result.TotalUsage.OutputTokens,
+				result.TotalUsage.TotalTokens,
+			)))
+		}
 		os.Exit(0)
 	}
 
@@ -198,11 +226,13 @@ func main() {
 			continue
 		}
 
-		fmt.Fprintln(os.Stderr, dim("\n=== Sending to API ==="))
-		fmt.Fprintln(os.Stderr, dim("System Prompt: You are a helpful AI assistant with access to a bash shell. Use bash tool to execute commands when needed. Be precise and careful with commands."))
-		fmt.Fprintln(os.Stderr, blue(fmt.Sprintf("User Prompt: %s", userPrompt)))
-		fmt.Fprintln(os.Stderr, dim("Available Tools: bash"))
-		fmt.Fprintln(os.Stderr, dim("======================"))
+		if !*quiet {
+			fmt.Fprintln(os.Stderr, dim("\n=== Sending to API ==="))
+			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("System Prompt: %s", finalSystemPrompt)))
+			fmt.Fprintln(os.Stderr, blue(fmt.Sprintf("User Prompt: %s", userPrompt)))
+			fmt.Fprintln(os.Stderr, dim("Available Tools: bash"))
+			fmt.Fprintln(os.Stderr, dim("======================"))
+		}
 
 		result, err := agent.Generate(ctx, fantasy.AgentCall{
 			Prompt:   userPrompt,
@@ -219,17 +249,21 @@ func main() {
 				case fantasy.TextContent:
 					fmt.Print(bright(c.Text))
 				case fantasy.ToolCallContent:
-					fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\n[Tool call: %s]", c.ToolName)))
-					var input map[string]any
-					json.Unmarshal([]byte(c.Input), &input)
-					fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Input: %+v", input)))
+					if !*quiet {
+						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\n[Tool call: %s]", c.ToolName)))
+						var input map[string]any
+						json.Unmarshal([]byte(c.Input), &input)
+						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Input: %+v", input)))
+					}
 				case fantasy.ToolResultContent:
-					fmt.Fprintln(os.Stderr, dim("[Tool result]"))
-					switch p := c.Result.(type) {
-					case fantasy.ToolResultOutputContentText:
-						fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("  Output: %s", p.Text)))
-					case fantasy.ToolResultOutputContentError:
-						fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Error: %s", p.Error)))
+					if !*quiet {
+						fmt.Fprintln(os.Stderr, dim("[Tool result]"))
+						switch p := c.Result.(type) {
+						case fantasy.ToolResultOutputContentText:
+							fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("  Output: %s", p.Text)))
+						case fantasy.ToolResultOutputContentError:
+							fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("  Error: %s", p.Error)))
+						}
 					}
 				}
 			}
@@ -273,10 +307,12 @@ func main() {
 		}
 
 		fmt.Println()
-		fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\nUsage: %d input tokens, %d output tokens, %d total tokens",
-			result.TotalUsage.InputTokens,
-			result.TotalUsage.OutputTokens,
-			result.TotalUsage.TotalTokens,
-		)))
+		if !*quiet {
+			fmt.Fprintln(os.Stderr, dim(fmt.Sprintf("\nUsage: %d input tokens, %d output tokens, %d total tokens",
+				result.TotalUsage.InputTokens,
+				result.TotalUsage.OutputTokens,
+				result.TotalUsage.TotalTokens,
+			)))
+		}
 	}
 }
