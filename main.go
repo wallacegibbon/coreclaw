@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -40,6 +41,27 @@ func yellow(text string) string {
 }
 
 func main() {
+	version := "0.1.0"
+	showVersion := flag.Bool("version", false, "Show version information")
+	showHelp := flag.Bool("help", false, "Show help information")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("coreclaw version %s\n", version)
+		os.Exit(0)
+	}
+
+	if *showHelp {
+		fmt.Printf("CoreClaw - A minimal AI Agent with bash tool access\n\n")
+		fmt.Printf("Usage:\n  coreclaw [prompt]    Execute a single prompt\n  coreclaw             Run in interactive mode\n\n")
+		fmt.Printf("Environment Variables:\n")
+		fmt.Printf("  OPENAI_API_KEY      OpenAI API key (uses GPT-4o)\n")
+		fmt.Printf("  DEEPSEEK_API_KEY    DeepSeek API key (uses deepseek-chat)\n")
+		fmt.Printf("  ZAI_API_KEY         ZAI API key (uses GPT-4o)\n\n")
+		fmt.Printf("Flags:\n")
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
 	openAIKey := os.Getenv("OPENAI_API_KEY")
 	deepSeekKey := os.Getenv("DEEPSEEK_API_KEY")
 	zaiKey := os.Getenv("ZAI_API_KEY")

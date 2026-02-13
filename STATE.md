@@ -43,6 +43,7 @@ For this project, simplicity is more important than efficiency.
 - Error handling for command execution
 - Multi-provider support with automatic provider detection
 - Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
+- CLI flags for version and help information
 
 ### Usage
 ```bash
