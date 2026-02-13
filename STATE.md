@@ -10,7 +10,7 @@ For this project, simplicity is more important than efficiency.
 
 ### Completed
 - ✅ Go module initialized (github.com/wallacegibbon/coreclaw)
-- ✅ fantasy dependency added (v0.7.2)
+- ✅ fantasy dependency added (v0.8.0)
 - ✅ readline dependency added for terminal input handling
 - ✅ Basic agent structure with OpenAI provider
 - ✅ Bash tool implementation with `fantasy.NewAgentTool`
@@ -97,7 +97,7 @@ export ZAI_API_KEY=your-zai-key
 ### Supported Providers
 - **OpenAI** (OPENAI_API_KEY): Uses GPT-4o at https://api.openai.com/v1
 - **DeepSeek** (DEEPSEEK_API_KEY): Uses deepseek-chat at https://api.deepseek.com/v1
-- **ZAI** (ZAI_API_KEY): Uses GPT-4o at https://api.zai.ai/v1
+- **ZAI** (ZAI_API_KEY): Uses GPT-4o at https://api.zai.ai/v4
 
 Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 
