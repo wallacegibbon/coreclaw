@@ -11,6 +11,7 @@ For this project, simplicity is more important than efficiency.
 ### Completed
 - ✅ Go module initialized (github.com/wallacegibbon/coreclaw)
 - ✅ fantasy dependency added (v0.7.2)
+- ✅ readline dependency added for terminal input handling
 - ✅ Basic agent structure with OpenAI provider
 - ✅ Bash tool implementation with `fantasy.NewAgentTool`
 - ✅ Command-line interface with prompt input
@@ -30,6 +31,11 @@ For this project, simplicity is more important than efficiency.
 - ✅ File-based prompts (--file) to read prompts from files
 - ✅ Custom system prompts (--system) to override default behavior
 - ✅ README.md with comprehensive documentation
+- ✅ Readline library integration for proper terminal input handling
+  - Automatic TTY detection
+  - Command history support (~/.coreclaw_history, max 1000 entries)
+  - Proper backspace/delete for all character encodings
+  - Ctrl-C interruption support
 
 ### Architecture
 - **Language Models**:
@@ -53,6 +59,8 @@ For this project, simplicity is more important than efficiency.
 - Read prompts from files for batch processing
 - Custom system prompts for specialized behaviors
 - Color-coded output for better readability
+- Command history for interactive sessions
+- Robust terminal input handling with readline (backspace, delete, Ctrl-C)
 
 ### Usage
 ```bash
