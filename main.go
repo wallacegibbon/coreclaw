@@ -141,7 +141,7 @@ func main() {
 	} else if zaiKey != "" {
 		config = providerConfig{
 			apiKey:    zaiKey,
-			baseURL:   "https://api.zai.ai/v1",
+			baseURL:   "https://api.zai.ai/v4",
 			modelName: "gpt-4o",
 		}
 	} else {
