@@ -1,5 +1,9 @@
+charm.land/catwalk v0.19.0 h1:h9w0VPYbDMoCUA7Vg4uqeCpLLUzGgUvKantwsGGUD+4=
+charm.land/catwalk v0.19.0/go.mod h1:rFC/V96rIHX7VES215c/qzI1EW/Moo1ggs1Q6seTy5s=
 charm.land/fantasy v0.8.0 h1:w0FNH2K7DF0xxXJL1AqojMa5HQhK1sK/Rogo0NwjWmQ=
 charm.land/fantasy v0.8.0/go.mod h1:KJ8vjy9FH7G2aeR/fL+os2uFHkQ4js2+UJVbsUKCXYM=
+github.com/charmbracelet/x/etag v0.2.0 h1:Euj1VkheoHfTYA9y+TCwkeXF/hN8Fb9l4LqZl79pt04=
+github.com/charmbracelet/x/etag v0.2.0/go.mod h1:C1B7/bsgvzzxpfu0Rabbd+rTHJa5TmC/qgTseCf6DF0=
 github.com/charmbracelet/x/exp/slice v0.0.0-20260209194814-eeb2896ac759 h1:96wFGlst+IDv3dIf5q29nw470wJYB3YAgemiciLZcG0=
 github.com/charmbracelet/x/exp/slice v0.0.0-20260209194814-eeb2896ac759/go.mod h1:vqEfX6xzqW1pKKZUUiFOKg0OQ7bCh54Q2vR/tserrRA=
 github.com/charmbracelet/x/json v0.2.0 h1:DqB+ZGx2h+Z+1s98HOuOyli+i97wsFQIxP2ZQANTPrQ=

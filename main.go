@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"charm.land/catwalk/pkg/embedded"
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/openai"
 	"github.com/chzyer/readline"
@@ -102,9 +103,9 @@ func main() {
 		fmt.Printf("CoreClaw - A minimal AI Agent with bash tool access\n\n")
 		fmt.Printf("Usage:\n  coreclaw [prompt]    Execute a single prompt\n  coreclaw             Run in interactive mode\n\n")
 		fmt.Printf("Environment Variables:\n")
-		fmt.Printf("  OPENAI_API_KEY      OpenAI API key (uses GPT-4o)\n")
-		fmt.Printf("  DEEPSEEK_API_KEY    DeepSeek API key (uses deepseek-chat)\n")
-		fmt.Printf("  ZAI_API_KEY         ZAI API key (uses GPT-4o)\n\n")
+		fmt.Printf("  OPENAI_API_KEY      OpenAI API key (uses GPT-5.1-codex)\n")
+		fmt.Printf("  DEEPSEEK_API_KEY    DeepSeek API key (uses deepseek-reasoner)\n")
+		fmt.Printf("  ZAI_API_KEY         ZAI API key (uses GLM-4.7)\n\n")
 		fmt.Printf("Flags:\n")
 		flag.PrintDefaults()
 		fmt.Printf("\nExamples:\n")
@@ -120,6 +121,8 @@ func main() {
 	if *systemPrompt != "" {
 		finalSystemPrompt = *systemPrompt
 	}
+	providers := embedded.GetAll()
+
 	openAIKey := os.Getenv("OPENAI_API_KEY")
 	deepSeekKey := os.Getenv("DEEPSEEK_API_KEY")
 	zaiKey := os.Getenv("ZAI_API_KEY")
@@ -129,8 +132,22 @@ func main() {
 	if openAIKey != "" {
 		config = providerConfig{
 			apiKey:    openAIKey,
-			baseURL:   "",
+			baseURL:   os.Getenv("OPENAI_API_ENDPOINT"),
 			modelName: "gpt-4o",
+		}
+		for _, p := range providers {
+			if p.ID == "openai" {
+				if p.DefaultLargeModelID != "" {
+					config.modelName = p.DefaultLargeModelID
+				}
+				if p.DefaultSmallModelID != "" {
+					config.modelName = p.DefaultSmallModelID
+				}
+				if p.APIEndpoint != "" && p.APIEndpoint[0] != '$' {
+					config.baseURL = p.APIEndpoint
+				}
+				break
+			}
 		}
 	} else if deepSeekKey != "" {
 		config = providerConfig{
@@ -138,11 +155,33 @@ func main() {
 			baseURL:   "https://api.deepseek.com/v1",
 			modelName: "deepseek-chat",
 		}
+		for _, p := range providers {
+			if p.ID == "deepseek" {
+				if p.DefaultLargeModelID != "" {
+					config.modelName = p.DefaultLargeModelID
+				} else if p.DefaultSmallModelID != "" {
+					config.modelName = p.DefaultSmallModelID
+				}
+				config.baseURL = p.APIEndpoint
+				break
+			}
+		}
 	} else if zaiKey != "" {
 		config = providerConfig{
 			apiKey:    zaiKey,
-			baseURL:   "https://api.zai.ai/v4",
-			modelName: "gpt-4o",
+			baseURL:   "https://api.z.ai/api/coding/paas/v4",
+			modelName: "glm-4.7",
+		}
+		for _, p := range providers {
+			if p.ID == "zai" {
+				if p.DefaultLargeModelID != "" {
+					config.modelName = p.DefaultLargeModelID
+				} else if p.DefaultSmallModelID != "" {
+					config.modelName = p.DefaultSmallModelID
+				}
+				config.baseURL = p.APIEndpoint
+				break
+			}
 		}
 	} else {
 		fmt.Fprintln(os.Stderr, "One of OPENAI_API_KEY, DEEPSEEK_API_KEY, or ZAI_API_KEY environment variables is required")

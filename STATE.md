@@ -11,6 +11,7 @@ For this project, simplicity is more important than efficiency.
 ### Completed
 - ✅ Go module initialized (github.com/wallacegibbon/coreclaw)
 - ✅ fantasy dependency added (v0.8.0)
+- ✅ catwalk dependency added (v0.19.0) for provider database
 - ✅ readline dependency added for terminal input handling
 - ✅ Basic agent structure with OpenAI provider
 - ✅ Bash tool implementation with `fantasy.NewAgentTool`
@@ -39,12 +40,13 @@ For this project, simplicity is more important than efficiency.
 
 ### Architecture
 - **Language Models**:
-  - OpenAI GPT-4o
-  - DeepSeek deepseek-chat
-  - ZAI GPT-4o
+  - OpenAI GPT-5.1-codex (or GPT-4o as fallback)
+  - DeepSeek deepseek-reasoner
+  - ZAI GLM-4.7
 - **Providers**: OpenAI, DeepSeek, ZAI (all using OpenAI-compatible API)
 - **Tool**: bash (executes shell commands)
 - **Framework**: charm.land/fantasy
+- **Provider Database**: charm.land/catwalk (embedded)
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 
 ### Features
@@ -95,9 +97,9 @@ export ZAI_API_KEY=your-zai-key
 ```
 
 ### Supported Providers
-- **OpenAI** (OPENAI_API_KEY): Uses GPT-4o at https://api.openai.com/v1
-- **DeepSeek** (DEEPSEEK_API_KEY): Uses deepseek-chat at https://api.deepseek.com/v1
-- **ZAI** (ZAI_API_KEY): Uses GPT-4o at https://api.zai.ai/v4
+- **OpenAI** (OPENAI_API_KEY): Uses GPT-5.1-codex at https://api.openai.com/v1 (or custom endpoint via OPENAI_API_ENDPOINT)
+- **DeepSeek** (DEEPSEEK_API_KEY): Uses deepseek-reasoner at https://api.deepseek.com/v1
+- **ZAI** (ZAI_API_KEY): Uses GLM-4.7 at https://api.z.ai/api/coding/paas/v4
 
 Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 
