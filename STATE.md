@@ -43,7 +43,7 @@ For this project, simplicity is more important than efficiency.
 
 ### Architecture
 - **Language Models**:
-  - OpenAI GPT-5.1-codex (or GPT-4o as fallback)
+  - OpenAI GPT-4o (or model from catwalk database)
   - DeepSeek deepseek-chat (reasoning models require special tool call handling)
   - ZAI GLM-4.7
 - **Providers**: OpenAI, DeepSeek, ZAI (all using OpenAI-compatible API)
@@ -104,7 +104,7 @@ export ZAI_API_KEY=your-zai-key
 ```
 
 ### Supported Providers
-- **OpenAI** (OPENAI_API_KEY): Uses GPT-5.1-codex at https://api.openai.com/v1 (or custom endpoint via OPENAI_API_ENDPOINT)
+- **OpenAI** (OPENAI_API_KEY): Uses GPT-4o at https://api.openai.com/v1 (or custom endpoint via OPENAI_API_ENDPOINT, or model from catwalk database)
 - **DeepSeek** (DEEPSEEK_API_KEY): Uses deepseek-chat at https://api.deepseek.com/v1 (reasoning models require special tool call handling)
 - **ZAI** (ZAI_API_KEY): Uses GLM-4.7 at https://api.z.ai/api/coding/paas/v4
 
@@ -115,4 +115,3 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - Add more sophisticated skills built on bash tool
 - Add config file support for persistent settings
 - Consider adding conversation history save/restore
-- Add markdown/formatted output mode

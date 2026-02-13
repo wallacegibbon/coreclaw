@@ -43,7 +43,7 @@ CoreClaw requires an API key from one of the following providers:
 
 - `OPENAI_API_KEY` - OpenAI API key (uses GPT-4o)
 - `DEEPSEEK_API_KEY` - DeepSeek API key (uses deepseek-chat)
-- `ZAI_API_KEY` - ZAI API key (uses GPT-4o)
+- `ZAI_API_KEY` - ZAI API key (uses GLM-4.7)
 
 Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 
@@ -56,15 +56,19 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - Multi-provider support (OpenAI, DeepSeek, ZAI)
 - Single-prompt and interactive modes
 - Color-styled output
+- Markdown rendering with glamour (can be disabled with --no-markdown)
 - Custom system prompts
 - Read prompts from files
 - Quiet mode for scripting
+- Debug mode with verbose output
 
 ## Flags
 
 - `-version` - Show version information
 - `-help` - Show help information
+- `-debug` - Show debug output
 - `-quiet` - Suppress debug output
+- `-no-markdown` - Disable markdown rendering
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt
 
