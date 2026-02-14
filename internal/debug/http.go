@@ -62,7 +62,7 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 					fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mChunks:\x1b[0m\n")
 					dr.firstRead = false
 				}
-				fmt.Fprintf(os.Stderr, "%s\n", formatted)
+				fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", formatted)
 			} else if jsonStr != "[DONE]" {
 				// Not JSON and not [DONE], print raw line
 				if dr.firstRead {
@@ -70,7 +70,7 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 					fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mChunks:\x1b[0m\n")
 					dr.firstRead = false
 				}
-				fmt.Fprintf(os.Stderr, "%s\n", line)
+				fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", line)
 			}
 		}
 	}
@@ -108,12 +108,15 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 					fmt.Fprintf(os.Stderr, "  %s: %v\n", k, v)
 				}
 			}
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n%s\n", formattedBody)
+			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
+			fmt.Fprintf(os.Stderr, "\x1b[38;2;137;180;250m%s\x1b[0m\n", formattedBody)
 		} else {
 			fmt.Fprintf(os.Stderr, "\x1b[38;2;166;227;161m>>> Request\x1b[0m\n")
 			fmt.Fprintf(os.Stderr, "\x1b[38;2;137;180;250m%s %s\x1b[0m\n", req.Method, req.URL)
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n%s\n", string(requestBody))
+			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
+			fmt.Fprintf(os.Stderr, "\x1b[38;2;137;180;250m%s\x1b[0m\n", string(requestBody))
 		}
+		fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
 	}
 
 	start := time.Now()
@@ -164,12 +167,16 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		var formattedBody any
 		if err := json.Unmarshal(responseBody, &formattedBody); err == nil {
 			formattedBody, _ = json.MarshalIndent(formattedBody, "", "  ")
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n%s\n", formattedBody)
+			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
+			fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", formattedBody)
 		} else {
 			dump, _ := httputil.DumpResponse(resp, false)
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n%s\n", dump)
+			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
+			fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", dump)
 		}
 	}
+
+	fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
 
 	fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mTime: %v\x1b[0m\n", time.Since(start))
 
