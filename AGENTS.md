@@ -43,9 +43,6 @@ coreclaw
 # Read prompt from file
 coreclaw --file prompt.txt
 
-# Quiet mode (no debug output)
-coreclaw --quiet "echo 'Hello'"
-
 # Custom system prompt
 coreclaw --system "You are a code reviewer" "Review this code"
 
@@ -72,7 +69,6 @@ Provider configurations are loaded from the embedded catwalk database.
 - `-version` - Show version information
 - `-help` - Show help information
 - `-debug` - Show debug output
-- `-quiet` - Suppress debug output
 - `-no-markdown` - Disable markdown rendering
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt

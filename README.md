@@ -30,9 +30,6 @@ coreclaw
 # Read prompt from file
 coreclaw --file prompt.txt
 
-# Quiet mode (no debug output)
-coreclaw --quiet "echo 'Hello'"
-
 # Custom system prompt
 coreclaw --system "You are a code reviewer" "Review this code"
 ```
@@ -59,7 +56,6 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - Markdown rendering with glamour (can be disabled with --no-markdown)
 - Custom system prompts
 - Read prompts from files
-- Quiet mode for scripting
 - Debug mode with verbose output
 
 ## Flags
@@ -67,7 +63,6 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - `-version` - Show version information
 - `-help` - Show help information
 - `-debug` - Show debug output
-- `-quiet` - Suppress debug output
 - `-no-markdown` - Disable markdown rendering
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt

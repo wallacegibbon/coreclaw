@@ -17,7 +17,6 @@ type Processor struct {
 	Agent     fantasy.Agent
 	Debug     bool
 	NoMarkdown bool
-	Quiet     bool
 }
 
 // NewProcessor creates a new prompt processor
@@ -29,7 +28,7 @@ func NewProcessor(agent fantasy.Agent) *Processor {
 
 // ProcessPrompt handles a single prompt with streaming and optional markdown rendering
 func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages []fantasy.Message) (*fantasy.AgentResult, string, error) {
-	if p.Debug && !p.Quiet {
+	if p.Debug {
 		fmt.Fprintln(os.Stdout, terminal.Dim("\n>>> Sending request to API server"))
 		fmt.Fprintln(os.Stdout, terminal.Blue(fmt.Sprintf("User Prompt: %s", prompt)))
 		fmt.Fprintln(os.Stdout, terminal.Dim("Available Tools: bash"))
@@ -44,12 +43,12 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	var responseText strings.Builder
 
-	if p.Debug && !p.Quiet {
+	if p.Debug {
 		p.setupDebugCallbacks(&streamCall)
 	}
 
 	streamCall.OnStepFinish = func(stepResult fantasy.StepResult) error {
-		if p.Debug && !p.Quiet {
+		if p.Debug {
 			fmt.Println()
 			fmt.Fprintln(os.Stdout, terminal.Dim("<<< Step finished"))
 		}
@@ -57,7 +56,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	streamCall.OnToolInputStart = func(id, toolName string) error {
-		if p.Debug && !p.Quiet {
+		if p.Debug {
 			fmt.Println()
 			fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf(">>> Tool invocation request: %s", toolName)))
 		}
@@ -78,7 +77,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 		return nil, "", err
 	}
 
-	if p.Debug && !p.Quiet {
+	if p.Debug {
 		fmt.Println()
 		fmt.Fprintln(os.Stdout, terminal.Dim("<<< Agent finished"))
 	}
@@ -89,7 +88,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 		fmt.Println()
 	}
 
-	if p.Debug && !p.Quiet {
+	if p.Debug {
 		fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf("\nUsage: %d input tokens, %d output tokens, %d total tokens",
 			agentResult.TotalUsage.InputTokens,
 			agentResult.TotalUsage.OutputTokens,

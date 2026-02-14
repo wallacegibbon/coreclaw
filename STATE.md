@@ -28,7 +28,6 @@ For this project, simplicity is more important than efficiency.
   - Applied to both single-prompt and interactive modes
   - Uses raw ANSI codes for lightweight output without padding
 - ✅ CLI flags for version and help information
-- ✅ Quiet mode (--quiet) to suppress debug output
 - ✅ File-based prompts (--file) to read prompts from files
 - ✅ Custom system prompts (--system) to override default behavior
 - ✅ README.md with comprehensive documentation
@@ -61,7 +60,6 @@ For this project, simplicity is more important than efficiency.
 - Multi-provider support with automatic provider detection
 - Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - CLI flags for version and help information
-- Quiet mode to suppress debug output for scripting
 - Read prompts from files for batch processing
 - Custom system prompts for specialized behaviors
 - Color-coded output for better readability
@@ -80,9 +78,6 @@ export ZAI_API_KEY=your-zai-key
 
 # Run with prompt (markdown rendering enabled by default)
 ./coreclaw "List files in current directory"
-
-# Run with quiet mode
-./coreclaw --quiet "List files"
 
 # Run without markdown rendering (streaming output)
 ./coreclaw --no-markdown "List files"

@@ -21,7 +21,6 @@ func main() {
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
 	debug := flag.Bool("debug", false, "Show debug output")
-	quiet := flag.Bool("quiet", false, "Suppress debug output")
 	noMarkdown := flag.Bool("no-markdown", false, "Disable markdown rendering")
 	promptFile := flag.String("file", "", "Read prompt from file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
@@ -55,7 +54,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *debug && !*quiet {
+	if *debug {
 		fmt.Fprintln(os.Stderr, terminal.Dim(fmt.Sprintf("Using model: %s", config.ModelName)))
 	}
 
@@ -73,7 +72,6 @@ func main() {
 
 	processor := agentpkg.NewProcessor(agent)
 	processor.Debug = *debug
-	processor.Quiet = *quiet
 	processor.NoMarkdown = *noMarkdown
 
 	ctx := context.Background()
@@ -115,7 +113,6 @@ func printHelp() {
 	fmt.Printf("  coreclaw                        Run in interactive mode\n")
 	fmt.Printf("  coreclaw \"list files\"            Execute a single prompt\n")
 	fmt.Printf("  coreclaw --debug \"list files\"   Execute with debug output\n")
-	fmt.Printf("  coreclaw --quiet \"list files\"   Execute without debug output\n")
 	fmt.Printf("  coreclaw --no-markdown \"list\"   Disable markdown rendering\n")
 }
 
