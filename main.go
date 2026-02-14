@@ -24,6 +24,9 @@ func main() {
 	noMarkdown := flag.Bool("no-markdown", false, "Disable markdown rendering")
 	promptFile := flag.String("file", "", "Read prompt from file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
+	apiKey := flag.String("api-key", "", "API key for the provider (overrides environment variables)")
+	baseURL := flag.String("base-url", "", "Base URL for the API endpoint (for local/openai-compatible servers)")
+	modelName := flag.String("model", "", "Model name to use (defaults to provider default)")
 	flag.Parse()
 
 	if *showVersion {
@@ -36,7 +39,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	config, err := provider.GetProviderConfig()
+	config, err := provider.GetProviderConfig(*apiKey, *baseURL, *modelName)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -58,7 +61,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, terminal.Dim(fmt.Sprintf("Using model: %s", config.ModelName)))
 	}
 
-	finalSystemPrompt := "You are a helpful AI assistant with access to a bash shell. Use bash tool to execute commands when needed. Be precise and careful with commands."
+	defaultSystemPrompt := "You are a helpful AI assistant with access to a bash shell. Use bash tool to execute commands when needed. Be precise and careful with commands."
+
+	// Note: Some models like qwen3-coding may not support OpenAI-compatible tool calling format.
+	// For best results, use models that fully support OpenAI's function calling API.
+
+	finalSystemPrompt := defaultSystemPrompt
 	if *systemPrompt != "" {
 		finalSystemPrompt = *systemPrompt
 	}
@@ -107,13 +115,16 @@ func printHelp() {
 	fmt.Printf("  OPENAI_API_KEY      OpenAI API key (uses GPT-4o)\n")
 	fmt.Printf("  DEEPSEEK_API_KEY    DeepSeek API key (uses deepseek-chat)\n")
 	fmt.Printf("  ZAI_API_KEY         ZAI API key (uses GLM-4.7)\n\n")
-	fmt.Printf("Flags:\n")
+	fmt.Printf("Flags (take precedence over environment variables):\n")
 	flag.PrintDefaults()
 	fmt.Printf("\nExamples:\n")
 	fmt.Printf("  coreclaw                        Run in interactive mode\n")
 	fmt.Printf("  coreclaw \"list files\"            Execute a single prompt\n")
 	fmt.Printf("  coreclaw --debug \"list files\"   Execute with debug output\n")
 	fmt.Printf("  coreclaw --no-markdown \"list\"   Disable markdown rendering\n")
+	fmt.Printf("  coreclaw --base-url http://localhost:11434/v1 \"hello\"  Use local server (with env API key)\n")
+	fmt.Printf("  coreclaw --base-url http://localhost:11434/v1 --model llama3 \"hello\"  Specify model\n")
+	fmt.Printf("  coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 \"hello\"  Use custom API key\n")
 }
 
 func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Message) {

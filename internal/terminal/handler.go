@@ -17,11 +17,12 @@ func GetPrompt(_ string) string {
 		username = "user"
 	}
 
-	prompt := fmt.Sprintf("%s@%s%s",
-		Cyan(username),
-		Green("coreclaw"),
-		Bright("⟩ "),
-	)
+	bg := "\x1b[48;2;49;50;68m"
+	cyanFg := "\x1b[38;2;137;220;235m"
+	greenFg := "\x1b[38;2;166;227;161m"
+	reset := "\x1b[0m"
+
+	prompt := fmt.Sprintf("%s%s«%s%s@%scoreclaw%s»%s ", bg, cyanFg, username, greenFg, cyanFg, bg, reset)
 	return prompt
 }
 

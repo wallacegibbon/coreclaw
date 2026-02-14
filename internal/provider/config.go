@@ -17,26 +17,58 @@ type Config struct {
 
 // GetProviderConfig returns the provider configuration based on available API keys
 // Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
-func GetProviderConfig() (*Config, error) {
+// Command line flags (--base-url, --model, --api-key) take precedence over environment variables
+func GetProviderConfig(apiKey, baseURL, modelName string) (*Config, error) {
 	providers := embedded.GetAll()
 
-	openAIKey := os.Getenv("OPENAI_API_KEY")
-	deepSeekKey := os.Getenv("DEEPSEEK_API_KEY")
-	zaiKey := os.Getenv("ZAI_API_KEY")
+	var selectedAPIKey string
 
-	if openAIKey != "" {
-		return getOpenAIConfig(providers, openAIKey), nil
+	// Command line API key takes precedence
+	if apiKey != "" {
+		selectedAPIKey = apiKey
+	} else {
+		// Otherwise use environment variables
+		openAIKey := os.Getenv("OPENAI_API_KEY")
+		deepSeekKey := os.Getenv("DEEPSEEK_API_KEY")
+		zaiKey := os.Getenv("ZAI_API_KEY")
+
+		if openAIKey != "" {
+			selectedAPIKey = openAIKey
+		} else if deepSeekKey != "" {
+			selectedAPIKey = deepSeekKey
+		} else if zaiKey != "" {
+			selectedAPIKey = zaiKey
+		} else {
+			return nil, fmt.Errorf("one of OPENAI_API_KEY, DEEPSEEK_API_KEY, or ZAI_API_KEY environment variables is required, or use --api-key flag")
+		}
 	}
 
-	if deepSeekKey != "" {
-		return getDeepSeekConfig(providers, deepSeekKey), nil
+	// Determine provider based on where the API key came from
+	var config *Config
+	if apiKey != "" {
+		// Using command line API key - default to OpenAI style
+		config = &Config{
+			APIKey:    selectedAPIKey,
+			BaseURL:   "https://api.openai.com/v1",
+			ModelName: "gpt-4o",
+		}
+	} else if os.Getenv("OPENAI_API_KEY") != "" {
+		config = getOpenAIConfig(providers, selectedAPIKey)
+	} else if os.Getenv("DEEPSEEK_API_KEY") != "" {
+		config = getDeepSeekConfig(providers, selectedAPIKey)
+	} else {
+		config = getZAIConfig(providers, selectedAPIKey)
 	}
 
-	if zaiKey != "" {
-		return getZAIConfig(providers, zaiKey), nil
+	// Override with command line flags if specified
+	if baseURL != "" {
+		config.BaseURL = baseURL
+	}
+	if modelName != "" {
+		config.ModelName = modelName
 	}
 
-	return nil, fmt.Errorf("one of OPENAI_API_KEY, DEEPSEEK_API_KEY, or ZAI_API_KEY environment variables is required")
+	return config, nil
 }
 
 func getOpenAIConfig(providers []catwalk.Provider, apiKey string) *Config {
