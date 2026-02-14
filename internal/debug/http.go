@@ -65,7 +65,7 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 						if !hasFinishReason || finishReason == nil {
 							// Streaming in progress - show condensed format
 							if delta, ok := choice["delta"].(map[string]any); ok {
-								if content, ok := delta["content"].(string); ok {
+								if content, ok := delta["content"].(string); ok && content != "" {
 									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.content\": %q }\x1b[0m\n", content)
 								} else if toolCalls, ok := delta["tool_calls"].([]any); ok && len(toolCalls) > 0 {
 									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.tool_calls\": [...%d items] }\x1b[0m\n", len(toolCalls))

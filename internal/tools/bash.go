@@ -2,9 +2,13 @@ package tools
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"os/exec"
+	"strings"
 
 	"charm.land/fantasy"
+	"github.com/wallacegibbon/coreclaw/internal/terminal"
 )
 
 // BashInput represents the input for the bash tool
@@ -22,6 +26,11 @@ func NewBashTool() fantasy.AgentTool {
 			if cmd == "" {
 				return fantasy.NewTextErrorResponse("command is required"), nil
 			}
+
+			// Escape newlines and tabs for display
+			displayCmd := strings.ReplaceAll(cmd, "\n", "\\n")
+			displayCmd = strings.ReplaceAll(displayCmd, "\t", "\\t")
+			fmt.Fprint(os.Stderr, terminal.Green("→ "+displayCmd+"\n"))
 
 			execCmd := exec.CommandContext(ctx, "bash", "-c", cmd)
 			output, err := execCmd.CombinedOutput()
