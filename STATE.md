@@ -59,6 +59,12 @@ For this project, simplicity is more important than efficiency.
 - ✅ Debug API filtering of empty SSE content chunks
   - Filters out empty delta content messages during streaming
   - Prevents log spam while maintaining normal SSE behavior
+- ✅ Ctrl-C handling in interactive mode
+  - Cancels unfinished requests when Ctrl-C is pressed
+  - Does nothing (continues waiting) if no request is in progress (at the prompt)
+  - Uses context cancellation to stop ongoing API calls
+  - Displays "Request cancelled." message when a request is interrupted
+  - Properly handles readline.ErrInterrupt to prevent process termination
 
 ### Architecture
 - **Language Models**:

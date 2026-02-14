@@ -3,10 +3,13 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"sync"
 
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/openai"
@@ -15,6 +18,7 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/provider"
 	"github.com/wallacegibbon/coreclaw/internal/terminal"
 	"github.com/wallacegibbon/coreclaw/internal/tools"
+	"github.com/chzyer/readline"
 )
 
 func main() {
@@ -140,19 +144,44 @@ func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Messag
 		}
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	requestInProgress := false
+	var mu sync.Mutex
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt)
+
+	go func() {
+		for range sigChan {
+			mu.Lock()
+			if requestInProgress {
+				mu.Unlock()
+				cancel()
+				fmt.Println("\nRequest cancelled.")
+			} else {
+				mu.Unlock()
+			}
+		}
+	}()
+
+	defer signal.Stop(sigChan)
+
 	for {
 		var userPrompt string
 
 		if isTTY {
-			// Print bracketed line before each prompt
 			fmt.Print(terminal.GetBracketedLine(baseURL, model))
 			userPrompt, err = rl.Readline()
 			if err != nil {
+				if errors.Is(err, readline.ErrInterrupt) {
+					continue
+				}
 				return
 			}
 			userPrompt = strings.TrimSpace(userPrompt)
 		} else {
-			// For non-TTY, GetPrompt returns just the input prompt
 			fmt.Fprint(os.Stderr, terminal.GetPrompt(baseURL, model))
 			reader := bufio.NewReader(os.Stdin)
 			input, _ := reader.ReadString('\n')
@@ -166,8 +195,22 @@ func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Messag
 			continue
 		}
 
-		_, responseText, err := processor.ProcessPrompt(context.Background(), userPrompt, messages)
+		mu.Lock()
+		requestInProgress = true
+		mu.Unlock()
+
+		_, responseText, err := processor.ProcessPrompt(ctx, userPrompt, messages)
+
+		mu.Lock()
+		requestInProgress = false
+		mu.Unlock()
+
 		if err != nil {
+			if ctx.Err() == context.Canceled {
+				cancel()
+				ctx, cancel = context.WithCancel(context.Background())
+				continue
+			}
 			continue
 		}
 

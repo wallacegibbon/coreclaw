@@ -102,7 +102,7 @@ func IsTerminal() bool {
 func ReadlineInstance(baseURL, model string) (*readline.Instance, error) {
 	return readline.NewEx(&readline.Config{
 		Prompt:          GetPrompt(baseURL, model),
-		InterruptPrompt: "^C",
+		InterruptPrompt: "",
 		HistoryFile:     os.Getenv("HOME") + "/.coreclaw_history",
 		HistoryLimit:    1000,
 	})
