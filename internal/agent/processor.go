@@ -13,7 +13,7 @@ import (
 
 // Processor handles prompt processing with streaming and markdown rendering
 type Processor struct {
-	Agent     fantasy.Agent
+	Agent      fantasy.Agent
 	NoMarkdown bool
 }
 

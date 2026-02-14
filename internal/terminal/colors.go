@@ -36,4 +36,3 @@ func Green(text string) string {
 func BgDark(text string) string {
 	return fmt.Sprintf("\x1b[48;2;49;50;68m%s\x1b[0m", text)
 }
-

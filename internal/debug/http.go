@@ -19,14 +19,14 @@ type DebugTransport struct {
 
 // debugReader wraps an io.Reader to log each chunk of data as it's read
 type debugReader struct {
-	reader   io.Reader
+	reader    io.Reader
 	buf       []byte
 	firstRead bool
 }
 
 func newDebugReader(r io.Reader) *debugReader {
 	return &debugReader{
-		reader:   r,
+		reader:    r,
 		buf:       make([]byte, 0, 4096),
 		firstRead: true,
 	}

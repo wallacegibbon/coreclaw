@@ -13,12 +13,12 @@ import (
 
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/openai"
+	"github.com/chzyer/readline"
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	debugpkg "github.com/wallacegibbon/coreclaw/internal/debug"
 	"github.com/wallacegibbon/coreclaw/internal/provider"
 	"github.com/wallacegibbon/coreclaw/internal/terminal"
 	"github.com/wallacegibbon/coreclaw/internal/tools"
-	"github.com/chzyer/readline"
 )
 
 func main() {
@@ -68,7 +68,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	defaultSystemPrompt := "You are a helpful AI assistant with access to a bash shell. Use bash tool to execute commands when needed. Be precise and careful with commands."
+	defaultSystemPrompt := `You are an AI assistant with access to a bash shell. Use the bash tool to interact with the system.
+
+CRITICAL RULES:
+- The bash tool is your ONLY way to interact with the system
+- ALWAYS use bash for: listing files, reading content, running commands, installing packages, checking system info
+- NEVER assume file contents or command outputs - use bash to verify
+- Be precise and careful with commands - double-check before executing
+- When uncertain about system state, use bash to investigate
+- For network operations (HTTP requests, downloading files, API calls), ALWAYS use curl
+
+GENERAL WORKFLOW:
+1. Use bash to gather information before making assumptions
+2. Execute commands to verify your understanding
+3. Run appropriate commands based on user requests
+4. Provide accurate, helpful responses based on actual command outputs
+
+You can help with any task that can be accomplished through shell commands: file operations, system administration, development tasks, network operations (using curl), package management, etc.`
 
 	// Note: Some models like qwen3-coding may not support OpenAI-compatible tool calling format.
 	// For best results, use models that fully support OpenAI's function calling API.
@@ -209,6 +225,7 @@ func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Messag
 			if ctx.Err() == context.Canceled {
 				cancel()
 				ctx, cancel = context.WithCancel(context.Background())
+				defer cancel()
 				continue
 			}
 			continue

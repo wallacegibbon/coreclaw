@@ -81,7 +81,7 @@ func GetBracketedLine(baseURL, model string) string {
 	bracketed.WriteString("»")
 	bracketed.WriteString(reset)
 	bracketed.WriteString("\n")
-	
+
 	return bracketed.String()
 }
 
