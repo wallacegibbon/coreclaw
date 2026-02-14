@@ -57,10 +57,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *debug {
-		fmt.Fprintln(os.Stderr, terminal.Dim(fmt.Sprintf("Using model: %s", config.ModelName)))
-	}
-
 	defaultSystemPrompt := "You are a helpful AI assistant with access to a bash shell. Use bash tool to execute commands when needed. Be precise and careful with commands."
 
 	// Note: Some models like qwen3-coding may not support OpenAI-compatible tool calling format.
