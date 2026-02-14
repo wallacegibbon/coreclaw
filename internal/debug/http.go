@@ -84,7 +84,6 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 					dr.firstRead = false
 				}
 				fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", formatted)
-				fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
 			} else if jsonStr != "[DONE]" {
 				// Not JSON and not [DONE], print raw line
 				if dr.firstRead {
@@ -93,7 +92,6 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 					dr.firstRead = false
 				}
 				fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", line)
-				fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
 			}
 		}
 	}
