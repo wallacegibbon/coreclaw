@@ -21,7 +21,6 @@ func main() {
 	version := "0.1.0"
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
-	debug := flag.Bool("debug", false, "Show debug output")
 	debugAPI := flag.Bool("debug-api", false, "Show raw API requests and responses")
 	noMarkdown := flag.Bool("no-markdown", false, "Disable markdown rendering")
 	promptFile := flag.String("file", "", "Read prompt from file")
@@ -83,7 +82,6 @@ func main() {
 	)
 
 	processor := agentpkg.NewProcessor(agent)
-	processor.Debug = *debug
 	processor.NoMarkdown = *noMarkdown
 
 	ctx := context.Background()
@@ -124,9 +122,6 @@ func printHelp() {
 	fmt.Printf("\nExamples:\n")
 	fmt.Printf("  coreclaw                        Run in interactive mode\n")
 	fmt.Printf("  coreclaw \"list files\"            Execute a single prompt\n")
-	fmt.Printf("  coreclaw --debug \"list files\"   Execute with debug output\n")
-	fmt.Printf("  coreclaw --no-markdown \"list\"   Disable markdown rendering\n")
-	fmt.Printf("  coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 \"hello\"  Use local server\n")
 	fmt.Printf("  coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 --model llama3 \"hello\"  Specify model\n")
 }
 

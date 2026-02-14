@@ -49,9 +49,6 @@ coreclaw --system "You are a code reviewer" "Review this code"
 # Disable markdown rendering (streaming output)
 coreclaw --no-markdown "List files"
 
-# Debug mode - show agent internals
-coreclaw --debug "list files"
-
 # Debug API mode - show raw API requests and responses
 coreclaw --debug-api "list files"
 
@@ -82,7 +79,6 @@ Provider configurations are loaded from the embedded catwalk database.
 
 - `-version` - Show version information
 - `-help` - Show help information
-- `-debug` - Show debug output
 - `-debug-api` - Show raw API requests and responses (to stderr)
 - `-no-markdown` - Disable markdown rendering
 - `-file string` - Read prompt from file

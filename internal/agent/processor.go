@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -15,7 +14,6 @@ import (
 // Processor handles prompt processing with streaming and markdown rendering
 type Processor struct {
 	Agent     fantasy.Agent
-	Debug     bool
 	NoMarkdown bool
 }
 
@@ -28,12 +26,6 @@ func NewProcessor(agent fantasy.Agent) *Processor {
 
 // ProcessPrompt handles a single prompt with streaming and optional markdown rendering
 func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages []fantasy.Message) (*fantasy.AgentResult, string, error) {
-	if p.Debug {
-		fmt.Fprintln(os.Stdout, terminal.Dim("\n>>> Sending request to API server"))
-		fmt.Fprintln(os.Stdout, terminal.Blue(fmt.Sprintf("User Prompt: %s", prompt)))
-		fmt.Fprintln(os.Stdout, terminal.Dim("Available Tools: bash"))
-	}
-
 	streamCall := fantasy.AgentStreamCall{
 		Prompt: prompt,
 	}
@@ -42,26 +34,6 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	var responseText strings.Builder
-
-	if p.Debug {
-		p.setupDebugCallbacks(&streamCall)
-	}
-
-	streamCall.OnStepFinish = func(stepResult fantasy.StepResult) error {
-		if p.Debug {
-			fmt.Println()
-			fmt.Fprintln(os.Stdout, terminal.Dim("<<< Step finished"))
-		}
-		return nil
-	}
-
-	streamCall.OnToolInputStart = func(id, toolName string) error {
-		if p.Debug {
-			fmt.Println()
-			fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf(">>> Tool invocation request: %s", toolName)))
-		}
-		return nil
-	}
 
 	streamCall.OnTextDelta = func(id, text string) error {
 		if p.NoMarkdown {
@@ -77,52 +49,13 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 		return nil, "", err
 	}
 
-	if p.Debug {
-		fmt.Println()
-		fmt.Fprintln(os.Stdout, terminal.Dim("<<< Agent finished"))
-	}
-
 	if !p.NoMarkdown {
 		p.renderMarkdown(responseText.String())
 	} else {
 		fmt.Println()
 	}
 
-	if p.Debug {
-		fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf("\nUsage: %d input tokens, %d output tokens, %d total tokens",
-			agentResult.TotalUsage.InputTokens,
-			agentResult.TotalUsage.OutputTokens,
-			agentResult.TotalUsage.TotalTokens,
-		)))
-	}
-
 	return agentResult, responseText.String(), nil
-}
-
-func (p *Processor) setupDebugCallbacks(streamCall *fantasy.AgentStreamCall) {
-	streamCall.OnAgentStart = func() {
-		fmt.Fprintln(os.Stdout, terminal.Dim(">>> Agent started"))
-	}
-	streamCall.OnStepStart = func(stepNumber int) error {
-		fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf(">>> Step %d started", stepNumber)))
-		return nil
-	}
-	streamCall.OnToolCall = func(toolCall fantasy.ToolCallContent) error {
-		var input map[string]any
-		json.Unmarshal([]byte(toolCall.Input), &input)
-		fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf("  Input: %+v", input)))
-		return nil
-	}
-	streamCall.OnToolResult = func(result fantasy.ToolResultContent) error {
-		fmt.Fprintln(os.Stdout, terminal.Dim("<<< Tool result received"))
-		switch p := result.Result.(type) {
-		case fantasy.ToolResultOutputContentText:
-			fmt.Fprintln(os.Stdout, terminal.Yellow(fmt.Sprintf("  Output: %s", p.Text)))
-		case fantasy.ToolResultOutputContentError:
-			fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf("  Error: %s", p.Error)))
-		}
-		return nil
-	}
 }
 
 func (p *Processor) renderMarkdown(text string) {

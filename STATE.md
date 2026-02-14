@@ -87,9 +87,6 @@ export ZAI_API_KEY=your-zai-key
 # Run without markdown rendering (streaming output)
 ./coreclaw --no-markdown "List files"
 
-# Run with debug output (shows agent internals)
-./coreclaw --debug "List files"
-
 # Run with API debug (shows raw HTTP requests/responses)
 ./coreclaw --debug-api "List files"
 
