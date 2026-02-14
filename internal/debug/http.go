@@ -54,8 +54,29 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 			}
 
 			// Try to parse as JSON and log it
-			var jsonData any
+			var jsonData map[string]any
 			if json.Unmarshal([]byte(jsonStr), &jsonData) == nil {
+				// Check if finish_reason is null (streaming in progress)
+				choices, ok := jsonData["choices"].([]any)
+				if ok && len(choices) > 0 {
+					choice, ok := choices[0].(map[string]any)
+					if ok {
+						finishReason, hasFinishReason := choice["finish_reason"]
+						if !hasFinishReason || finishReason == nil {
+							// Streaming in progress - show condensed format
+							if delta, ok := choice["delta"].(map[string]any); ok {
+								if content, ok := delta["content"].(string); ok {
+									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.content\": %q }\x1b[0m\n", content)
+								} else if toolCalls, ok := delta["tool_calls"].([]any); ok && len(toolCalls) > 0 {
+									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.tool_calls\": [...%d items] }\x1b[0m\n", len(toolCalls))
+								}
+							}
+							continue
+						}
+					}
+				}
+
+				// Full format for final chunks or other cases
 				formatted, _ := json.MarshalIndent(jsonData, "", "  ")
 				if dr.firstRead {
 					fmt.Fprintf(os.Stderr, "\x1b[38;2;203;166;247m<<< Response Stream\x1b[0m\n")
