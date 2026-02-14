@@ -107,7 +107,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	runInteractiveMode(processor, messages, config.ModelName)
+	runInteractiveMode(processor, messages, config.BaseURL, config.ModelName)
 }
 
 func printHelp() {
@@ -125,7 +125,7 @@ func printHelp() {
 	fmt.Printf("  coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 --model llama3 \"hello\"  Specify model\n")
 }
 
-func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Message, model string) {
+func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Message, baseURL, model string) {
 	isTTY := terminal.IsTerminal()
 
 	var rl interface {
@@ -133,7 +133,7 @@ func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Messag
 	}
 	var err error
 	if isTTY {
-		rl, err = terminal.ReadlineInstance(model)
+		rl, err = terminal.ReadlineInstance(baseURL, model)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize readline: %v\n", err)
 			os.Exit(1)
@@ -144,13 +144,16 @@ func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Messag
 		var userPrompt string
 
 		if isTTY {
+			// Print bracketed line before each prompt
+			fmt.Print(terminal.GetBracketedLine(baseURL, model))
 			userPrompt, err = rl.Readline()
 			if err != nil {
 				return
 			}
 			userPrompt = strings.TrimSpace(userPrompt)
 		} else {
-			fmt.Fprint(os.Stderr, terminal.GetPrompt(model))
+			// For non-TTY, GetPrompt returns just the input prompt
+			fmt.Fprint(os.Stderr, terminal.GetPrompt(baseURL, model))
 			reader := bufio.NewReader(os.Stdin)
 			input, _ := reader.ReadString('\n')
 			userPrompt = strings.TrimSpace(input)

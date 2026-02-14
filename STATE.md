@@ -44,6 +44,21 @@ For this project, simplicity is more important than efficiency.
   - Shows HTTP method, URL, headers (with sensitive data masked), and body
   - Colors request messages in green and response messages in purple
   - Useful for troubleshooting API communication issues
+- ✅ Prompt formatting with cyan brackets, green usernames, and consistent background
+  - Format: «USER@LOCALHOSTNAME — MODEL@API_URL»
+  - Background color applied to bracketed section only
+  - Newline before green ❯ prompt character with single space
+- ✅ Fixed prompt duplication bug
+  - Separated bracketed status line from input prompt
+  - Bracketed line prints once at session start
+  - Input prompt shows green ❯ with reset for clean input
+- ✅ Bash command visibility
+  - Commands printed in green before execution
+  - Newlines and tabs escaped for clean single-line display
+  - Uses → command format for clear differentiation
+- ✅ Debug API filtering of empty SSE content chunks
+  - Filters out empty delta content messages during streaming
+  - Prevents log spam while maintaining normal SSE behavior
 
 ### Architecture
 - **Language Models**:
