@@ -8,7 +8,7 @@ import (
 )
 
 // GetPrompt returns the shell prompt string
-func GetPrompt(_ string) string {
+func GetPrompt(model string) string {
 	username := os.Getenv("USER")
 	if username == "" {
 		username = os.Getenv("USERNAME")
@@ -22,7 +22,7 @@ func GetPrompt(_ string) string {
 	greenFg := "\x1b[38;2;166;227;161m"
 	reset := "\x1b[0m"
 
-	prompt := fmt.Sprintf("%s%s«%s%s@%scoreclaw%s»%s ", bg, cyanFg, username, greenFg, cyanFg, bg, reset)
+	prompt := fmt.Sprintf("%s%s«%s%s@%s%s%s»%s ", bg, cyanFg, username, greenFg, cyanFg, model, cyanFg, reset)
 	return prompt
 }
 
@@ -33,9 +33,9 @@ func IsTerminal() bool {
 }
 
 // ReadlineInstance creates and configures a readline instance
-func ReadlineInstance() (*readline.Instance, error) {
+func ReadlineInstance(model string) (*readline.Instance, error) {
 	return readline.NewEx(&readline.Config{
-		Prompt:          GetPrompt(""),
+		Prompt:          GetPrompt(model),
 		InterruptPrompt: "^C",
 		HistoryFile:     os.Getenv("HOME") + "/.coreclaw_history",
 		HistoryLimit:    1000,

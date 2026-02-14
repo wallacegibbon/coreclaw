@@ -105,7 +105,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	runInteractiveMode(processor, messages)
+	runInteractiveMode(processor, messages, config.ModelName)
 }
 
 func printHelp() {
@@ -127,7 +127,7 @@ func printHelp() {
 	fmt.Printf("  coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 \"hello\"  Use custom API key\n")
 }
 
-func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Message) {
+func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Message, model string) {
 	isTTY := terminal.IsTerminal()
 
 	var rl interface {
@@ -135,7 +135,7 @@ func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Messag
 	}
 	var err error
 	if isTTY {
-		rl, err = terminal.ReadlineInstance()
+		rl, err = terminal.ReadlineInstance(model)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize readline: %v\n", err)
 			os.Exit(1)
@@ -152,7 +152,7 @@ func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Messag
 			}
 			userPrompt = strings.TrimSpace(userPrompt)
 		} else {
-			fmt.Fprint(os.Stderr, terminal.GetPrompt(""))
+			fmt.Fprint(os.Stderr, terminal.GetPrompt(model))
 			reader := bufio.NewReader(os.Stdin)
 			input, _ := reader.ReadString('\n')
 			userPrompt = strings.TrimSpace(input)
