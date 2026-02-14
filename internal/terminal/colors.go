@@ -32,6 +32,11 @@ func Green(text string) string {
 	return fmt.Sprintf("\x1b[38;2;166;227;161m%s\x1b[0m", text)
 }
 
+// Red returns text in red color
+func Red(text string) string {
+	return fmt.Sprintf("\x1b[38;2;248;113;113m%s\x1b[0m", text)
+}
+
 // BgDark returns text with dark blue background
 func BgDark(text string) string {
 	return fmt.Sprintf("\x1b[48;2;49;50;68m%s\x1b[0m", text)

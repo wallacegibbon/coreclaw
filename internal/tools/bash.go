@@ -27,13 +27,28 @@ func NewBashTool() fantasy.AgentTool {
 				return fantasy.NewTextErrorResponse("command is required"), nil
 			}
 
+			execCmd := exec.CommandContext(ctx, "bash", "-c", cmd)
+			output, err := execCmd.CombinedOutput()
+
+			// Get exit status
+			exitStatus := 0
+			if err != nil {
+				if exitErr, ok := err.(*exec.ExitError); ok {
+					exitStatus = exitErr.ExitCode()
+				}
+			}
+
 			// Escape newlines and tabs for display
 			displayCmd := strings.ReplaceAll(cmd, "\n", "\\n")
 			displayCmd = strings.ReplaceAll(displayCmd, "\t", "\\t")
-			fmt.Fprint(os.Stderr, terminal.Green("→ "+displayCmd+"\n"))
 
-			execCmd := exec.CommandContext(ctx, "bash", "-c", cmd)
-			output, err := execCmd.CombinedOutput()
+			// Print command with exit status
+			if exitStatus == 0 {
+				fmt.Fprint(os.Stderr, terminal.Green(fmt.Sprintf("✓ %s\n", displayCmd)))
+			} else {
+				fmt.Fprint(os.Stderr, terminal.Red(fmt.Sprintf("● %s [%d]\n", displayCmd, exitStatus)))
+			}
+
 			if err != nil {
 				return fantasy.NewTextErrorResponse(string(output)), nil
 			}
