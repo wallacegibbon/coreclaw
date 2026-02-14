@@ -48,6 +48,12 @@ coreclaw --system "You are a code reviewer" "Review this code"
 
 # Disable markdown rendering (streaming output)
 coreclaw --no-markdown "List files"
+
+# Use local/openai-compatible server (requires --api-key)
+coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 "hello"
+
+# Specify model with custom server
+coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 --model llama3 "hello"
 ```
 
 
@@ -63,6 +69,8 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 
 Provider configurations are loaded from the embedded catwalk database.
 
+**Note**: When using `--base-url` for custom or local servers, environment variables are ignored. You must specify `--api-key` along with `--base-url`.
+
 
 ## CLI Flags
 
@@ -72,6 +80,9 @@ Provider configurations are loaded from the embedded catwalk database.
 - `-no-markdown` - Disable markdown rendering
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt
+- `-api-key string` - API key for the provider (required when using --base-url)
+- `-base-url string` - Base URL for the API endpoint (requires --api-key, ignores env vars)
+- `-model string` - Model name to use (defaults to provider default)
 
 
 ## Agent Instructions

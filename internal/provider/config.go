@@ -18,10 +18,29 @@ type Config struct {
 // GetProviderConfig returns the provider configuration based on available API keys
 // Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 // Command line flags (--base-url, --model, --api-key) take precedence over environment variables
+// When --base-url is specified, environment variables are ignored and --api-key is required
 func GetProviderConfig(apiKey, baseURL, modelName string) (*Config, error) {
 	providers := embedded.GetAll()
 
 	var selectedAPIKey string
+
+	// If --base-url is specified, ignore environment variables and require --api-key
+	if baseURL != "" {
+		if apiKey == "" {
+			return nil, fmt.Errorf("--api-key is required when --base-url is specified")
+		}
+		selectedAPIKey = apiKey
+		// Default to OpenAI-style configuration for custom base URLs
+		config := &Config{
+			APIKey:    selectedAPIKey,
+			BaseURL:   baseURL,
+			ModelName: modelName,
+		}
+		if config.ModelName == "" {
+			config.ModelName = "gpt-4o"
+		}
+		return config, nil
+	}
 
 	// Command line API key takes precedence
 	if apiKey != "" {
@@ -61,9 +80,6 @@ func GetProviderConfig(apiKey, baseURL, modelName string) (*Config, error) {
 	}
 
 	// Override with command line flags if specified
-	if baseURL != "" {
-		config.BaseURL = baseURL
-	}
 	if modelName != "" {
 		config.ModelName = modelName
 	}

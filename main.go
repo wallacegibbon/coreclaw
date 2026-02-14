@@ -24,8 +24,8 @@ func main() {
 	noMarkdown := flag.Bool("no-markdown", false, "Disable markdown rendering")
 	promptFile := flag.String("file", "", "Read prompt from file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
-	apiKey := flag.String("api-key", "", "API key for the provider (overrides environment variables)")
-	baseURL := flag.String("base-url", "", "Base URL for the API endpoint (for local/openai-compatible servers)")
+	apiKey := flag.String("api-key", "", "API key for the provider (required when using --base-url)")
+	baseURL := flag.String("base-url", "", "Base URL for the API endpoint (requires --api-key, ignores env vars)")
 	modelName := flag.String("model", "", "Model name to use (defaults to provider default)")
 	flag.Parse()
 
@@ -122,9 +122,8 @@ func printHelp() {
 	fmt.Printf("  coreclaw \"list files\"            Execute a single prompt\n")
 	fmt.Printf("  coreclaw --debug \"list files\"   Execute with debug output\n")
 	fmt.Printf("  coreclaw --no-markdown \"list\"   Disable markdown rendering\n")
-	fmt.Printf("  coreclaw --base-url http://localhost:11434/v1 \"hello\"  Use local server (with env API key)\n")
-	fmt.Printf("  coreclaw --base-url http://localhost:11434/v1 --model llama3 \"hello\"  Specify model\n")
-	fmt.Printf("  coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 \"hello\"  Use custom API key\n")
+	fmt.Printf("  coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 \"hello\"  Use local server\n")
+	fmt.Printf("  coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 --model llama3 \"hello\"  Specify model\n")
 }
 
 func runInteractiveMode(processor *agentpkg.Processor, messages []fantasy.Message, model string) {

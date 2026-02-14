@@ -105,6 +105,8 @@ export ZAI_API_KEY=your-zai-key
 
 Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 
+**Important**: When using `--base-url` for custom or local servers, environment variables are ignored. You must specify `--api-key` along with `--base-url`.
+
 ## Next Steps
 - Explore streaming support for better UX
 - Add more sophisticated skills built on bash tool
