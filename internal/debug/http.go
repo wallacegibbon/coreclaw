@@ -63,6 +63,7 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 					dr.firstRead = false
 				}
 				fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", formatted)
+				fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
 			} else if jsonStr != "[DONE]" {
 				// Not JSON and not [DONE], print raw line
 				if dr.firstRead {
@@ -71,6 +72,7 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 					dr.firstRead = false
 				}
 				fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", line)
+				fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
 			}
 		}
 	}
@@ -151,8 +153,8 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// Check response content type to confirm streaming
 	contentType := resp.Header.Get("Content-Type")
-	if isStreaming && contentType == "text/event-stream" {
-		fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mStreaming response - logging chunks...\x1b[0m\n")
+	if isStreaming && strings.Contains(contentType, "text/event-stream") {
+		fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
 		resp.Body = struct {
 			io.Reader
 			io.Closer
@@ -174,11 +176,9 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
 			fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", dump)
 		}
+		fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
+		fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mTime: %v\x1b[0m\n", time.Since(start))
 	}
-
-	fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
-
-	fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mTime: %v\x1b[0m\n", time.Since(start))
 
 	return resp, nil
 }
