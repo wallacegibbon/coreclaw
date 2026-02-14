@@ -56,13 +56,13 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - Markdown rendering with glamour (can be disabled with --no-markdown)
 - Custom system prompts
 - Read prompts from files
-- Debug mode with verbose output
+- API debug mode for HTTP requests and responses
 
 ## Flags
 
 - `-version` - Show version information
 - `-help` - Show help information
-- `-debug` - Show debug output
+- `-debug-api` - Show raw API requests and responses
 - `-no-markdown` - Disable markdown rendering
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt
