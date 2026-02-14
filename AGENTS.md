@@ -49,6 +49,12 @@ coreclaw --system "You are a code reviewer" "Review this code"
 # Disable markdown rendering (streaming output)
 coreclaw --no-markdown "List files"
 
+# Debug mode - show agent internals
+coreclaw --debug "list files"
+
+# Debug API mode - show raw API requests and responses
+coreclaw --debug-api "list files"
+
 # Use local/openai-compatible server (requires --api-key)
 coreclaw --api-key sk-xxx --base-url http://localhost:11434/v1 "hello"
 
@@ -77,6 +83,7 @@ Provider configurations are loaded from the embedded catwalk database.
 - `-version` - Show version information
 - `-help` - Show help information
 - `-debug` - Show debug output
+- `-debug-api` - Show raw API requests and responses (to stderr)
 - `-no-markdown` - Disable markdown rendering
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt

@@ -11,6 +11,7 @@ import (
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/openai"
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
+	debugpkg "github.com/wallacegibbon/coreclaw/internal/debug"
 	"github.com/wallacegibbon/coreclaw/internal/provider"
 	"github.com/wallacegibbon/coreclaw/internal/terminal"
 	"github.com/wallacegibbon/coreclaw/internal/tools"
@@ -21,6 +22,7 @@ func main() {
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
 	debug := flag.Bool("debug", false, "Show debug output")
+	debugAPI := flag.Bool("debug-api", false, "Show raw API requests and responses")
 	noMarkdown := flag.Bool("no-markdown", false, "Disable markdown rendering")
 	promptFile := flag.String("file", "", "Read prompt from file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
@@ -45,7 +47,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	provider, err := openai.New(openai.WithAPIKey(config.APIKey), openai.WithBaseURL(config.BaseURL))
+	var providerOpts []openai.Option
+	providerOpts = append(providerOpts, openai.WithAPIKey(config.APIKey), openai.WithBaseURL(config.BaseURL))
+	if *debugAPI {
+		providerOpts = append(providerOpts, openai.WithHTTPClient(debugpkg.NewHTTPClient()))
+	}
+
+	provider, err := openai.New(providerOpts...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create provider: %v\n", err)
 		os.Exit(1)

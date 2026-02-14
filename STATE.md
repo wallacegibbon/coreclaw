@@ -39,6 +39,11 @@ For this project, simplicity is more important than efficiency.
 - ✅ Markdown rendering with glamour
   - Renders AI responses with syntax highlighting and formatting
   - Can be disabled with --no-markdown flag for streaming output
+- ✅ API debug mode (--debug-api)
+  - Logs raw API requests and responses to stderr
+  - Shows HTTP method, URL, headers (with sensitive data masked), and body
+  - Colors request messages in green and response messages in purple
+  - Useful for troubleshooting API communication issues
 
 ### Architecture
 - **Language Models**:
@@ -81,6 +86,12 @@ export ZAI_API_KEY=your-zai-key
 
 # Run without markdown rendering (streaming output)
 ./coreclaw --no-markdown "List files"
+
+# Run with debug output (shows agent internals)
+./coreclaw --debug "List files"
+
+# Run with API debug (shows raw HTTP requests/responses)
+./coreclaw --debug-api "List files"
 
 # Run with prompt from file
 ./coreclaw --file prompt.txt
