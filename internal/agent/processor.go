@@ -38,9 +38,25 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	streamCall.OnTextDelta = func(id, text string) error {
 		responseText.WriteString(text)
-		fmt.Print(terminal.Bright(text))
-		if len(text) > 0 {
-			lastCharWasNewline = (text[len(text)-1] == '\n')
+		// Skip leading newlines if we're already at start of line (to avoid blank lines)
+		printText := text
+		if lastCharWasNewline && len(text) > 0 {
+			// Find first non-newline character
+			firstNonNewline := 0
+			for firstNonNewline < len(text) && text[firstNonNewline] == '\n' {
+				firstNonNewline++
+			}
+			if firstNonNewline > 0 {
+				// Skip leading newlines, but if the entire text is newlines, return early
+				if firstNonNewline == len(text) {
+					return nil
+				}
+				printText = text[firstNonNewline:]
+			}
+		}
+		fmt.Print(terminal.Bright(printText))
+		if len(printText) > 0 {
+			lastCharWasNewline = (printText[len(printText)-1] == '\n')
 		}
 		return nil
 	}
