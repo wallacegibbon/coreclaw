@@ -59,14 +59,14 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 				toolCallMutex.Lock()
 				toolCommands[tc.ToolCallID] = bashInput.Command
 				toolCallMutex.Unlock()
-				// Print command (status will be appended when it finishes)
+				// Print command with arrow prefix (status will be appended when it finishes)
 				displayCmd := strings.ReplaceAll(bashInput.Command, "\n", "\\n")
 				displayCmd = strings.ReplaceAll(displayCmd, "\t", "\\t")
 				// Only add newline if last text didn't end with one
 				if lastCharWasNewline {
-					fmt.Printf("  %s", displayCmd)
+					fmt.Printf("  %s%s", terminal.Dim("→ "), terminal.Green(displayCmd))
 				} else {
-					fmt.Printf("\n  %s", displayCmd)
+					fmt.Printf("\n  %s%s", terminal.Dim("→ "), terminal.Green(displayCmd))
 				}
 			}
 		}

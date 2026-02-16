@@ -53,7 +53,8 @@ For this project, simplicity is more important than efficiency.
   - Bracketed line prints once at session start
   - Input prompt shows green ❯ with reset for clean input
 - ✅ Bash command visibility
-  - Commands printed when they start
+  - Commands printed when they start with arrow prefix (→)
+  - Command text in green, arrow in dim color
   - Status appended at the end when command finishes
   - Green ✓ for success, red ● [exit_code] for errors
   - Newlines and tabs escaped for clean single-line display
