@@ -36,27 +36,35 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	var responseText strings.Builder
 	var lastCharWasNewline bool
 
+	// Suppress newlines after tool results and when we're already at a newline
+	var suppressNewlines bool
+
 	streamCall.OnTextDelta = func(id, text string) error {
 		responseText.WriteString(text)
-		// Skip leading newlines if we're already at start of line (to avoid blank lines)
-		printText := text
-		if lastCharWasNewline && len(text) > 0 {
-			// Find first non-newline character
-			firstNonNewline := 0
-			for firstNonNewline < len(text) && text[firstNonNewline] == '\n' {
-				firstNonNewline++
-			}
-			if firstNonNewline > 0 {
-				// Skip leading newlines, but if the entire text is newlines, return early
-				if firstNonNewline == len(text) {
-					return nil
-				}
-				printText = text[firstNonNewline:]
+
+		// Check if text contains any non-newline characters
+		hasNonNewlineContent := false
+		for _, r := range text {
+			if r != '\n' {
+				hasNonNewlineContent = true
+				break
 			}
 		}
-		fmt.Print(terminal.Bright(printText))
-		if len(printText) > 0 {
-			lastCharWasNewline = (printText[len(printText)-1] == '\n')
+
+		// Suppress newlines that come after tool results or when we're already on a new line
+		if suppressNewlines {
+			if hasNonNewlineContent {
+				// Found real content, stop suppressing
+				suppressNewlines = false
+			} else {
+				// Still just newlines, skip them
+				return nil
+			}
+		}
+
+		fmt.Print(terminal.Bright(text))
+		if len(text) > 0 {
+			lastCharWasNewline = (text[len(text)-1] == '\n')
 		}
 		return nil
 	}
@@ -119,6 +127,8 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 				statusText = terminal.Red(fmt.Sprintf("● [%d]", exitStatus))
 			}
 			fmt.Printf(" %s\n", statusText)
+			lastCharWasNewline = true
+			suppressNewlines = true
 		}
 		return nil
 	}
