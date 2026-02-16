@@ -3,12 +3,9 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
-	"strings"
 
 	"charm.land/fantasy"
-	"github.com/wallacegibbon/coreclaw/internal/terminal"
 )
 
 // BashInput represents the input for the bash tool
@@ -36,21 +33,8 @@ func NewBashTool() fantasy.AgentTool {
 				if exitErr, ok := err.(*exec.ExitError); ok {
 					exitStatus = exitErr.ExitCode()
 				}
-			}
-
-			// Escape newlines and tabs for display
-			displayCmd := strings.ReplaceAll(cmd, "\n", "\\n")
-			displayCmd = strings.ReplaceAll(displayCmd, "\t", "\\t")
-
-			// Print command with exit status
-			if exitStatus == 0 {
-				fmt.Fprint(os.Stderr, terminal.Green(fmt.Sprintf("✓ %s\n", displayCmd)))
-			} else {
-				fmt.Fprint(os.Stderr, terminal.Red(fmt.Sprintf("● %s [%d]\n", displayCmd, exitStatus)))
-			}
-
-			if err != nil {
-				return fantasy.NewTextErrorResponse(string(output)), nil
+				// Include exit status in error response
+				return fantasy.NewTextErrorResponse(fmt.Sprintf("[%d] %s", exitStatus, string(output))), nil
 			}
 
 			return fantasy.NewTextResponse(string(output)), nil

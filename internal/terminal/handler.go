@@ -1,7 +1,6 @@
 package terminal
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"strings"
@@ -87,9 +86,7 @@ func GetBracketedLine(baseURL, model string) string {
 
 // GetPrompt returns the shell prompt string (just the input prompt)
 func GetPrompt(baseURL, model string) string {
-	greenFg := "\x1b[38;2;166;227;161m"
-	reset := "\x1b[0m"
-	return fmt.Sprintf("%s❯ %s", greenFg, reset)
+	return Green("❯ ")
 }
 
 // IsTerminal checks if stdin is a terminal

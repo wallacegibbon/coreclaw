@@ -2,9 +2,11 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"charm.land/fantasy"
 	"github.com/wallacegibbon/coreclaw/internal/terminal"
@@ -32,15 +34,76 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	var responseText strings.Builder
+	var lastCharWasNewline bool
 
 	streamCall.OnTextDelta = func(id, text string) error {
 		responseText.WriteString(text)
 		fmt.Print(terminal.Bright(text))
+		if len(text) > 0 {
+			lastCharWasNewline = (text[len(text)-1] == '\n')
+		}
 		return nil
 	}
 
+	// Track tool calls to update status on the same line
+	toolCommands := make(map[string]string)
+	var toolCallMutex sync.Mutex
+
 	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
-		fmt.Println()
+		// Extract command from tool input (Input is JSON string)
+		if tc.ToolName == "bash" {
+			var bashInput struct {
+				Command string `json:"command"`
+			}
+			if err := json.Unmarshal([]byte(tc.Input), &bashInput); err == nil {
+				toolCallMutex.Lock()
+				toolCommands[tc.ToolCallID] = bashInput.Command
+				toolCallMutex.Unlock()
+				// Print command (status will be appended when it finishes)
+				displayCmd := strings.ReplaceAll(bashInput.Command, "\n", "\\n")
+				displayCmd = strings.ReplaceAll(displayCmd, "\t", "\\t")
+				// Only add newline if last text didn't end with one
+				if lastCharWasNewline {
+					fmt.Printf("  %s", displayCmd)
+				} else {
+					fmt.Printf("\n  %s", displayCmd)
+				}
+			}
+		}
+		return nil
+	}
+
+	streamCall.OnToolResult = func(tr fantasy.ToolResultContent) error {
+		toolCallMutex.Lock()
+		cmdStr, exists := toolCommands[tr.ToolCallID]
+		delete(toolCommands, tr.ToolCallID)
+		toolCallMutex.Unlock()
+
+		if exists {
+			displayCmd := strings.ReplaceAll(cmdStr, "\n", "\\n")
+			displayCmd = strings.ReplaceAll(displayCmd, "\t", "\\t")
+
+			// Determine status based on result type
+			exitStatus := 0
+			if tr.Result.GetType() == fantasy.ToolResultContentTypeError {
+				if errResult, ok := fantasy.AsToolResultOutputType[fantasy.ToolResultOutputContentError](tr.Result); ok && errResult.Error != nil {
+					errMsg := errResult.Error.Error()
+					if parsed, err := fmt.Sscanf(errMsg, "[%d]", &exitStatus); err != nil || parsed != 1 {
+						exitStatus = 1
+					}
+				}
+			}
+
+			// Update the line with final status
+			// Just append the status after the command (no carriage return needed)
+			var statusText string
+			if exitStatus == 0 {
+				statusText = terminal.Green("✓")
+			} else {
+				statusText = terminal.Red(fmt.Sprintf("● [%d]", exitStatus))
+			}
+			fmt.Printf(" %s\n", statusText)
+		}
 		return nil
 	}
 

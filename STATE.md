@@ -53,9 +53,11 @@ For this project, simplicity is more important than efficiency.
   - Bracketed line prints once at session start
   - Input prompt shows green ❯ with reset for clean input
 - ✅ Bash command visibility
-  - Commands printed in green before execution
+  - Commands printed when they start
+  - Status appended at the end when command finishes
+  - Green ✓ for success, red ● [exit_code] for errors
   - Newlines and tabs escaped for clean single-line display
-  - Uses → command format for clear differentiation
+  - No carriage return tricks - simple and reliable formatting
 - ✅ Debug API filtering of empty SSE content chunks
   - Filters out empty delta content messages during streaming
   - Prevents log spam while maintaining normal SSE behavior
