@@ -52,8 +52,8 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - Error handling for command execution
 - Multi-provider support (OpenAI, DeepSeek, ZAI)
 - Single-prompt and interactive modes
+- Real-time streaming output
 - Color-styled output
-- Markdown rendering with glamour (can be disabled with --no-markdown)
 - Custom system prompts
 - Read prompts from files
 - API debug mode for HTTP requests and responses
@@ -63,7 +63,6 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - `-version` - Show version information
 - `-help` - Show help information
 - `-debug-api` - Show raw API requests and responses
-- `-no-markdown` - Disable markdown rendering
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt
 

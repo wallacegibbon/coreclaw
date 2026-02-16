@@ -46,9 +46,6 @@ coreclaw --file prompt.txt
 # Custom system prompt
 coreclaw --system "You are a code reviewer" "Review this code"
 
-# Disable markdown rendering (streaming output)
-coreclaw --no-markdown "List files"
-
 # Debug API mode - show raw API requests and responses
 coreclaw --debug-api "list files"
 
@@ -80,7 +77,6 @@ Provider configurations are loaded from the embedded catwalk database.
 - `-version` - Show version information
 - `-help` - Show help information
 - `-debug-api` - Show raw API requests and responses (to stderr)
-- `-no-markdown` - Disable markdown rendering
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt
 - `-api-key string` - API key for the provider (required when using --base-url)

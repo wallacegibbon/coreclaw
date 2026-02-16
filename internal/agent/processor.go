@@ -7,14 +7,12 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
-	"github.com/charmbracelet/glamour"
 	"github.com/wallacegibbon/coreclaw/internal/terminal"
 )
 
-// Processor handles prompt processing with streaming and markdown rendering
+// Processor handles prompt processing with streaming
 type Processor struct {
-	Agent      fantasy.Agent
-	NoMarkdown bool
+	Agent fantasy.Agent
 }
 
 // NewProcessor creates a new prompt processor
@@ -36,10 +34,13 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	var responseText strings.Builder
 
 	streamCall.OnTextDelta = func(id, text string) error {
-		if p.NoMarkdown {
-			fmt.Print(terminal.Bright(text))
-		}
 		responseText.WriteString(text)
+		fmt.Print(terminal.Bright(text))
+		return nil
+	}
+
+	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
+		fmt.Println()
 		return nil
 	}
 
@@ -49,34 +50,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 		return nil, "", err
 	}
 
-	if !p.NoMarkdown {
-		p.renderMarkdown(responseText.String())
-	} else {
-		fmt.Println()
-	}
+	fmt.Println()
 
 	return agentResult, responseText.String(), nil
-}
-
-func (p *Processor) renderMarkdown(text string) {
-	renderer, err := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(80),
-	)
-	if err != nil {
-		fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf("Failed to create markdown renderer: %v", err)))
-		fmt.Print(terminal.Bright(text))
-		fmt.Println()
-		return
-	}
-
-	rendered, err := renderer.Render(text)
-	if err != nil {
-		fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf("Failed to render markdown: %v", err)))
-		fmt.Print(terminal.Bright(text))
-		fmt.Println()
-		return
-	}
-
-	fmt.Print(rendered)
 }

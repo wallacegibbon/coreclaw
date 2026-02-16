@@ -26,7 +26,6 @@ func main() {
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
 	debugAPI := flag.Bool("debug-api", false, "Show raw API requests and responses")
-	noMarkdown := flag.Bool("no-markdown", false, "Disable markdown rendering")
 	promptFile := flag.String("file", "", "Read prompt from file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
 	apiKey := flag.String("api-key", "", "API key for the provider (required when using --base-url)")
@@ -102,7 +101,6 @@ You can help with any task that can be accomplished through shell commands: file
 	)
 
 	processor := agentpkg.NewProcessor(agent)
-	processor.NoMarkdown = *noMarkdown
 
 	ctx := context.Background()
 	var messages []fantasy.Message
