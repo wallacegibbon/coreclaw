@@ -88,9 +88,9 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 				displayCmd = strings.ReplaceAll(displayCmd, "\t", "\\t")
 				// Only add newline if last text didn't end with one
 				if lastCharWasNewline {
-					fmt.Printf("  %s%s", terminal.Dim("→ "), terminal.Green(displayCmd))
+					fmt.Printf("%s%s", terminal.Dim("→ "), terminal.Green(displayCmd))
 				} else {
-					fmt.Printf("\n  %s%s", terminal.Dim("→ "), terminal.Green(displayCmd))
+					fmt.Printf("\n%s%s", terminal.Dim("→ "), terminal.Green(displayCmd))
 				}
 			}
 		}
