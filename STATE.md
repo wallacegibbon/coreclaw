@@ -23,7 +23,6 @@ For this project, simplicity is more important than efficiency.
 - ✅ Color styling with ANSI escape codes
   - AI responses: bold white (#cdd6f4)
   - User prompts: blue (#89b4fa)
-  - Tool outputs: yellow (#f9e2af)
   - Debug/info messages: dim gray (#6c7086)
   - Applied to both single-prompt and interactive modes
   - Uses raw ANSI codes for lightweight output without padding
@@ -56,7 +55,7 @@ For this project, simplicity is more important than efficiency.
   - Commands printed when they start with arrow prefix (→)
   - Command text in green, arrow in dim color
   - Status appended at the end when command finishes
-  - Green ✓ for success, red ● [exit_code] for errors
+  - Green ✓ for success, red ✗ [exit_code] for errors
   - Newlines and tabs escaped for clean single-line display
   - No carriage return tricks - simple and reliable formatting
 - ✅ Debug API filtering of empty SSE content chunks
@@ -136,7 +135,6 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 **Important**: When using `--base-url` for custom or local servers, environment variables are ignored. You must specify `--api-key` along with `--base-url`.
 
 ## Next Steps
-- Explore streaming support for better UX
 - Add more sophisticated skills built on bash tool
 - Add config file support for persistent settings
 - Consider adding conversation history save/restore

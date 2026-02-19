@@ -115,6 +115,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 					if parsed, err := fmt.Sscanf(errMsg, "[%d]", &exitStatus); err != nil || parsed != 1 {
 						exitStatus = 1
 					}
+					// Output text not needed - only status matters
 				}
 			}
 
@@ -124,7 +125,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 			if exitStatus == 0 {
 				statusText = terminal.Green("✓")
 			} else {
-				statusText = terminal.Red(fmt.Sprintf("● [%d]", exitStatus))
+				statusText = terminal.Red(fmt.Sprintf("✗ [%d]", exitStatus))
 			}
 			fmt.Printf(" %s\n", statusText)
 			lastCharWasNewline = true
