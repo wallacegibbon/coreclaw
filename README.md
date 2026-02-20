@@ -1,6 +1,6 @@
 # CoreClaw
 
-A minimal AI Agent that can handle toolcalling. We only provide one tool: `bash`. All skills are based on this only one tool. And all functionalities are built by skills.
+A minimal AI Agent that can handle toolcalling. All skills are based on this only one tool. And all functionalities are built by skills.
 
 For this project, simplicity is more important than efficiency.
 
@@ -20,29 +20,30 @@ go build
 
 ## Usage
 
+All configuration must be specified via command line flags:
+
 ```bash
-# Single prompt
-coreclaw "List all files in the current directory"
+# OpenAI API
+coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "hello"
 
-# Interactive mode
-coreclaw
+# Anthropic API
+coreclaw --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 "hello"
 
-# Read prompt from file
-coreclaw --file prompt.txt
-
-# Custom system prompt
-coreclaw --system "You are a code reviewer" "Review this code"
+# Local AI server (e.g., Ollama)
+coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 "hello"
 ```
 
-## Environment Variables
+## Flags
 
-CoreClaw requires an API key from one of the following providers:
-
-- `OPENAI_API_KEY` - OpenAI API key (uses GPT-4o)
-- `DEEPSEEK_API_KEY` - DeepSeek API key (uses deepseek-chat)
-- `ZAI_API_KEY` - ZAI API key (uses GLM-4.7)
-
-Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
+- `-type string` - Provider type: `anthropic` or `openai` (required)
+- `-base-url string` - API endpoint URL (required)
+- `-api-key string` - API key (required)
+- `-model string` - Model name to use
+- `-version` - Show version information
+- `-help` - Show help information
+- `-debug-api` - Show raw API requests and responses
+- `-file string` - Read prompt from file
+- `-system string` - Override system prompt
 
 ## Features
 
@@ -50,21 +51,13 @@ Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
 - Multi-step conversations with tool calls
 - Token usage tracking
 - Error handling for command execution
-- Multi-provider support (OpenAI, DeepSeek, ZAI)
+- Multi-provider support (OpenAI, Anthropic, DeepSeek, ZAI)
 - Single-prompt and interactive modes
 - Real-time streaming output
 - Color-styled output
 - Custom system prompts
 - Read prompts from files
 - API debug mode for HTTP requests and responses
-
-## Flags
-
-- `-version` - Show version information
-- `-help` - Show help information
-- `-debug-api` - Show raw API requests and responses
-- `-file string` - Read prompt from file
-- `-system string` - Override system prompt
 
 ## Project Status
 
