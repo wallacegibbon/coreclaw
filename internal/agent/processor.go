@@ -36,8 +36,8 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	var responseText strings.Builder
 	var lastCharWasNewline bool
 
-	// Suppress newlines after tool results and when we're already at a newline
-	var suppressNewlines bool
+	// Suppress leading newlines and newlines after tool results
+	var suppressNewlines = true
 
 	streamCall.OnTextDelta = func(id, text string) error {
 		responseText.WriteString(text)
