@@ -1,6 +1,8 @@
 # CoreClaw
 
-A minimal AI Agent that can handle toolcalling. All skills are based on this only one tool. And all functionalities are built by skills.
+A minimal AI Agent that can handle toolcalling, powered by Large Language Models. It provides a single tool—`bash`—and all capabilities are built on top of it.
+
+CoreClaw supports multiple providers (OpenAI, Anthropic, DeepSeek, ZAI, and any OpenAI-compatible or Anthropic-compatible server like Ollama) via a simple CLI interface.
 
 For this project, simplicity is more important than efficiency.
 

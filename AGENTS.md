@@ -1,7 +1,8 @@
 # CoreClaw
 
-A minimal AI Agent that can handle toolcalling. We only provide one tool: `bash`.
-All skills are based on this only one tool. And all functionalities are built by skills.
+A minimal AI Agent that can handle toolcalling, powered by Large Language Models. It provides a single tool—`bash`—and all capabilities are built on top of it.
+
+CoreClaw supports multiple providers (OpenAI, Anthropic, DeepSeek, ZAI, and any OpenAI-compatible or Anthropic-compatible server like Ollama) via a simple CLI interface.
 
 For this project, simplicity is more important than efficiency.
 
@@ -70,4 +71,5 @@ coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GL
 ## Agent Instructions
 - **Read STATE.md** at the start of every conversation
 - **Update STATE.md** after completing any meaningful work (features, bug fixes, etc.)
+- **Keep AGENTS.md and README.md in sync** - update both files together before commits
 - Keep STATE.md as the single source of truth for project status
