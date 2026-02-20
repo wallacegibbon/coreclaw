@@ -31,8 +31,17 @@ coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_AP
 # Anthropic API
 coreclaw --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 "hello"
 
-# Local AI server (e.g., Ollama)
+# Local AI server (e.g., Ollama, LM Studio)
 coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 "hello"
+
+# MiniMax (Anthropic-compatible)
+coreclaw --type anthropic --base-url $MINIMAXI_API_URL --api-key $MINIMAXI_API_KEY --model MiniMax-M2.5 "hello"
+
+# DeepSeek (OpenAI-compatible)
+coreclaw --type openai --base-url $DEEPSEEK_API_URL --api-key $DEEPSEEK_API_KEY --model deepseek-chat "hello"
+
+# ZAI (OpenAI-compatible)
+coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GLM-4.7 "hello"
 ```
 
 ## Flags
