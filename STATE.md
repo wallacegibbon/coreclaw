@@ -67,6 +67,10 @@ For this project, simplicity is more important than efficiency.
   - Uses context cancellation to stop ongoing API calls
   - Displays "Request cancelled." message when a request is interrupted
   - Properly handles readline.ErrInterrupt to prevent process termination
+- ✅ Refactored codebase for better maintainability
+  - Extracted CLI flag parsing to `internal/config` package
+  - Extracted run logic to `internal/run` package
+  - Simplified main.go to ~80 lines of minimal glue code
 
 ### Architecture
 - **Language Models**:
@@ -78,6 +82,19 @@ For this project, simplicity is more important than efficiency.
 - **Framework**: charm.land/fantasy
 - **Provider Database**: charm.land/catwalk (embedded)
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
+
+### Code Structure
+```
+internal/
+  agent/       - Agent processor for streaming responses
+  config/      - CLI flags and settings parsing
+  debug/       - Debug HTTP transport for API debugging
+  provider/    - Provider configuration (API keys, endpoints)
+  run/         - Runner for single prompt and interactive modes
+  terminal/    - Terminal utilities (colors, prompts, readline)
+  tools/       - Tool implementations (bash)
+main.go       - Entry point, minimal glue code
+```
 
 ### Features
 - Execute bash commands through the AI agent
