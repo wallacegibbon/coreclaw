@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"charm.land/fantasy"
+	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/openai"
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/config"
@@ -33,7 +34,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	provider, err := createProvider(providerConfig.APIKey, providerConfig.BaseURL, cfg.DebugAPI)
+	provider, err := createProvider(providerConfig.Provider, providerConfig.APIKey, providerConfig.BaseURL, cfg.DebugAPI)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create provider: %v\n", err)
 		os.Exit(1)
@@ -71,7 +72,28 @@ func main() {
 	}
 }
 
-func createProvider(apiKey, baseURL string, debugAPI bool) (interface{ LanguageModel(context.Context, string) (fantasy.LanguageModel, error) }, error) {
+func createProvider(provider, apiKey, baseURL string, debugAPI bool) (interface{ LanguageModel(context.Context, string) (fantasy.LanguageModel, error) }, error) {
+	switch provider {
+	case "anthropic":
+		return createAnthropicProvider(apiKey, baseURL, debugAPI)
+	default:
+		return createOpenAIProvider(apiKey, baseURL, debugAPI)
+	}
+}
+
+func createAnthropicProvider(apiKey, baseURL string, debugAPI bool) (interface{ LanguageModel(context.Context, string) (fantasy.LanguageModel, error) }, error) {
+	var opts []anthropic.Option
+	opts = append(opts, anthropic.WithAPIKey(apiKey))
+	if baseURL != "" {
+		opts = append(opts, anthropic.WithBaseURL(baseURL))
+	}
+	if debugAPI {
+		opts = append(opts, anthropic.WithHTTPClient(debugpkg.NewHTTPClient()))
+	}
+	return anthropic.New(opts...)
+}
+
+func createOpenAIProvider(apiKey, baseURL string, debugAPI bool) (interface{ LanguageModel(context.Context, string) (fantasy.LanguageModel, error) }, error) {
 	var opts []openai.Option
 	opts = append(opts, openai.WithAPIKey(apiKey), openai.WithBaseURL(baseURL))
 	if debugAPI {
@@ -85,17 +107,18 @@ func printHelp() {
 	fmt.Printf("Usage:\n")
 	fmt.Printf("  coreclaw [prompt]    Execute a single prompt\n")
 	fmt.Printf("  coreclaw             Run in interactive mode\n\n")
-	fmt.Printf("Environment Variables:\n")
-	fmt.Printf("  OPENAI_API_KEY      OpenAI API key (uses GPT-4o)\n")
-	fmt.Printf("  DEEPSEEK_API_KEY    DeepSeek API key (uses deepseek-chat)\n")
-	fmt.Printf("  ZAI_API_KEY         ZAI API key (uses GLM-4.7)\n\n")
+	fmt.Printf("Examples:\n")
+	fmt.Printf("  coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o \"hello\"\n")
+	fmt.Printf("  coreclaw --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 \"hello\"\n")
+	fmt.Printf("  coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 \"hello\"\n\n")
 	fmt.Printf("Flags:\n")
-	fmt.Printf("  -version            Show version information\n")
-	fmt.Printf("  -help               Show help information\n")
-	fmt.Printf("  -debug-api          Show raw API requests and responses\n")
-	fmt.Printf("  -file string        Read prompt from file\n")
-	fmt.Printf("  -system string      Override system prompt\n")
-	fmt.Printf("  -api-key string     API key (required with --base-url)\n")
-	fmt.Printf("  -base-url string    Custom API endpoint\n")
-	fmt.Printf("  -model string       Model name to use\n")
+	fmt.Printf("  -type string        Provider type: anthropic, openai (required)\n")
+	fmt.Printf("  -base-url string    API endpoint URL (required)\n")
+	fmt.Printf("  -api-key string    API key (required)\n")
+	fmt.Printf("  -model string      Model name to use\n")
+	fmt.Printf("  -version           Show version information\n")
+	fmt.Printf("  -help              Show help information\n")
+	fmt.Printf("  -debug-api         Show raw API requests and responses\n")
+	fmt.Printf("  -file string       Read prompt from file\n")
+	fmt.Printf("  -system string     Override system prompt\n")
 }

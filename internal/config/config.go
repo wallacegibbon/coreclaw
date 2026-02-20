@@ -20,6 +20,7 @@ type Settings struct {
 	APIKey       string
 	BaseURL      string
 	ModelName    string
+	ProviderType string
 	Prompt       string
 }
 
@@ -33,6 +34,7 @@ func Parse() *Settings {
 	apiKey := flag.String("api-key", "", "API key for the provider (required when using --base-url)")
 	baseURL := flag.String("base-url", "", "Base URL for the API endpoint (requires --api-key, ignores env vars)")
 	modelName := flag.String("model", "", "Model name to use (defaults to provider default)")
+	providerType := flag.String("type", "", "Provider type: anthropic, openai (overrides auto-detection)")
 	flag.Parse()
 
 	s := &Settings{
@@ -44,6 +46,7 @@ func Parse() *Settings {
 		APIKey:       *apiKey,
 		BaseURL:      *baseURL,
 		ModelName:    *modelName,
+		ProviderType: *providerType,
 	}
 
 	// Get prompt from file or args
@@ -63,5 +66,5 @@ func Parse() *Settings {
 
 // GetProviderConfig returns the provider configuration
 func (s *Settings) GetProviderConfig() (*provider.Config, error) {
-	return provider.GetProviderConfig(s.APIKey, s.BaseURL, s.ModelName)
+	return provider.GetProviderConfig(s.APIKey, s.BaseURL, s.ModelName, s.ProviderType)
 }

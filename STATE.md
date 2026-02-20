@@ -19,7 +19,7 @@ For this project, simplicity is more important than efficiency.
 - ✅ Tool calling support with bash command execution
 - ✅ Tool result display
 - ✅ Usage statistics (input/output/total tokens)
-- ✅ Multi-provider support (OpenAI, DeepSeek, ZAI)
+- ✅ Multi-provider support (OpenAI, Anthropic, DeepSeek, ZAI)
 - ✅ Color styling with ANSI escape codes
   - AI responses: bold white (#cdd6f4)
   - User prompts: blue (#89b4fa)
@@ -71,16 +71,15 @@ For this project, simplicity is more important than efficiency.
   - Extracted CLI flag parsing to `internal/config` package
   - Extracted run logic to `internal/run` package
   - Simplified main.go to ~80 lines of minimal glue code
+- ✅ CLI-based provider configuration
+  - All config via CLI flags: --type, --base-url, --api-key, --model
+  - No environment variables or default configs
+  - Supports anthropic and openai provider types
 
 ### Architecture
-- **Language Models**:
-  - OpenAI GPT-4o (or model from catwalk database)
-  - DeepSeek deepseek-chat (reasoning models require special tool call handling)
-  - ZAI GLM-4.7
-- **Providers**: OpenAI, DeepSeek, ZAI (all using OpenAI-compatible API)
+- **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
 - **Tool**: bash (executes shell commands)
 - **Framework**: charm.land/fantasy
-- **Provider Database**: charm.land/catwalk (embedded)
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 
 ### Code Structure
@@ -101,11 +100,9 @@ main.go       - Entry point, minimal glue code
 - Multi-step conversations with tool calls
 - Token usage tracking
 - Error handling for command execution
-- Multi-provider support with automatic provider detection
-- Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
-- CLI flags for version and help information
-- Read prompts from files for batch processing
-- Custom system prompts for specialized behaviors
+- CLI-based provider configuration (no env vars)
+- CLI flags: --type, --base-url, --api-key, --model
+- Provider types: anthropic, openai
 - Color-coded output for better readability
 - Command history for interactive sessions
 - Robust terminal input handling with readline (backspace, delete, Ctrl-C)
@@ -113,45 +110,30 @@ main.go       - Entry point, minimal glue code
 
 ### Usage
 ```bash
-# Set API key (any one of the three)
-export OPENAI_API_KEY=your-openai-key
-# or
-export DEEPSEEK_API_KEY=your-deepseek-key
-# or
-export ZAI_API_KEY=your-zai-key
+# OpenAI API
+./coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "hello"
 
-# Run with prompt (streaming output enabled by default)
-./coreclaw "List files in current directory"
+# Anthropic API
+./coreclaw --type anthropic --base-url https://api.Anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 "hello"
 
-# Run with API debug (shows raw HTTP requests/responses)
-./coreclaw --debug-api "List files"
+# Local AI server (e.g., Ollama)
+./coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 "hello"
+
+# Run with API debug
+./coreclaw --debug-api --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "List files"
 
 # Run with prompt from file
-./coreclaw --file prompt.txt
+./coreclaw --file prompt.txt --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
 # Run with custom system prompt
-./coreclaw --system "You are a code reviewer" "Review this code"
+./coreclaw --system "You are a code reviewer" --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "Review this code"
 
-# Run interactively (no prompt provided)
-./coreclaw
-
-# Show version
-./coreclaw --version
+# Run interactively
+./coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
 # Show help
 ./coreclaw --help
 ```
 
-### Supported Providers
-- **OpenAI** (OPENAI_API_KEY): Uses GPT-4o at https://api.openai.com/v1 (or custom endpoint via OPENAI_API_ENDPOINT, or model from catwalk database)
-- **DeepSeek** (DEEPSEEK_API_KEY): Uses deepseek-chat at https://api.deepseek.com/v1 (reasoning models require special tool call handling)
-- **ZAI** (ZAI_API_KEY): Uses GLM-4.7 at https://api.z.ai/api/coding/paas/v4
-
-Provider selection priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > ZAI_API_KEY
-
-**Important**: When using `--base-url` for custom or local servers, environment variables are ignored. You must specify `--api-key` along with `--base-url`.
-
 ## Next Steps
 - Add more sophisticated skills built on bash tool
-- Add config file support for persistent settings
-- Consider adding conversation history save/restore
