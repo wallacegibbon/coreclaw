@@ -38,7 +38,6 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	// Suppress newlines after tool results and when we're already at a newline
 	var suppressNewlines bool
-	var newlineCounter int
 
 	streamCall.OnTextDelta = func(id, text string) error {
 		responseText.WriteString(text)
@@ -53,33 +52,20 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 		}
 
 		// Suppress newlines that come after tool results or when we're already on a new line
-		// But allow exactly one newline to separate tool results from following text
+		// Don't allow any newlines through to keep output tight
 		if suppressNewlines {
+			// Skip all newlines until we get real content
 			if hasNonNewlineContent {
 				// Found real content, stop suppressing and print everything
 				suppressNewlines = false
-				newlineCounter = 0
 				fmt.Print(terminal.Bright(text))
 				if len(text) > 0 {
 					lastCharWasNewline = (text[len(text)-1] == '\n')
 				}
 				return nil
-			} else {
-				// Count newlines and allow only one
-				for _, r := range text {
-					if r == '\n' {
-						newlineCounter++
-					}
-				}
-				if newlineCounter == 1 {
-					// Allow first newline through
-					fmt.Print(terminal.Bright("\n"))
-					lastCharWasNewline = true
-					return nil
-				}
-				// Skip additional newlines
-				return nil
 			}
+			// Skip any newlines
+			return nil
 		}
 
 		fmt.Print(terminal.Bright(text))
@@ -96,7 +82,6 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
 		// Reset newline suppression state when a new tool call starts
 		suppressNewlines = false
-		newlineCounter = 0
 
 		// Extract command from tool input (Input is JSON string)
 		if tc.ToolName == "bash" {
