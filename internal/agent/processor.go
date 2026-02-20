@@ -34,7 +34,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	var responseText strings.Builder
-	var lastCharWasNewline bool
+	var lastCharWasNewline = true // Start true to suppress leading newline before first tool call
 
 	// Suppress leading newlines and newlines after tool results
 	var suppressNewlines = true
