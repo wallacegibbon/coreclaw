@@ -33,14 +33,16 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 		streamCall.Messages = messages
 	}
 
-	var responseText strings.Builder
-	var lastCharWasNewline = true // Start true to suppress leading newline
+	responseText := &strings.Builder{}
+	toolCommands := make(map[string]string)
+	var toolCallMutex sync.Mutex
 
-	// Suppress leading newlines and newlines after tool results
-	var suppressNewlines = true
+	var (
+		suppressNewlines   = true
+		lastCharWasNewline = true
+	)
 
 	streamCall.OnTextStart = func(id string) error {
-		// Add newline before text starts (after tool results)
 		if !lastCharWasNewline {
 			fmt.Println()
 		}
@@ -50,78 +52,45 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	streamCall.OnTextDelta = func(id, text string) error {
 		responseText.WriteString(text)
 
-		// Check if text contains any non-newline characters
-		hasNonNewlineContent := false
-		for _, r := range text {
-			if r != '\n' {
-				hasNonNewlineContent = true
-				break
-			}
-		}
-
-		// Suppress newlines that come after tool results or when we're already on a new line
-		// Don't allow any newlines through to keep output tight
+		// Skip leading newlines to keep output tight
 		if suppressNewlines {
-			// Skip all newlines until we get real content
-			if hasNonNewlineContent {
-				// Found real content, stop suppressing and print everything
+			if hasNonNewline(text) {
 				suppressNewlines = false
-				fmt.Print(terminal.Bright(text))
-				if len(text) > 0 {
-					lastCharWasNewline = (text[len(text)-1] == '\n')
-				}
+			} else {
 				return nil
 			}
-			// Skip any newlines
-			return nil
 		}
 
-		// Show all text as bright (no thinking detection for OpenAI-compatible APIs)
 		fmt.Print(terminal.Bright(text))
 		if len(text) > 0 {
-			lastCharWasNewline = (text[len(text)-1] == '\n')
+			lastCharWasNewline = text[len(text)-1] == '\n'
 		}
 		return nil
 	}
 
-	// Handle reasoning/thinking content
+	// Handle reasoning/thinking content (Anthropic)
 	streamCall.OnReasoningDelta = func(id, text string) error {
 		fmt.Print(terminal.Dim(text))
 		return nil
 	}
 
 	streamCall.OnReasoningEnd = func(id string, reasoning fantasy.ReasoningContent) error {
-		// Add newline after thinking content ends
 		fmt.Println()
 		return nil
 	}
 
-	// Track tool calls to update status on the same line
-	toolCommands := make(map[string]string)
-	var toolCallMutex sync.Mutex
-
 	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
-		// Reset newline suppression state when a new tool call starts
 		suppressNewlines = false
 
-		// Extract command from tool input (Input is JSON string)
 		if tc.ToolName == "bash" {
-			var bashInput struct {
-				Command string `json:"command"`
-			}
-			if err := json.Unmarshal([]byte(tc.Input), &bashInput); err == nil {
+			cmd := extractBashCommand(tc.Input)
+			if cmd != "" {
 				toolCallMutex.Lock()
-				toolCommands[tc.ToolCallID] = bashInput.Command
+				toolCommands[tc.ToolCallID] = cmd
 				toolCallMutex.Unlock()
-				// Print command with arrow prefix (status will be appended when it finishes)
-				displayCmd := strings.ReplaceAll(bashInput.Command, "\n", "\\n")
-				displayCmd = strings.ReplaceAll(displayCmd, "\t", "\\t")
-				// Only add newline if last text didn't end with one
-				if lastCharWasNewline {
-					fmt.Printf("%s%s", terminal.Dim("→ "), terminal.Green(displayCmd))
-				} else {
-					fmt.Printf("\n%s%s", terminal.Dim("→ "), terminal.Green(displayCmd))
-				}
+
+				printCommand(cmd, lastCharWasNewline)
+				lastCharWasNewline = false
 			}
 		}
 		return nil
@@ -129,35 +98,12 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	streamCall.OnToolResult = func(tr fantasy.ToolResultContent) error {
 		toolCallMutex.Lock()
-		cmdStr, exists := toolCommands[tr.ToolCallID]
+		cmd, exists := toolCommands[tr.ToolCallID]
 		delete(toolCommands, tr.ToolCallID)
 		toolCallMutex.Unlock()
 
 		if exists {
-			displayCmd := strings.ReplaceAll(cmdStr, "\n", "\\n")
-			displayCmd = strings.ReplaceAll(displayCmd, "\t", "\\t")
-
-			// Determine status based on result type
-			exitStatus := 0
-			if tr.Result.GetType() == fantasy.ToolResultContentTypeError {
-				if errResult, ok := fantasy.AsToolResultOutputType[fantasy.ToolResultOutputContentError](tr.Result); ok && errResult.Error != nil {
-					errMsg := errResult.Error.Error()
-					if parsed, err := fmt.Sscanf(errMsg, "[%d]", &exitStatus); err != nil || parsed != 1 {
-						exitStatus = 1
-					}
-					// Output text not needed - only status matters
-				}
-			}
-
-			// Update the line with final status
-			// Just append the status after the command (no carriage return needed)
-			var statusText string
-			if exitStatus == 0 {
-				statusText = terminal.Green("✓")
-			} else {
-				statusText = terminal.Red(fmt.Sprintf("✗ [%d]", exitStatus))
-			}
-			fmt.Printf(" %s\n", statusText)
+			printResult(cmd, tr)
 			lastCharWasNewline = true
 			suppressNewlines = true
 		}
@@ -172,20 +118,82 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	fmt.Println()
 
-	// Extract the assistant message from the result
-	var assistantMsg fantasy.Message
-	if agentResult != nil && len(agentResult.Steps) > 0 {
-		lastStep := agentResult.Steps[len(agentResult.Steps)-1]
-		if len(lastStep.Messages) > 0 {
-			// Find assistant message in messages
-			for _, msg := range lastStep.Messages {
-				if msg.Role == fantasy.MessageRoleAssistant {
-					assistantMsg = msg
-					break
-				}
+	assistantMsg := extractAssistantMessage(agentResult)
+	return agentResult, responseText.String(), assistantMsg, nil
+}
+
+// hasNonNewline checks if text contains any non-newline characters
+func hasNonNewline(text string) bool {
+	for _, r := range text {
+		if r != '\n' {
+			return true
+		}
+	}
+	return false
+}
+
+// extractBashCommand extracts the command from bash tool input JSON
+func extractBashCommand(input string) string {
+	var bashInput struct {
+		Command string `json:"command"`
+	}
+	if err := json.Unmarshal([]byte(input), &bashInput); err != nil {
+		return ""
+	}
+	return bashInput.Command
+}
+
+// formatCommand formats a command for display (escape newlines and tabs)
+func formatCommand(cmd string) string {
+	cmd = strings.ReplaceAll(cmd, "\n", "\\n")
+	cmd = strings.ReplaceAll(cmd, "\t", "\\t")
+	return cmd
+}
+
+// printCommand displays a command with arrow prefix
+func printCommand(cmd string, lastCharWasNewline bool) {
+	displayCmd := formatCommand(cmd)
+	prefix := terminal.Dim("→ ")
+	if lastCharWasNewline {
+		fmt.Printf("%s%s", prefix, terminal.Green(displayCmd))
+	} else {
+		fmt.Printf("\n%s%s", prefix, terminal.Green(displayCmd))
+	}
+}
+
+// printResult displays the command result with success/failure status
+func printResult(cmd string, tr fantasy.ToolResultContent) {
+	exitStatus := 0
+
+	if tr.Result.GetType() == fantasy.ToolResultContentTypeError {
+		if errResult, ok := fantasy.AsToolResultOutputType[fantasy.ToolResultOutputContentError](tr.Result); ok && errResult.Error != nil {
+			errMsg := errResult.Error.Error()
+			if _, err := fmt.Sscanf(errMsg, "[%d]", &exitStatus); err != nil {
+				exitStatus = 1
 			}
 		}
 	}
 
-	return agentResult, responseText.String(), assistantMsg, nil
+	var statusText string
+	if exitStatus == 0 {
+		statusText = terminal.Green("✓")
+	} else {
+		statusText = terminal.Red(fmt.Sprintf("✗ [%d]", exitStatus))
+	}
+	fmt.Printf(" %s\n", statusText)
+}
+
+// extractAssistantMessage extracts the assistant message from agent result
+func extractAssistantMessage(agentResult *fantasy.AgentResult) fantasy.Message {
+	if agentResult == nil || len(agentResult.Steps) == 0 {
+		return fantasy.Message{}
+	}
+
+	lastStep := agentResult.Steps[len(agentResult.Steps)-1]
+	for _, msg := range lastStep.Messages {
+		if msg.Role == fantasy.MessageRoleAssistant {
+			return msg
+		}
+	}
+	return fantasy.Message{}
 }
