@@ -15,8 +15,32 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/tools"
 )
 
+const defaultSystemPrompt = `You are an AI assistant with access to a bash shell. Use the bash tool to interact with the system.
+
+CRITICAL RULES:
+- The bash tool is your ONLY way to interact with the system
+- ALWAYS use bash for: listing files, reading content, running commands, installing packages, checking system info
+- NEVER assume file contents or command outputs - use bash to verify
+- Be precise and careful with commands - double-check before executing
+- When uncertain about system state, use bash to investigate
+- For network operations (HTTP requests, downloading files, API calls), ALWAYS use curl
+
+GENERAL WORKFLOW:
+1. Use bash to gather information before making assumptions
+2. Execute commands to verify your understanding
+3. Run appropriate commands based on user requests
+4. Provide accurate, helpful responses based on actual command outputs
+
+You can help with any task that can be accomplished through shell commands: file operations, system administration, development tasks, network operations (using curl), package management, etc.`
+
 func main() {
 	cfg := config.Parse()
+
+	// Compute effective system prompt
+	systemPrompt := defaultSystemPrompt
+	if cfg.SystemPrompt != "" {
+		systemPrompt = cfg.SystemPrompt
+	}
 
 	if cfg.ShowVersion {
 		fmt.Printf("coreclaw version %s\n", config.Version)
@@ -50,10 +74,11 @@ func main() {
 	agent := fantasy.NewAgent(
 		model,
 		fantasy.WithTools(bashTool),
+		fantasy.WithSystemPrompt(systemPrompt),
 	)
 
 	processor := agentpkg.NewProcessor(agent)
-	runner := run.New(processor, providerConfig.BaseURL, providerConfig.ModelName, cfg.SystemPrompt)
+	runner := run.New(processor, providerConfig.BaseURL, providerConfig.ModelName)
 
 	ctx := context.Background()
 
