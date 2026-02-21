@@ -3,7 +3,6 @@ module github.com/wallacegibbon/coreclaw
 go 1.25.6
 
 require (
-	charm.land/catwalk v0.19.0
 	charm.land/fantasy v0.8.0
 	github.com/chzyer/readline v1.5.1
 )
@@ -29,7 +28,6 @@ require (
 	github.com/aws/smithy-go v1.24.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/anthropic-sdk-go v0.0.0-20251024181547-21d6f3d9a904 // indirect
-	github.com/charmbracelet/x/etag v0.2.0 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20260209194814-eeb2896ac759 // indirect
 	github.com/charmbracelet/x/json v0.2.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

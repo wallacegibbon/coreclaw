@@ -80,7 +80,7 @@ func main() {
 	)
 
 	processor := agentpkg.NewProcessor(agent)
-	runner := run.New(processor, providerConfig.BaseURL, providerConfig.ModelName)
+	runner := run.New(processor, providerConfig.BaseURL, providerConfig.ModelName, cfg.VimMode)
 
 	ctx := context.Background()
 
@@ -163,5 +163,7 @@ Flags:
   -debug-api          Show raw API requests and responses
   -file string        Read prompt from file
   -system string      Override system prompt
+  -vim                Enable vim keybindings (default: true)
+  -novim              Disable vim keybindings
 `)
 }

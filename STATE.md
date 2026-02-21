@@ -11,7 +11,6 @@ For this project, simplicity is more important than efficiency.
 ### Completed
 - ✅ Go module initialized (github.com/wallacegibbon/coreclaw)
 - ✅ fantasy dependency added (v0.8.0)
-- ✅ catwalk dependency added (v0.19.0) for provider database
 - ✅ readline dependency added for terminal input handling
 - ✅ Basic agent structure with OpenAI provider
 - ✅ Bash tool implementation with `fantasy.NewAgentTool`

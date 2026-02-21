@@ -22,15 +22,17 @@ type Runner struct {
 	Messages  []fantasy.Message
 	BaseURL   string
 	ModelName string
+	VimMode   bool
 }
 
 // New creates a new Runner
-func New(processor *agent.Processor, baseURL, modelName string) *Runner {
+func New(processor *agent.Processor, baseURL, modelName string, vimMode bool) *Runner {
 	return &Runner{
 		Processor: processor,
 		Messages:  nil,
 		BaseURL:   baseURL,
 		ModelName: modelName,
+		VimMode:   vimMode,
 	}
 }
 
@@ -49,7 +51,7 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 	}
 	var err error
 	if isTTY {
-		rl, err = terminal.ReadlineInstance(r.BaseURL, r.ModelName)
+		rl, err = terminal.ReadlineInstance(r.BaseURL, r.ModelName, r.VimMode)
 		if err != nil {
 			return fmt.Errorf("failed to initialize readline: %w", err)
 		}

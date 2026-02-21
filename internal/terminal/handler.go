@@ -96,11 +96,14 @@ func IsTerminal() bool {
 }
 
 // ReadlineInstance creates and configures a readline instance
-func ReadlineInstance(baseURL, model string) (*readline.Instance, error) {
-	return readline.NewEx(&readline.Config{
+func ReadlineInstance(baseURL, model string, vimMode bool) (*readline.Instance, error) {
+	cfg := &readline.Config{
 		Prompt:          GetPrompt(baseURL, model),
 		InterruptPrompt: "",
 		HistoryFile:     os.Getenv("HOME") + "/.coreclaw_history",
 		HistoryLimit:    1000,
-	})
+		VimMode:         vimMode,
+	}
+
+	return readline.NewEx(cfg)
 }

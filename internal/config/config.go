@@ -15,6 +15,7 @@ type Settings struct {
 	ShowVersion bool
 	ShowHelp     bool
 	DebugAPI     bool
+	VimMode      bool
 	PromptFile   string
 	SystemPrompt string
 	APIKey       string
@@ -29,6 +30,8 @@ func Parse() *Settings {
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
 	debugAPI := flag.Bool("debug-api", false, "Show raw API requests and responses")
+	vimMode := flag.Bool("vim", true, "Enable vim keybindings (default: true)")
+	noVimMode := flag.Bool("novim", false, "Disable vim keybindings")
 	promptFile := flag.String("file", "", "Read prompt from file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
 	apiKey := flag.String("api-key", "", "API key for the provider (required when using --base-url)")
@@ -41,6 +44,7 @@ func Parse() *Settings {
 		ShowVersion:  *showVersion,
 		ShowHelp:     *showHelp,
 		DebugAPI:     *debugAPI,
+		VimMode:      *vimMode && !*noVimMode,
 		PromptFile:   *promptFile,
 		SystemPrompt: *systemPrompt,
 		APIKey:       *apiKey,
