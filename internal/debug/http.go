@@ -56,7 +56,38 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 			// Try to parse as JSON and log it
 			var jsonData map[string]any
 			if json.Unmarshal([]byte(jsonStr), &jsonData) == nil {
-				// Check if finish_reason is null (streaming in progress)
+				// Check if this is Anthropic streaming format (content as array)
+				if content, ok := jsonData["content"].([]any); ok && len(content) > 0 {
+					// Anthropic streaming format - check for content blocks
+					for _, block := range content {
+						blockMap, ok := block.(map[string]any)
+						if !ok {
+							continue
+						}
+						blockType, _ := blockMap["type"].(string)
+						if blockType == "tool_use" {
+							name, _ := blockMap["name"].(string)
+							input, _ := blockMap["input"].(map[string]any)
+							inputJson, _ := json.Marshal(input)
+							fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"content\": { type: \"tool_use\", name: %q, input: %s } }\x1b[0m\n", name, inputJson)
+						} else if blockType == "thinking" {
+							thinking, _ := blockMap["thinking"].(string)
+							if len(thinking) > 0 && dr.firstRead {
+								fmt.Fprintf(os.Stderr, "\x1b[38;2;203;166;247m<<< Response Stream\x1b[0m\n")
+								fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mChunks:\x1b[0m\n")
+								dr.firstRead = false
+							}
+							fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"content\": { type: \"thinking\", ... } }\x1b[0m\n")
+						}
+					}
+					// Check for Anthropic-specific streaming fields
+					if _, hasType := jsonData["type"]; !hasType {
+						// Not a final response, continue
+						continue
+					}
+				}
+
+				// Check if finish_reason is null (streaming in progress) - OpenAI format
 				choices, ok := jsonData["choices"].([]any)
 				if ok && len(choices) > 0 {
 					choice, ok := choices[0].(map[string]any)
@@ -65,7 +96,10 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 						if !hasFinishReason || finishReason == nil {
 							// Streaming in progress - show condensed format
 							if delta, ok := choice["delta"].(map[string]any); ok {
-								if content, ok := delta["content"].(string); ok && content != "" {
+								// Check for thinking field first (Ollama uses this)
+								if thinking, ok := delta["thinking"].(string); ok && thinking != "" {
+									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.thinking\": %q }\x1b[0m\n", thinking)
+								} else if content, ok := delta["content"].(string); ok && content != "" {
 									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.content\": %q }\x1b[0m\n", content)
 								} else if toolCalls, ok := delta["tool_calls"].([]any); ok && len(toolCalls) > 0 {
 									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.tool_calls\": [...%d items] }\x1b[0m\n", len(toolCalls))

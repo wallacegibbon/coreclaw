@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"charm.land/fantasy"
 	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/openai"
+	"charm.land/fantasy/providers/openaicompat"
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/config"
 	debugpkg "github.com/wallacegibbon/coreclaw/internal/debug"
@@ -119,6 +121,18 @@ func createAnthropicProvider(apiKey, baseURL string, debugAPI bool) (interface{ 
 }
 
 func createOpenAIProvider(apiKey, baseURL string, debugAPI bool) (interface{ LanguageModel(context.Context, string) (fantasy.LanguageModel, error) }, error) {
+	// Use openaicompat for non-OpenAI URLs (Ollama, LM Studio, DeepSeek, etc.)
+	// This enables reasoning/thinking content support
+	if !strings.Contains(baseURL, "api.openai.com") {
+		var opts []openaicompat.Option
+		opts = append(opts, openaicompat.WithAPIKey(apiKey), openaicompat.WithBaseURL(baseURL))
+		if debugAPI {
+			opts = append(opts, openaicompat.WithHTTPClient(debugpkg.NewHTTPClient()))
+		}
+		return openaicompat.New(opts...)
+	}
+
+	// Use native OpenAI provider for api.openai.com
 	var opts []openai.Option
 	opts = append(opts, openai.WithAPIKey(apiKey), openai.WithBaseURL(baseURL))
 	if debugAPI {

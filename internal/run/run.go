@@ -36,7 +36,7 @@ func New(processor *agent.Processor, baseURL, modelName string) *Runner {
 
 // RunSingle runs a single prompt and exits
 func (r *Runner) RunSingle(ctx context.Context, prompt string) error {
-	_, _, err := r.Processor.ProcessPrompt(ctx, prompt, r.Messages)
+	_, _, _, err := r.Processor.ProcessPrompt(ctx, prompt, r.Messages)
 	return err
 }
 
@@ -110,7 +110,7 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 		requestInProgress = true
 		mu.Unlock()
 
-		_, responseText, err := r.Processor.ProcessPrompt(ctx, userPrompt, r.Messages)
+		_, responseText, assistantMsg, err := r.Processor.ProcessPrompt(ctx, userPrompt, r.Messages)
 
 		mu.Lock()
 		requestInProgress = false
@@ -128,7 +128,10 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 
 		r.Messages = append(r.Messages, fantasy.NewUserMessage(userPrompt))
 
-		if responseText != "" {
+		// Store assistant message with both text and tool calls
+		if assistantMsg.Role != "" {
+			r.Messages = append(r.Messages, assistantMsg)
+		} else if responseText != "" {
 			r.Messages = append(r.Messages, fantasy.Message{
 				Role:    fantasy.MessageRoleAssistant,
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: responseText}},

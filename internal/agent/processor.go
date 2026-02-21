@@ -25,7 +25,7 @@ func NewProcessor(agent fantasy.Agent) *Processor {
 }
 
 // ProcessPrompt handles a single prompt with streaming and optional markdown rendering
-func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages []fantasy.Message) (*fantasy.AgentResult, string, error) {
+func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages []fantasy.Message) (*fantasy.AgentResult, string, fantasy.Message, error) {
 	streamCall := fantasy.AgentStreamCall{
 		Prompt: prompt,
 	}
@@ -34,10 +34,18 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	var responseText strings.Builder
-	var lastCharWasNewline = true // Start true to suppress leading newline before first tool call
+	var lastCharWasNewline = true // Start true to suppress leading newline
 
 	// Suppress leading newlines and newlines after tool results
 	var suppressNewlines = true
+
+	streamCall.OnTextStart = func(id string) error {
+		// Add newline before text starts (after tool results)
+		if !lastCharWasNewline {
+			fmt.Println()
+		}
+		return nil
+	}
 
 	streamCall.OnTextDelta = func(id, text string) error {
 		responseText.WriteString(text)
@@ -68,10 +76,23 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 			return nil
 		}
 
+		// Show all text as bright (no thinking detection for OpenAI-compatible APIs)
 		fmt.Print(terminal.Bright(text))
 		if len(text) > 0 {
 			lastCharWasNewline = (text[len(text)-1] == '\n')
 		}
+		return nil
+	}
+
+	// Handle reasoning/thinking content
+	streamCall.OnReasoningDelta = func(id, text string) error {
+		fmt.Print(terminal.Dim(text))
+		return nil
+	}
+
+	streamCall.OnReasoningEnd = func(id string, reasoning fantasy.ReasoningContent) error {
+		// Add newline after thinking content ends
+		fmt.Println()
 		return nil
 	}
 
@@ -146,10 +167,25 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	agentResult, err := p.Agent.Stream(ctx, streamCall)
 	if err != nil {
 		fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf("Error: %v", err)))
-		return nil, "", err
+		return nil, "", fantasy.Message{}, err
 	}
 
 	fmt.Println()
 
-	return agentResult, responseText.String(), nil
+	// Extract the assistant message from the result
+	var assistantMsg fantasy.Message
+	if agentResult != nil && len(agentResult.Steps) > 0 {
+		lastStep := agentResult.Steps[len(agentResult.Steps)-1]
+		if len(lastStep.Messages) > 0 {
+			// Find assistant message in messages
+			for _, msg := range lastStep.Messages {
+				if msg.Role == fantasy.MessageRoleAssistant {
+					assistantMsg = msg
+					break
+				}
+			}
+		}
+	}
+
+	return agentResult, responseText.String(), assistantMsg, nil
 }

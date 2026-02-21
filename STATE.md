@@ -75,6 +75,26 @@ For this project, simplicity is more important than efficiency.
   - All config via CLI flags: --type, --base-url, --api-key, --model
   - No environment variables or default configs
   - Supports anthropic and openai provider types
+- ✅ Fixed tool_use messages being lost in conversation history
+  - Changed Processor.ProcessPrompt to return assistant message including tool calls
+  - Updated run.go to store full assistant message (text + tool calls) in history
+  - Previously only text was stored, losing tool calls between requests
+- ✅ Debug API now shows Anthropic content blocks
+  - Added parsing for Anthropic streaming format (content as array)
+  - Shows tool_use and thinking blocks in debug output
+- ✅ Thinking/thinking content display for Anthropic-compatible APIs
+  - Added OnReasoningDelta and OnReasoningEnd callbacks
+  - Thinking displayed in dim color with newline after
+- ✅ Text before tool calls displayed as thinking for OpenAI-compatible APIs
+  - Text before first tool call shown in dim (thinking style)
+  - Text after tool calls shown in bright
+  - Added OnTextStart for clean formatting between responses
+- ✅ Fixed thinking/reasoning content for OpenAI-compatible APIs
+  - Use openaicompat provider for non-OpenAI URLs (Ollama, LM Studio, DeepSeek, etc.)
+  - openaicompat has reasoning content hooks that the native openai provider lacks
+  - Debug transport now shows thinking field in addition to content and tool_calls
+- ✅ Simplified text display for OpenAI-compatible APIs
+  - All text now shown bright (no thinking detection)
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
