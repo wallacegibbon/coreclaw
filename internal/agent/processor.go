@@ -24,7 +24,7 @@ func NewProcessor(agent fantasy.Agent) *Processor {
 }
 
 // ProcessPrompt handles a single prompt with streaming
-func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages []fantasy.Message) (*fantasy.AgentResult, string, fantasy.Message, error) {
+func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages []fantasy.Message) (*fantasy.AgentResult, string, fantasy.Message, fantasy.Usage, error) {
 	streamCall := fantasy.AgentStreamCall{
 		Prompt: prompt,
 	}
@@ -72,13 +72,71 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	agentResult, err := p.Agent.Stream(ctx, streamCall)
 	if err != nil {
 		fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf("Error: %v", err)))
-		return nil, "", fantasy.Message{}, err
+		return nil, "", fantasy.Message{}, fantasy.Usage{}, err
 	}
 
-	fmt.Println()
-
 	assistantMsg := extractAssistantMessage(agentResult)
-	return agentResult, responseText.String(), assistantMsg, nil
+	return agentResult, responseText.String(), assistantMsg, agentResult.TotalUsage, nil
+}
+
+// Summarize handles summarizing the conversation history
+func (p *Processor) Summarize(ctx context.Context, messages []fantasy.Message) (string, fantasy.Message, fantasy.Usage, error) {
+	summarizePrompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
+
+	streamCall := fantasy.AgentStreamCall{
+		Prompt: summarizePrompt,
+	}
+	if len(messages) > 0 {
+		streamCall.Messages = messages
+	}
+
+	responseText := &strings.Builder{}
+
+	streamCall.OnTextStart = func(id string) error {
+		return nil
+	}
+
+	streamCall.OnTextDelta = func(id, text string) error {
+		responseText.WriteString(text)
+		fmt.Print(terminal.Bright(text))
+		return nil
+	}
+
+	streamCall.OnReasoningDelta = func(id, text string) error {
+		fmt.Print(terminal.Dim(text))
+		return nil
+	}
+
+	streamCall.OnReasoningEnd = func(id string, reasoning fantasy.ReasoningContent) error {
+		fmt.Println()
+		return nil
+	}
+
+	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
+		return nil
+	}
+
+	streamCall.OnToolResult = func(tr fantasy.ToolResultContent) error {
+		return nil
+	}
+
+	agentResult, err := p.Agent.Stream(ctx, streamCall)
+	if err != nil {
+		return "", fantasy.Message{}, fantasy.Usage{}, err
+	}
+
+	var usage fantasy.Usage
+	if agentResult != nil {
+		usage = agentResult.TotalUsage
+	}
+
+	// Create a summary message that replaces the conversation
+	summaryMsg := fantasy.Message{
+		Role:    fantasy.MessageRoleUser,
+		Content: []fantasy.MessagePart{fantasy.TextPart{Text: responseText.String()}},
+	}
+
+	return responseText.String(), summaryMsg, usage, nil
 }
 
 // extractBashCommand extracts the command from bash tool input JSON

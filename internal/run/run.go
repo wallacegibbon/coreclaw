@@ -18,11 +18,13 @@ import (
 
 // Runner handles running the agent
 type Runner struct {
-	Processor  *agent.Processor
-	Messages  []fantasy.Message
-	BaseURL   string
-	ModelName string
-	VimMode   bool
+	Processor   *agent.Processor
+	Messages    []fantasy.Message
+	BaseURL     string
+	ModelName   string
+	VimMode     bool
+	TotalSpent  fantasy.Usage
+	ContextSize int64
 }
 
 // New creates a new Runner
@@ -38,7 +40,7 @@ func New(processor *agent.Processor, baseURL, modelName string, vimMode bool) *R
 
 // RunSingle runs a single prompt and exits
 func (r *Runner) RunSingle(ctx context.Context, prompt string) error {
-	_, _, _, err := r.Processor.ProcessPrompt(ctx, prompt, r.Messages)
+	_, _, _, _, err := r.Processor.ProcessPrompt(ctx, prompt, r.Messages)
 	return err
 }
 
@@ -108,15 +110,65 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 			continue
 		}
 
+		// Handle /summarize command
+		if strings.HasPrefix(userPrompt, "/") {
+			command := strings.TrimPrefix(userPrompt, "/")
+			switch command {
+			case "summarize":
+				mu.Lock()
+				requestInProgress = true
+				mu.Unlock()
+
+				_, summaryMsg, usage, err := r.Processor.Summarize(ctx, r.Messages)
+
+				mu.Lock()
+				requestInProgress = false
+				mu.Unlock()
+
+				// Accumulate token usage
+				r.TotalSpent.InputTokens += usage.InputTokens
+				r.TotalSpent.OutputTokens += usage.OutputTokens
+				r.TotalSpent.TotalTokens += usage.TotalTokens
+				r.TotalSpent.ReasoningTokens += usage.ReasoningTokens
+
+				// Replace messages with summary to reduce token count
+				r.Messages = []fantasy.Message{summaryMsg}
+				// Context becomes the summarize output
+				r.ContextSize = usage.OutputTokens
+
+				// Print context size and total spent
+				fmt.Println()
+				printUsage(r.ContextSize, r.TotalSpent)
+
+				if err != nil {
+					if ctx.Err() == context.Canceled {
+						cancel()
+						ctx, cancel = context.WithCancel(context.Background())
+						defer cancel()
+						continue
+					}
+				}
+			default:
+				fmt.Printf("Unknown command: %s\n", command)
+			}
+			continue
+		}
+
 		mu.Lock()
 		requestInProgress = true
 		mu.Unlock()
 
-		_, responseText, assistantMsg, err := r.Processor.ProcessPrompt(ctx, userPrompt, r.Messages)
+		_, responseText, assistantMsg, usage, err := r.Processor.ProcessPrompt(ctx, userPrompt, r.Messages)
 
 		mu.Lock()
 		requestInProgress = false
 		mu.Unlock()
+
+		// Accumulate token usage
+		r.TotalSpent.InputTokens += usage.InputTokens
+		r.TotalSpent.OutputTokens += usage.OutputTokens
+		r.TotalSpent.TotalTokens += usage.TotalTokens
+		r.TotalSpent.ReasoningTokens += usage.ReasoningTokens
 
 		if err != nil {
 			if ctx.Err() == context.Canceled {
@@ -139,5 +191,20 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: responseText}},
 			})
 		}
+
+		// Accumulate context size
+		r.ContextSize += usage.InputTokens
+
+		// Print context size and total spent
+		fmt.Println()
+		printUsage(r.ContextSize, r.TotalSpent)
 	}
+}
+
+// printUsage displays context size and total tokens spent
+func printUsage(contextSize int64, spent fantasy.Usage) {
+	dim := "\x1b[90m"
+	reset := "\x1b[0m"
+	fmt.Fprintf(os.Stdout, dim+"Tokens: context=%d, spent=%d"+reset+"\n",
+		contextSize, spent.TotalTokens)
 }

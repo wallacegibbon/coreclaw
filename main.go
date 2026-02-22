@@ -99,7 +99,9 @@ func main() {
 	}
 }
 
-func createProvider(provider, apiKey, baseURL string, debugAPI bool) (interface{ LanguageModel(context.Context, string) (fantasy.LanguageModel, error) }, error) {
+func createProvider(provider, apiKey, baseURL string, debugAPI bool) (interface {
+	LanguageModel(context.Context, string) (fantasy.LanguageModel, error)
+}, error) {
 	switch provider {
 	case "anthropic":
 		return createAnthropicProvider(apiKey, baseURL, debugAPI)
@@ -108,7 +110,9 @@ func createProvider(provider, apiKey, baseURL string, debugAPI bool) (interface{
 	}
 }
 
-func createAnthropicProvider(apiKey, baseURL string, debugAPI bool) (interface{ LanguageModel(context.Context, string) (fantasy.LanguageModel, error) }, error) {
+func createAnthropicProvider(apiKey, baseURL string, debugAPI bool) (interface {
+	LanguageModel(context.Context, string) (fantasy.LanguageModel, error)
+}, error) {
 	var opts []anthropic.Option
 	opts = append(opts, anthropic.WithAPIKey(apiKey))
 	if baseURL != "" {
@@ -120,7 +124,9 @@ func createAnthropicProvider(apiKey, baseURL string, debugAPI bool) (interface{ 
 	return anthropic.New(opts...)
 }
 
-func createOpenAIProvider(apiKey, baseURL string, debugAPI bool) (interface{ LanguageModel(context.Context, string) (fantasy.LanguageModel, error) }, error) {
+func createOpenAIProvider(apiKey, baseURL string, debugAPI bool) (interface {
+	LanguageModel(context.Context, string) (fantasy.LanguageModel, error)
+}, error) {
 	// Use openaicompat for non-OpenAI URLs (Ollama, LM Studio, DeepSeek, etc.)
 	// This enables reasoning/thinking content support
 	if !strings.Contains(baseURL, "api.openai.com") {

@@ -12,7 +12,7 @@ const Version = "0.1.0"
 
 // Settings holds all CLI configuration
 type Settings struct {
-	ShowVersion bool
+	ShowVersion  bool
 	ShowHelp     bool
 	DebugAPI     bool
 	VimMode      bool
