@@ -66,6 +66,8 @@ coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GL
 - `-debug-api` - Show raw API requests and responses (to stderr)
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt
+- `-vim` - Enable vim keybindings (default: true)
+- `-novim` - Disable vim keybindings
 
 
 ## Agent Instructions
