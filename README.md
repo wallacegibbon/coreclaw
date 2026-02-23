@@ -55,6 +55,7 @@ coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GL
 - `-debug-api` - Show raw API requests and responses
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt
+- `-skill string` - Skills directory path
 
 ## Features
 
@@ -69,6 +70,7 @@ coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GL
 - Custom system prompts
 - Read prompts from files
 - API debug mode for HTTP requests and responses
+- Skills system (agentskills.io compatible)
 
 ## Project Status
 

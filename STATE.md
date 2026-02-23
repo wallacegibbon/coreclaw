@@ -91,6 +91,13 @@ For this project, simplicity is more important than efficiency.
   - Debug transport now shows thinking field in addition to content and tool_calls
 - ✅ Simplified text display for OpenAI-compatible APIs
   - All text now shown bright (no thinking detection)
+- ✅ Skills system based on agentskills.io specification
+  - Skill discovery from directories with SKILL.md files
+  - YAML frontmatter parsing (name, description, license, compatibility)
+  - Progressive disclosure: metadata at startup, full content on activation
+  - System prompt injection with XML format for available skills
+  - Skill activation via Manager.ActivateSkill()
+  - Test coverage for parsing, discovery, and activation
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
@@ -106,6 +113,7 @@ internal/
   debug/       - Debug HTTP transport for API debugging
   provider/    - Provider configuration (API keys, endpoints)
   run/         - Runner for single prompt and interactive modes
+  skills/      - Skills system (discovery, parsing, activation)
   terminal/    - Terminal utilities (colors, prompts, readline)
   tools/       - Tool implementations (bash)
 main.go       - Entry point, minimal glue code
@@ -117,7 +125,7 @@ main.go       - Entry point, minimal glue code
 - Token usage tracking
 - Error handling for command execution
 - CLI-based provider configuration (no env vars)
-- CLI flags: --type, --base-url, --api-key, --model
+- CLI flags: --type, --base-url, --api-key, --model, --skill
 - Provider types: anthropic, openai
 - Color-coded output for better readability
 - Command history for interactive sessions
@@ -146,6 +154,9 @@ main.go       - Entry point, minimal glue code
 
 # Run interactively
 ./coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+
+# Run with skills
+./coreclaw --skill ./skills --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "extract text from document.pdf"
 
 # Show help
 ./coreclaw --help

@@ -14,6 +14,7 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/config"
 	debugpkg "github.com/wallacegibbon/coreclaw/internal/debug"
 	"github.com/wallacegibbon/coreclaw/internal/run"
+	"github.com/wallacegibbon/coreclaw/internal/skills"
 	"github.com/wallacegibbon/coreclaw/internal/tools"
 )
 
@@ -70,6 +71,19 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create language model: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Initialize skills manager
+	skillsManager, err := skills.NewManager(cfg.Skills)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize skills: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Generate skills fragment for system prompt
+	skillsFragment := skillsManager.GenerateSystemPromptFragment()
+	if skillsFragment != "" {
+		systemPrompt = systemPrompt + "\n\n" + skillsFragment
 	}
 
 	bashTool := tools.NewBashTool()
@@ -162,13 +176,14 @@ Examples:
 Flags:
   -type string        Provider type: anthropic, openai (required)
   -base-url string    API endpoint URL (required)
-  -api-key string     API key (required)
+  -api-key string     API key for the provider (required)
   -model string       Model name to use
   -version            Show version information
   -help               Show help information
   -debug-api          Show raw API requests and responses
   -file string        Read prompt from file
   -system string      Override system prompt
+  -skill string       Skills directory path (can be specified multiple times)
   -vim                Enable vim keybindings (default: true)
   -novim              Disable vim keybindings
 `)

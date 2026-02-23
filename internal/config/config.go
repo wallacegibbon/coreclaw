@@ -23,6 +23,7 @@ type Settings struct {
 	ModelName    string
 	ProviderType string
 	Prompt       string
+	Skills       []string
 }
 
 // Parse parses CLI flags and returns settings
@@ -38,7 +39,14 @@ func Parse() *Settings {
 	baseURL := flag.String("base-url", "", "Base URL for the API endpoint (requires --api-key, ignores env vars)")
 	modelName := flag.String("model", "", "Model name to use (defaults to provider default)")
 	providerType := flag.String("type", "", "Provider type: anthropic, openai (overrides auto-detection)")
+	skill := flag.String("skill", "", "Skill path (can be specified multiple times)")
 	flag.Parse()
+
+	// Collect skill paths
+	var skillPaths []string
+	if *skill != "" {
+		skillPaths = append(skillPaths, *skill)
+	}
 
 	s := &Settings{
 		ShowVersion:  *showVersion,
@@ -51,6 +59,7 @@ func Parse() *Settings {
 		BaseURL:      *baseURL,
 		ModelName:    *modelName,
 		ProviderType: *providerType,
+		Skills:       skillPaths,
 	}
 
 	// Get prompt from file or args

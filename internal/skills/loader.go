@@ -1,0 +1,143 @@
+package skills
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// Manager handles skill discovery and loading
+type Manager struct {
+	skills      []Skill
+	skillDir    string
+}
+
+// NewManager creates a new skill manager
+func NewManager(skillPaths []string) (*Manager, error) {
+	m := &Manager{
+		skills:   []Skill{},
+		skillDir: "",
+	}
+
+	// If no skill paths provided, return empty manager
+	if len(skillPaths) == 0 {
+		return m, nil
+	}
+
+	// Use first skill path as skill directory
+	// (multiple paths could be supported in future)
+	m.skillDir = skillPaths[0]
+
+	// Discover and load skill metadata
+	if err := m.discoverSkills(); err != nil {
+		return nil, fmt.Errorf("failed to discover skills: %w", err)
+	}
+
+	return m, nil
+}
+
+// discoverSkills scans the skills directory for skills
+func (m *Manager) discoverSkills() error {
+	entries, err := os.ReadDir(m.skillDir)
+	if err != nil {
+		// If directory doesn't exist, that's OK - no skills
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		skillPath := filepath.Join(m.skillDir, entry.Name())
+		skillFile := filepath.Join(skillPath, "SKILL.md")
+
+		if _, err := os.Stat(skillFile); os.IsNotExist(err) {
+			continue
+		}
+
+		// Load only metadata at startup
+		skill, err := m.loadSkillMetadata(skillFile, entry.Name())
+		if err != nil {
+			// Skip invalid skills but log warning
+			fmt.Fprintf(os.Stderr, "Warning: failed to load skill %s: %v\n", entry.Name(), err)
+			continue
+		}
+
+		m.skills = append(m.skills, skill)
+	}
+
+	return nil
+}
+
+// loadSkillMetadata loads only the frontmatter from a SKILL.md file
+func (m *Manager) loadSkillMetadata(skillFile, dirName string) (Skill, error) {
+	content, err := os.ReadFile(skillFile)
+	if err != nil {
+		return Skill{}, err
+	}
+
+	metadata, _, err := ParseSkillMarkdown(string(content))
+	if err != nil {
+		return Skill{}, err
+	}
+
+	// Validate name matches directory
+	if metadata.Name != "" && metadata.Name != dirName {
+		return Skill{}, fmt.Errorf("skill name '%s' does not match directory '%s'", metadata.Name, dirName)
+	}
+
+	// Use directory name if name not specified
+	if metadata.Name == "" {
+		metadata.Name = dirName
+	}
+
+	return Skill{
+		Name:        metadata.Name,
+		Description: metadata.Description,
+		Location:    skillFile,
+		Content:     string(content), // Store full content for activation
+		Metadata:    metadata,
+	}, nil
+}
+
+// ActivateSkill loads the full content of a skill
+func (m *Manager) ActivateSkill(name string) (string, error) {
+	for _, skill := range m.skills {
+		if skill.Name == name {
+			return skill.Content, nil
+		}
+	}
+	return "", fmt.Errorf("skill not found: %s", name)
+}
+
+// GetMetadata returns all skill metadata for system prompt injection
+func (m *Manager) GetMetadata() []Skill {
+	return m.skills
+}
+
+// GenerateSystemPromptFragment generates the XML fragment for system prompt
+func (m *Manager) GenerateSystemPromptFragment() string {
+	if len(m.skills) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n<available_skills>\n")
+
+	for _, skill := range m.skills {
+		sb.WriteString("  <skill>\n")
+		sb.WriteString(fmt.Sprintf("    <name>%s</name>\n", skill.Name))
+		sb.WriteString(fmt.Sprintf("    <description>%s</description>\n", skill.Description))
+		sb.WriteString(fmt.Sprintf("    <location>%s</location>\n", skill.Location))
+		sb.WriteString("  </skill>\n")
+	}
+
+	sb.WriteString("</available_skills>\n")
+
+	return sb.String()
+}
