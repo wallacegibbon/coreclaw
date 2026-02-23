@@ -35,6 +35,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	responseText := &strings.Builder{}
 
 	streamCall.OnTextStart = func(id string) error {
+		fmt.Println()
 		return nil
 	}
 
