@@ -23,7 +23,9 @@ const defaultSystemPrompt = `You are an AI assistant with bash tool access.
 RULES:
 - Use bash for all interactions (file ops, commands, network via curl)
 - Never assume - verify with bash commands
-- Check <available_skills> below; activate relevant ones by reading their SKILL.md`
+- Check <available_skills> below; activate relevant ones by reading their SKILL.md
+- When running skill scripts, cd to the skill's directory first (e.g., cd /path/to/skill && ./scripts/script.sh)
+- Do NOT use find to locate scripts - use the path from SKILL.md`
 
 func main() {
 	cfg := config.Parse()

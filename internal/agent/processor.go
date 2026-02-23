@@ -51,6 +51,10 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	streamCall.OnReasoningEnd = func(id string, reasoning fantasy.ReasoningContent) error {
+		return nil
+	}
+
+	streamCall.OnTextStart = func(id string) error {
 		fmt.Println()
 		return nil
 	}
