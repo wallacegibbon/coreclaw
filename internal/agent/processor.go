@@ -35,7 +35,6 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	responseText := &strings.Builder{}
 
 	streamCall.OnTextStart = func(id string) error {
-		fmt.Println()
 		return nil
 	}
 
@@ -162,7 +161,7 @@ func formatCommand(cmd string) string {
 func printCommand(cmd string) {
 	displayCmd := formatCommand(cmd)
 	prefix := terminal.Dim("→ ")
-	fmt.Printf("\n%s%s\n", prefix, terminal.Green(displayCmd))
+	fmt.Printf("%s%s\n", prefix, terminal.Green(displayCmd))
 }
 
 // extractAssistantMessage extracts the assistant message from agent result
