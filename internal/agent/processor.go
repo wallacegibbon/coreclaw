@@ -67,6 +67,21 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	streamCall.OnToolResult = func(tr fantasy.ToolResultContent) error {
+		// Print tool output from beginning of line
+		fmt.Println()
+
+		// Extract text from tool result
+		var text string
+		switch result := tr.Result.(type) {
+		case fantasy.ToolResultOutputContentText:
+			text = result.Text
+		case fantasy.ToolResultOutputContentError:
+			text = result.Error.Error()
+		default:
+			text = fmt.Sprintf("%v", tr.Result)
+		}
+
+		fmt.Print(terminal.Dim(text))
 		return nil
 	}
 
