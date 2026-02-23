@@ -161,7 +161,7 @@ func formatCommand(cmd string) string {
 func printCommand(cmd string) {
 	displayCmd := formatCommand(cmd)
 	prefix := terminal.Dim("→ ")
-	fmt.Printf("%s%s\n", prefix, terminal.Green(displayCmd))
+	fmt.Printf("\n%s%s\n", prefix, terminal.Green(displayCmd))
 }
 
 // extractAssistantMessage extracts the assistant message from agent result
