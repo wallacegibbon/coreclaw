@@ -12,11 +12,6 @@ func Bright(text string) string {
 	return fmt.Sprintf("\x1b[1;38;2;205;214;244m%s\x1b[0m", text)
 }
 
-// Cyan returns text in cyan color
-func Cyan(text string) string {
-	return fmt.Sprintf("\x1b[38;2;137;220;235m%s\x1b[0m", text)
-}
-
 // Green returns text in green color
 func Green(text string) string {
 	return fmt.Sprintf("\x1b[38;2;166;227;161m%s\x1b[0m", text)

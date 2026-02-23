@@ -131,9 +131,9 @@ func (m *Manager) GenerateSystemPromptFragment() string {
 
 	for _, skill := range m.skills {
 		sb.WriteString("  <skill>\n")
-		sb.WriteString(fmt.Sprintf("    <name>%s</name>\n", skill.Name))
-		sb.WriteString(fmt.Sprintf("    <description>%s</description>\n", skill.Description))
-		sb.WriteString(fmt.Sprintf("    <location>%s</location>\n", skill.Location))
+		fmt.Fprintf(&sb, "    <name>%s</name>\n", skill.Name)
+		fmt.Fprintf(&sb, "    <description>%s</description>\n", skill.Description)
+		fmt.Fprintf(&sb, "    <location>%s</location>\n", skill.Location)
 		sb.WriteString("  </skill>\n")
 	}
 
