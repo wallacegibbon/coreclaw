@@ -80,34 +80,6 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 							fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"content\": { type: \"thinking\", ... } }\x1b[0m\n")
 						}
 					}
-					// Check for Anthropic-specific streaming fields
-					if _, hasType := jsonData["type"]; !hasType {
-						// Not a final response, continue
-						continue
-					}
-				}
-
-				// Check if finish_reason is null (streaming in progress) - OpenAI format
-				choices, ok := jsonData["choices"].([]any)
-				if ok && len(choices) > 0 {
-					choice, ok := choices[0].(map[string]any)
-					if ok {
-						finishReason, hasFinishReason := choice["finish_reason"]
-						if !hasFinishReason || finishReason == nil {
-							// Streaming in progress - show condensed format
-							if delta, ok := choice["delta"].(map[string]any); ok {
-								// Check for thinking field first (Ollama uses this)
-								if thinking, ok := delta["thinking"].(string); ok && thinking != "" {
-									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.thinking\": %q }\x1b[0m\n", thinking)
-								} else if content, ok := delta["content"].(string); ok && content != "" {
-									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.content\": %q }\x1b[0m\n", content)
-								} else if toolCalls, ok := delta["tool_calls"].([]any); ok && len(toolCalls) > 0 {
-									fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"choices[0].delta.tool_calls\": [...%d items] }\x1b[0m\n", len(toolCalls))
-								}
-							}
-							continue
-						}
-					}
 				}
 
 				// Full format for final chunks or other cases
