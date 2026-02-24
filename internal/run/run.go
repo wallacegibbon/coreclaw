@@ -158,6 +158,9 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 		requestInProgress = true
 		mu.Unlock()
 
+		// Add user message to history BEFORE processing (so it's preserved on Ctrl-C)
+		r.Messages = append(r.Messages, fantasy.NewUserMessage(userPrompt))
+
 		_, responseText, assistantMsg, usage, err := r.Processor.ProcessPrompt(ctx, userPrompt, r.Messages)
 
 		mu.Lock()
@@ -179,8 +182,6 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 			}
 			continue
 		}
-
-		r.Messages = append(r.Messages, fantasy.NewUserMessage(userPrompt))
 
 		// Store assistant message with both text and tool calls
 		if assistantMsg.Role != "" {
