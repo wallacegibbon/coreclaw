@@ -131,7 +131,7 @@ func (p *Processor) Summarize(ctx context.Context, messages []fantasy.Message) (
 
 	// Create a summary message that replaces the conversation
 	summaryMsg := fantasy.Message{
-		Role:    fantasy.MessageRoleUser,
+		Role:    fantasy.MessageRoleAssistant,
 		Content: []fantasy.MessagePart{fantasy.TextPart{Text: responseText.String()}},
 	}
 
