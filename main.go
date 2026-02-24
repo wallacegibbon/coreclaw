@@ -21,8 +21,7 @@ import (
 const defaultSystemPrompt = `You are an AI assistant with bash tool access.
 
 RULES:
-- Use bash for all interactions (file ops, commands, network via curl)
-- Never assume - verify with bash commands
+- Never assume - verify with tools
 - Check <available_skills> below; activate relevant ones using the activate_skill tool
 - When running skill scripts, cd to the skill's directory first (e.g., cd /path/to/skill && ./scripts/script.sh)
 - Do NOT use find to locate scripts - use the path from SKILL.md`
@@ -77,14 +76,14 @@ func main() {
 		systemPrompt = systemPrompt + "\n\n" + skillsFragment
 	}
 
-	bashTool := tools.NewBashTool()
-	activateSkillTool := tools.NewActivateSkillTool(skillsManager)
 	readFileTool := tools.NewReadFileTool()
-	editFileTool := tools.NewEditFileTool()
+	writeFileTool := tools.NewWriteFileTool()
+	activateSkillTool := tools.NewActivateSkillTool(skillsManager)
+	bashTool := tools.NewBashTool()
 
 	agent := fantasy.NewAgent(
 		model,
-		fantasy.WithTools(bashTool, activateSkillTool, readFileTool, editFileTool),
+		fantasy.WithTools(readFileTool, writeFileTool, activateSkillTool, bashTool),
 		fantasy.WithSystemPrompt(systemPrompt),
 	)
 

@@ -1,6 +1,6 @@
 # CoreClaw
 
-A minimal AI Agent that can handle toolcalling, powered by Large Language Models. It provides a single tool—`bash`—and all capabilities are built on top of it.
+A minimal AI Agent that can handle toolcalling, powered by Large Language Models. It provides multiple tools for file operations and shell execution.
 
 CoreClaw supports multiple providers (OpenAI, Anthropic, DeepSeek, ZAI, and any OpenAI-compatible or Anthropic-compatible server like Ollama) via a simple CLI interface.
 
@@ -73,6 +73,18 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 - `-novim` - Disable vim keybindings
 
 
+## Tools
+
+CoreClaw provides the following tools (ordered from safest to most dangerous):
+
+| Tool | Description |
+|------|-------------|
+| `read_file` | Read the contents of a file |
+| `write_file` | Create a new file or replace entire file content |
+| `activate_skill` | Load and execute a skill |
+| `bash` | Execute shell commands |
+
+
 ## Skills System
 
 CoreClaw supports the Agent Skills specification from [agentskills.io](https://agentskills.io). Skills are packages of instructions, scripts, and resources that agents can discover and use to perform specific tasks.
@@ -142,3 +154,12 @@ Skills metadata is injected into the system prompt using XML format:
 - **Update STATE.md** after completing any meaningful work (features, bug fixes, etc.)
 - **Keep AGENTS.md and README.md in sync** - update both files together before commits
 - Keep STATE.md as the single source of truth for project status
+
+### Tool Ordering
+
+Tools must be ordered from safest to most dangerous:
+
+1. `read_file` - Read file contents
+2. `write_file` - Create or replace files (full overwrite)
+3. `activate_skill` - Load and execute skills
+4. `bash` - Execute shell commands (most dangerous)
