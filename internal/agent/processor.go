@@ -174,12 +174,12 @@ func printToolCall(tc fantasy.ToolCallContent) {
 		cmd := extractBashCommand(tc.Input)
 		if cmd != "" {
 			displayCmd := formatCommand(cmd)
-			fmt.Printf("\n%s %s\n", terminal.Yellow("→"), terminal.Green(displayCmd))
+			fmt.Printf("\n%s %s: %s\n", terminal.Yellow("→"), terminal.Yellow("bash"), terminal.Green(displayCmd))
 		}
 	case "activate_skill":
 		name := extractSkillName(tc.Input)
 		if name != "" {
-			fmt.Printf("\n%s %s\n", terminal.Yellow("→"), terminal.Yellow(name))
+			fmt.Printf("\n%s %s: %s\n", terminal.Yellow("→"), terminal.Yellow("activate_skill"), terminal.Green(name))
 		}
 	}
 }
