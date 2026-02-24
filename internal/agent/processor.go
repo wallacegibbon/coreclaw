@@ -60,12 +60,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
-		if tc.ToolName == "bash" {
-			cmd := extractBashCommand(tc.Input)
-			if cmd != "" {
-				printCommand(cmd)
-			}
-		}
+		printToolCall(tc)
 		return nil
 	}
 
@@ -154,6 +149,17 @@ func extractBashCommand(input string) string {
 	return bashInput.Command
 }
 
+// extractSkillName extracts the skill name from activate_skill tool input JSON
+func extractSkillName(input string) string {
+	var skillInput struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal([]byte(input), &skillInput); err != nil {
+		return ""
+	}
+	return skillInput.Name
+}
+
 // formatCommand formats a command for display (escape newlines and tabs)
 func formatCommand(cmd string) string {
 	cmd = strings.ReplaceAll(cmd, "\n", "\\n")
@@ -161,11 +167,21 @@ func formatCommand(cmd string) string {
 	return cmd
 }
 
-// printCommand displays a command with arrow prefix
-func printCommand(cmd string) {
-	displayCmd := formatCommand(cmd)
-	prefix := terminal.Dim("→ ")
-	fmt.Printf("\n%s%s\n", prefix, terminal.Green(displayCmd))
+// printToolCall displays tool call info in uniform format
+func printToolCall(tc fantasy.ToolCallContent) {
+	switch tc.ToolName {
+	case "bash":
+		cmd := extractBashCommand(tc.Input)
+		if cmd != "" {
+			displayCmd := formatCommand(cmd)
+			fmt.Printf("\n%s %s\n", terminal.Yellow("→"), terminal.Green(displayCmd))
+		}
+	case "activate_skill":
+		name := extractSkillName(tc.Input)
+		if name != "" {
+			fmt.Printf("\n%s %s\n", terminal.Yellow("→"), terminal.Yellow(name))
+		}
+	}
 }
 
 // extractAssistantMessage extracts the assistant message from agent result
