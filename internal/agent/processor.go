@@ -160,6 +160,28 @@ func extractSkillName(input string) string {
 	return skillInput.Name
 }
 
+// extractReadFilePath extracts the path from read_file tool input JSON
+func extractReadFilePath(input string) string {
+	var fileInput struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(input), &fileInput); err != nil {
+		return ""
+	}
+	return fileInput.Path
+}
+
+// extractEditFilePath extracts the path from edit_file tool input JSON
+func extractEditFilePath(input string) string {
+	var fileInput struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(input), &fileInput); err != nil {
+		return ""
+	}
+	return fileInput.Path
+}
+
 // formatCommand formats a command for display (escape newlines and tabs)
 func formatCommand(cmd string) string {
 	cmd = strings.ReplaceAll(cmd, "\n", "\\n")
@@ -180,6 +202,16 @@ func printToolCall(tc fantasy.ToolCallContent) {
 		name := extractSkillName(tc.Input)
 		if name != "" {
 			fmt.Printf("\n%s %s: %s\n", terminal.Yellow("→"), terminal.Yellow("activate_skill"), terminal.Green(name))
+		}
+	case "read_file":
+		path := extractReadFilePath(tc.Input)
+		if path != "" {
+			fmt.Printf("\n%s %s: %s\n", terminal.Yellow("→"), terminal.Yellow("read_file"), terminal.Green(path))
+		}
+	case "edit_file":
+		path := extractEditFilePath(tc.Input)
+		if path != "" {
+			fmt.Printf("\n%s %s: %s\n", terminal.Yellow("→"), terminal.Yellow("edit_file"), terminal.Green(path))
 		}
 	}
 }

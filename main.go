@@ -79,10 +79,12 @@ func main() {
 
 	bashTool := tools.NewBashTool()
 	activateSkillTool := tools.NewActivateSkillTool(skillsManager)
+	readFileTool := tools.NewReadFileTool()
+	editFileTool := tools.NewEditFileTool()
 
 	agent := fantasy.NewAgent(
 		model,
-		fantasy.WithTools(bashTool, activateSkillTool),
+		fantasy.WithTools(bashTool, activateSkillTool, readFileTool, editFileTool),
 		fantasy.WithSystemPrompt(systemPrompt),
 	)
 
