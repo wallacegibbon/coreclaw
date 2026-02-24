@@ -25,14 +25,11 @@ go build
 All configuration must be specified via command line flags:
 
 ```bash
-# OpenAI API
-coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "hello"
-
-# Anthropic API
-coreclaw --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 "hello"
-
-# Local AI server (e.g., Ollama, LM Studio)
+# Local Ollama OpenAI-compatible server
 coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 "hello"
+
+# Local Ollama Anthropic-compatible server
+coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --model gpt-oss:20b "hello"
 
 # MiniMax (Anthropic-compatible)
 coreclaw --type anthropic --base-url $MINIMAXI_API_URL --api-key $MINIMAXI_API_KEY --model MiniMax-M2.5 "hello"
@@ -42,6 +39,11 @@ coreclaw --type openai --base-url $DEEPSEEK_API_URL --api-key $DEEPSEEK_API_KEY 
 
 # ZAI (OpenAI-compatible)
 coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GLM-4.7 "hello"
+```
+
+Running with skills
+```bash
+coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --model gpt-oss:20b --skill ~/playground/coreclaw/misc/samples/skills/
 ```
 
 ## Flags
