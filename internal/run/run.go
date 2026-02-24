@@ -161,7 +161,12 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 		// Add user message to history BEFORE processing (so it's preserved on Ctrl-C)
 		r.Messages = append(r.Messages, fantasy.NewUserMessage(userPrompt))
 
-		_, responseText, assistantMsg, usage, err := r.Processor.ProcessPrompt(ctx, userPrompt, r.Messages)
+		// Create a copy of messages to send to API (without the pending user message)
+		// This prevents duplication when Ctrl-C is pressed
+		messagesForAPI := make([]fantasy.Message, len(r.Messages)-1)
+		copy(messagesForAPI, r.Messages[:len(r.Messages)-1])
+
+		_, responseText, assistantMsg, usage, err := r.Processor.ProcessPrompt(ctx, userPrompt, messagesForAPI)
 
 		mu.Lock()
 		requestInProgress = false
