@@ -93,6 +93,8 @@ func (w *TLVWriter) writeColored(tag byte, value string) {
 		colored = Dim(value)
 	case stream.TagError:
 		colored = Dim(value)
+	case stream.TagUsage:
+		colored = "\n" + Dim("Tokens: " + value) + "\n"
 	default:
 		colored = value
 	}
@@ -136,7 +138,7 @@ func (w *TLVWriter) Close() error {
 // isValidTag checks if a byte is a valid TLV tag
 func isValidTag(b byte) bool {
 	switch b {
-	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError:
+	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagUsage:
 		return true
 	}
 	return false

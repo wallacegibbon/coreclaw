@@ -102,12 +102,14 @@ For this project, simplicity is more important than efficiency.
   - Input/Output interfaces in internal/stream/stream.go
   - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E')
   - Buffered reads/writes with Flush() method
-- ✅ TerminalAdaptor connecting stdio to agent processor
-  - internal/terminal/adaptor.go
-  - TLV decoding and ANSI color styling
-- ✅ WebSocket server (coreclaw-web)
+- ✅ Adaptors in internal/adaptors/
+  - terminal.go - Terminal adaptor connecting stdio to agent processor
+  - websocket.go - WebSocket server with per-client sessions
+  - colors.go - ANSI color styling
+  - handler.go - Input/Output interfaces
+  - chat.html - Embedded chat UI
+- ✅ coreclaw-web command
   - cmd/coreclaw-web/main.go entry point
-  - internal/websocket/adaptor.go
   - Per-client independent agent sessions
   - Embedded chat UI (auto-served at /)
   - WebSocket endpoint at /ws
@@ -123,15 +125,14 @@ For this project, simplicity is more important than efficiency.
 ```
 internal/
   agent/       - Agent processor for streaming responses
+  adaptors/    - Terminal and WebSocket adaptors
   config/      - CLI flags and settings parsing
   debug/       - Debug HTTP transport for API debugging
   provider/    - Provider configuration (API keys, endpoints)
   run/         - Runner for single prompt and interactive modes
   skills/      - Skills system (discovery, parsing, activation)
   stream/      - IOStream interfaces and TLV protocol
-  terminal/    - Terminal adaptor (stdio to streams)
   tools/       - Tool implementations (bash, read_file, write_file, activate_skill)
-  websocket/   - WebSocket server with per-client sessions
 cmd/coreclaw-web/       - coreclaw-web entry point
 main.go        - coreclaw entry point
 ```

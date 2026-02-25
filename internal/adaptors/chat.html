@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 10px;
+            background: #f5f5f5;
+            color: #333;
+        }
+        #status {
+            text-align: center;
+            padding: 3px 8px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .connected { background: #e8f5e9; color: #2e7d32; }
+        .disconnected { background: #ffebee; color: #c62828; }
+        .connecting { background: #fff8e1; color: #f57f17; }
+        #messages {
+            height: 60vh;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 5px;
+            margin-bottom: 10px;
+            background: #fff;
+        }
+        .message { margin-bottom: 8px; padding: 6px 10px; border-radius: 5px; }
+        .user { background: #e3f2fd; }
+        .assistant { background: #f5f5f5; }
+        .tool { background: #fff8e1; font-size: 0.9em; }
+        .error { background: #ffebee; color: #c62828; }
+        .reasoning { background: #f5f5f5; color: #666; font-style: italic; }
+        .system { background: #f5f5f5; color: #666; font-size: 0.9em; text-align: center; }
+        .message.assistant p { margin: 0 0 8px 0; }
+        .message.assistant p:last-child { margin-bottom: 0; }
+        .message.assistant code { background: #eee; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+        .message.assistant pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .message.assistant pre code { background: none; padding: 0; }
+        .message.assistant ul, .message.assistant ol { margin: 0 0 8px 0; padding-left: 20px; }
+        #input-area {
+            display: flex;
+            gap: 10px;
+        }
+        #prompt {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #fff;
+            color: #333;
+            font-size: 16px;
+        }
+        #prompt:focus { outline: none; border-color: #666; }
+        #send {
+            padding: 12px 24px;
+            min-width: 80px;
+            background: #333;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #send:hover { background: #555; }
+        #send:disabled { background: #999; cursor: not-allowed; }
+        #send.cancel { background: #c62828; }
+        #send.cancel:hover { background: #d32f2f; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <div id="status" class="disconnected">Disconnected</div>
+    <div id="messages"></div>
+    <div id="input-area">
+        <input type="text" id="prompt" placeholder="Type your message..." autocomplete="off">
+        <button id="send">Send</button>
+    </div>
+
+    <script>
+        const messages = document.getElementById('messages');
+        const prompt = document.getElementById('prompt');
+        const send = document.getElementById('send');
+        const status = document.getElementById('status');
+
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + location.host + '/ws';
+        let ws = null;
+        let waitingForResponse = false;
+
+        // Buffer for accumulating incoming binary data
+        let buffer = [];
+        // Separate accumulators for text and reasoning
+        let currentTextValue = '';
+        let currentTextElement = null;
+        let currentReasoningValue = '';
+        let currentReasoningElement = null;
+
+        function connect() {
+            status.textContent = 'Connecting...';
+            status.className = 'connecting';
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                status.textContent = 'Connected';
+                status.className = 'connected';
+                send.disabled = false;
+            };
+
+            ws.onclose = () => {
+                status.textContent = 'Disconnected';
+                status.className = 'disconnected';
+                send.disabled = true;
+                waitingForResponse = false;
+                updateSendButton();
+                setTimeout(connect, 3000);
+            };
+
+            ws.onerror = () => {
+                status.textContent = 'Error';
+                status.className = 'disconnected';
+            };
+
+            ws.onmessage = (event) => {
+                if (event.data instanceof Blob) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const bytes = new Uint8Array(reader.result);
+                        // Append new bytes to buffer
+                        buffer.push(...bytes);
+                        processBuffer();
+                    };
+                    reader.readAsArrayBuffer(event.data);
+                } else {
+                    addMessage('system', event.data);
+                }
+            };
+        }
+
+        // Process buffer and extract complete TLV messages
+        function processBuffer() {
+            while (buffer.length >= 5) {
+                const tag = String.fromCharCode(buffer[0]);
+                const length = new DataView(new Uint8Array(buffer.slice(1, 5)).buffer).getUint32(0, false);
+
+                if (buffer.length < 5 + length) {
+                    break; // Wait for more data
+                }
+
+                const value = new TextDecoder().decode(new Uint8Array(buffer.slice(5, 5 + length)));
+                buffer = buffer.slice(5 + length);
+
+                handleTLV(tag, value);
+            }
+        }
+
+        // Handle a complete TLV message
+        function handleTLV(tag, value) {
+            if (tag === 'T') {
+                // Text: accumulate and stream to current message
+                currentTextValue += value;
+                if (currentTextElement) {
+                    updateMessageContent(currentTextElement, 'assistant', currentTextValue);
+                } else {
+                    currentTextElement = addMessageElement('assistant', currentTextValue);
+                }
+                // Response received, update button state
+                if (waitingForResponse && currentTextValue.length > 0) {
+                    waitingForResponse = false;
+                    updateSendButton();
+                }
+            } else if (tag === 'R') {
+                // Reasoning: accumulate in separate element
+                currentReasoningValue += value;
+                if (currentReasoningElement) {
+                    updateMessageContent(currentReasoningElement, 'reasoning', currentReasoningValue);
+                } else {
+                    currentReasoningElement = addMessageElement('reasoning', currentReasoningValue);
+                }
+            } else if (tag === 't') {
+                // Tool call: flush current text/reasoning, show tool
+                flushCurrentText();
+                addMessage('tool', value);
+            } else if (tag === 'E') {
+                // Error: flush current text/reasoning, show error
+                flushCurrentText();
+                addMessage('error', value);
+                waitingForResponse = false;
+                updateSendButton();
+            } else if (tag === 'U') {
+                // Usage: show as system message (dim text)
+                flushCurrentText();
+                addMessage('system', 'Tokens: ' + value);
+            } else if (tag === 'D') {
+                // Done: request completed (success or canceled)
+                waitingForResponse = false;
+                updateSendButton();
+            }
+        }
+
+        // Flush accumulated text/reasoning to finalize the message
+        function flushCurrentText() {
+            if (currentTextElement && currentTextValue) {
+                updateMessageContent(currentTextElement, 'assistant', currentTextValue);
+            }
+            if (currentReasoningElement && currentReasoningValue) {
+                updateMessageContent(currentReasoningElement, 'reasoning', currentReasoningValue);
+            }
+            currentTextValue = '';
+            currentTextElement = null;
+            currentReasoningValue = '';
+            currentReasoningElement = null;
+        }
+
+        // Create message element without content (for streaming)
+        function addMessageElement(type, text) {
+            const div = document.createElement('div');
+            div.className = 'message ' + type;
+            if (type === 'tool') {
+                div.innerHTML = '<pre>' + escapeHtml(text) + '</pre>';
+            } else if (type === 'assistant' || type === 'reasoning') {
+                div.innerHTML = marked.parse(text);
+            } else {
+                div.textContent = text;
+            }
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+            return div;
+        }
+
+        // Update message content (for streaming)
+        function updateMessageContent(element, type, text) {
+            if (type === 'tool') {
+                element.innerHTML = '<pre>' + escapeHtml(text) + '</pre>';
+            } else if (type === 'assistant' || type === 'reasoning') {
+                element.innerHTML = marked.parse(text);
+            } else {
+                element.textContent = text;
+            }
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Add complete message
+        function addMessage(type, text) {
+            flushCurrentText();
+            addMessageElement(type, text);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateSendButton() {
+            if (waitingForResponse) {
+                send.textContent = 'Cancel';
+                send.classList.add('cancel');
+            } else {
+                send.textContent = 'Send';
+                send.classList.remove('cancel');
+            }
+        }
+
+        function sendMessage() {
+            if (waitingForResponse) {
+                // Cancel: send cancel signal to stop current request
+                waitingForResponse = false;
+                ws.send('CANCEL\n');
+                return;
+            }
+
+            const text = prompt.value.trim();
+            if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+            // Show user message in dialog
+            addMessage('user', text);
+
+            ws.send(text + '\n');
+            prompt.value = '';
+            waitingForResponse = true;
+            updateSendButton();
+        }
+
+        send.addEventListener('click', sendMessage);
+        prompt.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        connect();
+    </script>
+</body>
+</html>

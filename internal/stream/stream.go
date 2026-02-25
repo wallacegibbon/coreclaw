@@ -11,6 +11,7 @@ const (
 	TagTool      = 't' // Tool call output
 	TagReasoning = 'R' // Reasoning/thinking content
 	TagError     = 'E' // Error messages
+	TagUsage     = 'U' // Usage info (context size, tokens spent)
 )
 
 // WriteTLV writes a TLV message to the output

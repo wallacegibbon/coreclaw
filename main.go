@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/wallacegibbon/coreclaw/internal/adaptors"
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/app"
 	"github.com/wallacegibbon/coreclaw/internal/config"
 	"github.com/wallacegibbon/coreclaw/internal/run"
-	"github.com/wallacegibbon/coreclaw/internal/adaptors"
 )
 
 func main() {

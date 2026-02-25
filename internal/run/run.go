@@ -7,11 +7,9 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 
-	"charm.land/fantasy"
-	"github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/adaptors"
+	"github.com/wallacegibbon/coreclaw/internal/agent"
 )
 
 // Runner handles running the agent
@@ -20,7 +18,6 @@ type Runner struct {
 	Processor *agent.Processor
 	BaseURL   string
 	ModelName string
-	TotalSpent fantasy.Usage
 }
 
 // New creates a new Runner with a terminal adaptor
@@ -46,21 +43,22 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	requestInProgress := false
-	var mu sync.Mutex
+	// Create runner for tracking request state
+	syncRunner := agent.NewSyncRunner(r.Session)
+
+	// Set up command callback to send usage info
+	r.Session.OnCommandDone = func() {
+		r.Session.SendUsage()
+	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 
 	go func() {
 		for range sigChan {
-			mu.Lock()
-			if requestInProgress {
-				mu.Unlock()
+			if syncRunner.IsInProgress() {
 				cancel()
 				fmt.Println("\nRequest cancelled.")
-			} else {
-				mu.Unlock()
 			}
 		}
 	}()
@@ -81,86 +79,31 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 			continue
 		}
 
-		// Handle /summarize command
+		// Handle commands like /summarize
 		if strings.HasPrefix(userPrompt, "/") {
 			command := strings.TrimPrefix(userPrompt, "/")
-			switch command {
-			case "summarize":
-				mu.Lock()
-				requestInProgress = true
-				mu.Unlock()
-
-				_, summaryMsg, usage, err := r.Processor.Summarize(ctx, r.Session.Messages)
-
-				mu.Lock()
-				requestInProgress = false
-				mu.Unlock()
-
-				// Accumulate token usage
-				r.TotalSpent.InputTokens += usage.InputTokens
-				r.TotalSpent.OutputTokens += usage.OutputTokens
-				r.TotalSpent.TotalTokens += usage.TotalTokens
-				r.TotalSpent.ReasoningTokens += usage.ReasoningTokens
-
-				// Replace messages with summary to reduce token count
-				r.Session.Messages = []fantasy.Message{summaryMsg}
-				// Context becomes the summarize output
-				ctxSize := usage.OutputTokens
-
-				// Print context size and total spent
-				fmt.Println()
-				printUsage(ctxSize, r.TotalSpent)
-
-				if err != nil {
-					if ctx.Err() == context.Canceled {
-						cancel()
-						ctx, cancel = context.WithCancel(context.Background())
-						defer cancel()
-						continue
-					}
-				}
-			default:
-				fmt.Printf("Unknown command: %s\n", command)
-			}
-			continue
-		}
-
-		mu.Lock()
-		requestInProgress = true
-		mu.Unlock()
-
-		_, usage, err := r.Session.ProcessPrompt(ctx, userPrompt)
-
-		mu.Lock()
-		requestInProgress = false
-		mu.Unlock()
-
-		// Accumulate token usage
-		r.TotalSpent.InputTokens += usage.InputTokens
-		r.TotalSpent.OutputTokens += usage.OutputTokens
-		r.TotalSpent.TotalTokens += usage.TotalTokens
-		r.TotalSpent.ReasoningTokens += usage.ReasoningTokens
-
-		if err != nil {
-			if ctx.Err() == context.Canceled {
+			_, err := r.Session.HandleCommand(ctx, command)
+			if err != nil && ctx.Err() == context.Canceled {
 				cancel()
 				ctx, cancel = context.WithCancel(context.Background())
 				defer cancel()
-				continue
 			}
 			continue
 		}
 
-		// Print context size and total spent
-		fmt.Println()
-		printUsage(usage.InputTokens, r.TotalSpent)
-	}
-}
+		syncRunner.SetInProgress(true)
 
-// printUsage displays context size and total tokens spent
-func printUsage(contextSize int64, spent fantasy.Usage) {
-	dim := "\x1b[90m"
-	reset := "\x1b[0m"
-	fmt.Fprintf(os.Stdout, dim+"Tokens: context=%d, spent=%d"+reset+"\n",
-		contextSize, spent.TotalTokens)
+		_, _, err = r.Session.ProcessPrompt(ctx, userPrompt)
+
+		syncRunner.SetInProgress(false)
+
+		// Send usage info after each prompt
+		r.Session.SendUsage()
+
+		if err != nil && ctx.Err() == context.Canceled {
+			cancel()
+			ctx, cancel = context.WithCancel(context.Background())
+			defer cancel()
+		}
+	}
 }

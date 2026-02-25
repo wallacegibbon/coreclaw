@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/wallacegibbon/coreclaw/internal/adaptors"
 	"github.com/wallacegibbon/coreclaw/internal/app"
 	"github.com/wallacegibbon/coreclaw/internal/config"
-	"github.com/wallacegibbon/coreclaw/internal/adaptors"
 )
 
 func main() {
