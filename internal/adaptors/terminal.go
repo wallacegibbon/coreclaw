@@ -51,7 +51,6 @@ func (a *TerminalAdaptor) Start() {
 		for range sigChan {
 			if runner.IsInProgress() {
 				cancel()
-				fmt.Println("\nRequest cancelled.")
 			}
 		}
 	}()

@@ -100,7 +100,6 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 				}
 				if len(message) >= 6 && string(message[:6]) == "CANCEL" {
 					cancel()
-					fmt.Println("\nRequest cancelled.")
 					continue
 				}
 
@@ -118,11 +117,11 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 			// Reset client input state (enable "Send" button, etc.)
 			stream.WriteTLV(output, 'D', "")
 
-			input, err := input.readLine()
+			line, err := input.readLine()
 			if err != nil {
 				return
 			}
-			userPrompt = strings.TrimSpace(input)
+			userPrompt = strings.TrimSpace(line)
 			if userPrompt == "" {
 				continue
 			}
