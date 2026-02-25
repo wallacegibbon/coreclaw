@@ -111,6 +111,10 @@ For this project, simplicity is more important than efficiency.
   - Per-client independent agent sessions
   - Embedded chat UI (auto-served at /)
   - WebSocket endpoint at /ws
+- ✅ Fixed WebSocket cancel button only working once
+  - Read loop now signals cancel via channel instead of calling cancel directly
+  - Main loop listens on cancel channel and calls the current cancel function
+  - This ensures cancel always works regardless of context recreation
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)

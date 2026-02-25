@@ -8,6 +8,9 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
+// AgentFactory creates a new agent for each client session
+type AgentFactory func() fantasy.Agent
+
 // NewSession creates a processor, session, and runner with common setup
 func NewSession(
 	agent fantasy.Agent,

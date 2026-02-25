@@ -9,9 +9,6 @@ type SyncRunner struct {
 	Session    *Session
 	mu         sync.Mutex
 	inProgress bool
-
-	// OnDone is called after each request completes
-	OnDone func()
 }
 
 // NewSyncRunner creates a new thread-safe Runner

@@ -2,11 +2,11 @@ package adaptors
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 
-	"charm.land/fantasy"
 	"github.com/gorilla/websocket"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 
@@ -18,9 +18,6 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
-
-// AgentFactory creates a new agent for each client session
-type AgentFactory func() fantasy.Agent
 
 // WebSocketAdaptor connects WebSocket to the agent processor
 type WebSocketAdaptor struct {
@@ -88,21 +85,10 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 		agent := factory()
 		session, runner := NewSession(agent, baseURL, modelName, input, output)
 
-		// Create cancellable context for this client
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-		runner.OnDone = func() {
-			stream.WriteTLV(output, 'D', "")
-		}
-
-		// Send welcome message
 		conn.WriteMessage(websocket.TextMessage, []byte("Connected to CoreClaw\n"))
-
-		// Handle client disconnect and cancel signals
-		defer func() {
-			cancel()
-			conn.Close()
-		}()
 
 		// Read loop - handles client input and cancel signals
 		go func() {
@@ -112,57 +98,55 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 					cancel()
 					return
 				}
-
-				// Check for CANCEL signal
 				if len(message) >= 6 && string(message[:6]) == "CANCEL" {
 					cancel()
+					fmt.Println("\nRequest cancelled.")
 					continue
 				}
 
 				select {
 				case input.clientCh <- message:
 				case <-ctx.Done():
-					return
 				}
 			}
 		}()
 
 		// Interactive loop - synchronous like terminal
 		for {
-			// Read prompt from client
-			line, err := input.readLine()
+			var userPrompt string
+
+			// Reset client input state (enable "Send" button, etc.)
+			stream.WriteTLV(output, 'D', "")
+
+			input, err := input.readLine()
 			if err != nil {
 				return
 			}
-
-			if len(line) == 0 {
+			userPrompt = strings.TrimSpace(input)
+			if userPrompt == "" {
 				continue
 			}
 
-			// If context was cancelled, create new one for next request
-			if ctx.Err() == context.Canceled {
-				ctx, cancel = context.WithCancel(context.Background())
-			}
-
 			// Handle commands like /summarize
-			if strings.HasPrefix(line, "/") {
-				command := strings.TrimPrefix(line, "/")
+			if strings.HasPrefix(userPrompt, "/") {
+				command := strings.TrimPrefix(userPrompt, "/")
 				_, err := session.HandleCommand(ctx, command)
 				if err != nil && ctx.Err() == context.Canceled {
 					ctx, cancel = context.WithCancel(context.Background())
+					defer cancel()
 				}
-				runner.OnDone()
 				continue
 			}
 
 			runner.SetInProgress(true)
-			session.ProcessPrompt(ctx, line)
+			session.ProcessPrompt(ctx, userPrompt)
 			runner.SetInProgress(false)
-
-			// Send usage info after prompt
 			session.SendUsage()
 
-			runner.OnDone()
+			if ctx.Err() == context.Canceled {
+				ctx, cancel = context.WithCancel(context.Background())
+				defer cancel()
+			}
 		}
 	}
 }

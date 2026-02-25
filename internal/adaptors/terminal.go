@@ -45,6 +45,7 @@ func (a *TerminalAdaptor) Start() {
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
+	defer signal.Stop(sigChan)
 
 	go func() {
 		for range sigChan {
@@ -55,8 +56,7 @@ func (a *TerminalAdaptor) Start() {
 		}
 	}()
 
-	defer signal.Stop(sigChan)
-
+	// Interactive loop
 	for {
 		var userPrompt string
 
@@ -66,16 +66,15 @@ func (a *TerminalAdaptor) Start() {
 			return
 		}
 		userPrompt = strings.TrimSpace(input)
-
 		if userPrompt == "" {
 			continue
 		}
 
+		// Handle commands like /summarize
 		if strings.HasPrefix(userPrompt, "/") {
 			command := strings.TrimPrefix(userPrompt, "/")
 			_, err := session.HandleCommand(ctx, command)
 			if err != nil && ctx.Err() == context.Canceled {
-				cancel()
 				ctx, cancel = context.WithCancel(context.Background())
 				defer cancel()
 			}
@@ -88,7 +87,6 @@ func (a *TerminalAdaptor) Start() {
 		session.SendUsage()
 
 		if ctx.Err() == context.Canceled {
-			cancel()
 			ctx, cancel = context.WithCancel(context.Background())
 			defer cancel()
 		}
