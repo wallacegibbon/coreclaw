@@ -33,22 +33,13 @@ type WebSocketAdaptor struct {
 // NewWebSocketAdaptor creates a new WebSocket adaptor that listens on the given port
 // Each client gets its own agent session
 func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName string) *WebSocketAdaptor {
-	return NewWebSocketAdaptorWithStatic(port, factory, baseURL, modelName, nil)
-}
-
-// NewWebSocketAdaptorWithStatic creates a WebSocket adaptor with optional static file server
-func NewWebSocketAdaptorWithStatic(port string, factory AgentFactory, baseURL, modelName string, staticFS http.FileSystem) *WebSocketAdaptor {
 	mux := http.NewServeMux()
 
 	// Handle WebSocket
 	mux.HandleFunc("/ws", handleWebSocket(factory, baseURL, modelName))
 
-	// Handle static files or embedded index.html
-	if staticFS != nil {
-		mux.Handle("/", http.FileServer(staticFS))
-	} else {
-		mux.HandleFunc("/", serveIndex)
-	}
+	// Serve embedded index.html
+	mux.HandleFunc("/", serveIndex)
 
 	server := &http.Server{
 		Addr:    port,

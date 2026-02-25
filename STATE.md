@@ -26,7 +26,6 @@ For this project, simplicity is more important than efficiency.
   - Applied to both single-prompt and interactive modes
   - Uses raw ANSI codes for lightweight output without padding
 - ✅ CLI flags for version and help information
-- ✅ File-based prompts (--file) to read prompts from files
 - ✅ Custom system prompts (--system) to override default behavior
 - ✅ README.md with comprehensive documentation
 - ✅ Readline library integration for proper terminal input handling
@@ -106,7 +105,6 @@ For this project, simplicity is more important than efficiency.
   - terminal.go - Terminal adaptor connecting stdio to agent processor
   - websocket.go - WebSocket server with per-client sessions
   - colors.go - ANSI color styling
-  - handler.go - Input/Output interfaces
   - chat.html - Embedded chat UI
 - ✅ coreclaw-web command
   - cmd/coreclaw-web/main.go entry point
