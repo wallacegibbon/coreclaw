@@ -88,7 +88,7 @@ func main() {
 	)
 
 	processor := agentpkg.NewProcessor(agent)
-	runner := run.New(processor, providerConfig.BaseURL, providerConfig.ModelName, cfg.VimMode)
+	runner := run.New(processor, providerConfig.BaseURL, providerConfig.ModelName)
 
 	ctx := context.Background()
 
@@ -178,7 +178,5 @@ Flags:
   -file string        Read prompt from file
   -system string      Override system prompt
   -skill string       Skills directory path (can be specified multiple times)
-  -vim                Enable vim keybindings (default: true)
-  -novim              Disable vim keybindings
 `)
 }

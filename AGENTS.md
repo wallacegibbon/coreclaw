@@ -68,8 +68,6 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 - `-file string` - Read prompt from file
 - `-system string` - Override system prompt
 - `-skill string` - Skills directory path (can be specified multiple times)
-- `-vim` - Enable vim keybindings (default: true)
-- `-novim` - Disable vim keybindings
 
 
 ## Tools

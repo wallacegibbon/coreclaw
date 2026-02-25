@@ -20,19 +20,17 @@ type Runner struct {
 	Messages    []fantasy.Message
 	BaseURL     string
 	ModelName   string
-	VimMode     bool
 	TotalSpent  fantasy.Usage
 	ContextSize int64
 }
 
 // New creates a new Runner
-func New(processor *agent.Processor, baseURL, modelName string, vimMode bool) *Runner {
+func New(processor *agent.Processor, baseURL, modelName string) *Runner {
 	return &Runner{
 		Processor: processor,
 		Messages:  nil,
 		BaseURL:   baseURL,
 		ModelName: modelName,
-		VimMode:   vimMode,
 	}
 }
 
