@@ -2,24 +2,117 @@ package adaptors
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"strings"
 
+	"charm.land/fantasy"
+	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
-// Adaptor connects stdio to the agent processor
-type Adaptor struct {
-	Input  stream.Input
-	Output stream.Output
+// TerminalAdaptor connects stdio to the agent processor
+type TerminalAdaptor struct {
+	Input     stream.Input
+	Output    stream.Output
+	Agent     fantasy.Agent
+	BaseURL   string
+	ModelName string
+	Prompt    string
 }
 
-// NewAdaptor creates a new terminal adaptor with stdio
-func NewAdaptor() *Adaptor {
-	return &Adaptor{
-		Input:  &StdinReader{Reader: bufio.NewReader(os.Stdin)},
-		Output: &TLVWriter{Writer: bufio.NewWriter(os.Stdout)},
+// NewTerminalAdaptor creates a new terminal adaptor with stdio
+func NewTerminalAdaptor(agent fantasy.Agent, baseURL, modelName, prompt string) *TerminalAdaptor {
+	return &TerminalAdaptor{
+		Input:     &StdinReader{Reader: bufio.NewReader(os.Stdin)},
+		Output:    &TLVWriter{Writer: bufio.NewWriter(os.Stdout)},
+		Agent:     agent,
+		BaseURL:   baseURL,
+		ModelName: modelName,
+		Prompt:    prompt,
+	}
+}
+
+// Start runs the terminal adaptor - single prompt mode or interactive loop
+func (a *TerminalAdaptor) Start() {
+	processor := agentpkg.NewProcessorWithIO(a.Agent, a.Input, a.Output)
+	session := agentpkg.NewSession(processor)
+
+	ctx := context.Background()
+
+	if a.Prompt != "" {
+		session.ProcessPrompt(ctx, a.Prompt)
+		return
+	}
+
+	a.runInteractive(session)
+}
+
+func (a *TerminalAdaptor) runInteractive(session *agentpkg.Session) {
+	reader := bufio.NewReader(a.Input)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	syncRunner := agentpkg.NewSyncRunner(session)
+
+	session.OnCommandDone = func() {
+		session.SendUsage()
+	}
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt)
+
+	go func() {
+		for range sigChan {
+			if syncRunner.IsInProgress() {
+				cancel()
+				fmt.Println("\nRequest cancelled.")
+			}
+		}
+	}()
+
+	defer signal.Stop(sigChan)
+
+	for {
+		var userPrompt string
+
+		fmt.Fprint(os.Stderr, GetPrompt(a.BaseURL, a.ModelName))
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return
+		}
+		userPrompt = strings.TrimSpace(input)
+
+		if userPrompt == "" {
+			continue
+		}
+
+		if strings.HasPrefix(userPrompt, "/") {
+			command := strings.TrimPrefix(userPrompt, "/")
+			_, err := session.HandleCommand(ctx, command)
+			if err != nil && ctx.Err() == context.Canceled {
+				cancel()
+				ctx, cancel = context.WithCancel(context.Background())
+				defer cancel()
+			}
+			continue
+		}
+
+		syncRunner.SetInProgress(true)
+		session.ProcessPrompt(ctx, userPrompt)
+		syncRunner.SetInProgress(false)
+		session.SendUsage()
+
+		if ctx.Err() == context.Canceled {
+			cancel()
+			ctx, cancel = context.WithCancel(context.Background())
+			defer cancel()
+		}
 	}
 }
 

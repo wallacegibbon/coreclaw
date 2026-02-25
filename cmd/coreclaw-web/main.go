@@ -34,20 +34,8 @@ func main() {
 	}
 
 	// Create WebSocket adaptor
-	wsAdaptor := adaptors.NewWebSocketAdaptor(port, appCfg.AgentFactory())
-
-	// Print startup info
-	fmt.Printf("Starting CoreClaw WebSocket server on %s\n", port)
-	fmt.Printf("  Provider: %s\n", appCfg.Cfg.ProviderType)
-	fmt.Printf("  Model: %s\n", appCfg.Cfg.ModelName)
-	fmt.Printf("  Base URL: %s\n", appCfg.Cfg.BaseURL)
-	if len(appCfg.Cfg.Skills) > 0 {
-		fmt.Printf("  Skills: %v\n", appCfg.Cfg.Skills)
-	}
-	fmt.Printf("\nWeb UI:   http://localhost%s\n", port)
-	fmt.Printf("WebSocket: ws://localhost%s/ws\n", port)
-
-	wsAdaptor.Start()
+	adaptor := adaptors.NewWebSocketAdaptor(port, appCfg.AgentFactory())
+	adaptor.Start()
 
 	// Wait for interrupt
 	select {}

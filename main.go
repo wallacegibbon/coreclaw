@@ -1,15 +1,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
 	"github.com/wallacegibbon/coreclaw/internal/adaptors"
-	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/app"
 	"github.com/wallacegibbon/coreclaw/internal/config"
-	"github.com/wallacegibbon/coreclaw/internal/run"
 )
 
 func main() {
@@ -33,28 +30,9 @@ func main() {
 
 	agent := appCfg.CreateAgent()
 
-	// Create terminal adaptor for stdio
-	adaptor := adaptors.NewAdaptor()
-
-	// Create processor with terminal output stream
-	processor := agentpkg.NewProcessorWithIO(agent, adaptor.Input, adaptor.Output)
-	runner := run.New(processor, adaptor, appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName)
-
-	ctx := context.Background()
-
-	if cfg.Prompt != "" {
-		err = runner.RunSingle(ctx, cfg.Prompt)
-		if err != nil {
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}
-
-	err = runner.RunInteractive(ctx)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	// Create terminal adaptor and start (single prompt or interactive)
+	adaptor := adaptors.NewTerminalAdaptor(agent, appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName, cfg.Prompt)
+	adaptor.Start()
 }
 
 func printHelp() {
