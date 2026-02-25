@@ -98,12 +98,26 @@ For this project, simplicity is more important than efficiency.
   - System prompt injection with XML format for available skills
   - Skill activation via Manager.ActivateSkill()
   - Test coverage for parsing, discovery, and activation
+- ✅ IOStream abstraction layer
+  - Input/Output interfaces in internal/stream/stream.go
+  - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E')
+  - Buffered reads/writes with Flush() method
+- ✅ TerminalAdaptor connecting stdio to agent processor
+  - internal/terminal/adaptor.go
+  - TLV decoding and ANSI color styling
+- ✅ WebSocket server (coreclaw-web)
+  - cmd/coreclaw-web/main.go entry point
+  - internal/websocket/adaptor.go
+  - Per-client independent agent sessions
+  - Embedded chat UI (auto-served at /)
+  - WebSocket endpoint at /ws
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
 - **Tool**: bash (executes shell commands)
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
+- **Stream Protocol**: TLV (Tag-Length-Value) for structured output
 
 ### Code Structure
 ```
@@ -114,9 +128,12 @@ internal/
   provider/    - Provider configuration (API keys, endpoints)
   run/         - Runner for single prompt and interactive modes
   skills/      - Skills system (discovery, parsing, activation)
-  terminal/    - Terminal utilities (colors, prompts)
-  tools/       - Tool implementations (bash)
-main.go       - Entry point, minimal glue code
+  stream/      - IOStream interfaces and TLV protocol
+  terminal/    - Terminal adaptor (stdio to streams)
+  tools/       - Tool implementations (bash, read_file, write_file, activate_skill)
+  websocket/   - WebSocket server with per-client sessions
+cmd/coreclaw-web/       - coreclaw-web entry point
+main.go        - coreclaw entry point
 ```
 
 ### Features
@@ -131,6 +148,8 @@ main.go       - Entry point, minimal glue code
 - Command history for interactive sessions
 - Direct stdin reading for terminal input
 - Proper conversation history management for multi-turn tool calls
+- IOStream abstraction with TLV protocol
+- Web server with WebSocket support and chat UI
 
 ### Usage
 ```bash
@@ -160,6 +179,18 @@ main.go       - Entry point, minimal glue code
 
 # Show help
 ./coreclaw --help
+```
+
+### coreclaw-web (WebSocket Server)
+```bash
+# Start WebSocket server
+./coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+
+# Custom address
+./coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 --addr :9090
+
+# Then open http://localhost:8080 in browser
+# WebSocket endpoint: ws://localhost:8080/ws
 ```
 
 ## Next Steps

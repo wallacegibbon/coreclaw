@@ -1,4 +1,4 @@
-package terminal
+package adaptors
 
 import "fmt"
 

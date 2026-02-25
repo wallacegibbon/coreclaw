@@ -2,7 +2,7 @@
 
 A minimal AI Agent that can handle toolcalling, powered by Large Language Models. It provides multiple tools for file operations and shell execution.
 
-CoreClaw supports multiple providers (OpenAI, Anthropic, DeepSeek, ZAI, and any OpenAI-compatible or Anthropic-compatible server like Ollama) via a simple CLI interface.
+CoreClaw supports all OpenAI-compatible or Anthropic-compatible API servers.
 
 For this project, simplicity is more important than efficiency.
 
@@ -12,6 +12,7 @@ For this project, simplicity is more important than efficiency.
 - Binary: `coreclaw`
 - Dependencies:
   - `charm.land/fantasy` - Agent framework
+  - `github.com/gorilla/websocket` - WebSocket server
 
 
 ## Installation
@@ -69,6 +70,22 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 - `-system string` - Override system prompt
 - `-skill string` - Skills directory path (can be specified multiple times)
 
+
+## Web Server
+
+`coreclaw-web` runs a WebSocket server with a built-in chat UI.
+
+```bash
+# Start WebSocket server
+coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+
+# Custom address
+coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 --addr :9090
+```
+
+- **Web UI**: Open `http://localhost:8080` in browser
+- **WebSocket**: `ws://localhost:8080/ws`
+- Each browser tab gets its own independent agent session
 
 ## Tools
 

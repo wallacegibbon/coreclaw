@@ -7,10 +7,10 @@ import (
 
 // Message tags for TLV protocol
 const (
-	TagText     = 'T' // Regular text output
-	TagTool     = 't' // Tool call output
+	TagText      = 'T' // Regular text output
+	TagTool      = 't' // Tool call output
 	TagReasoning = 'R' // Reasoning/thinking content
-	TagError    = 'E' // Error messages
+	TagError     = 'E' // Error messages
 )
 
 // WriteTLV writes a TLV message to the output
@@ -18,16 +18,14 @@ func WriteTLV(output Output, tag byte, value string) error {
 	data := []byte(value)
 	length := int32(len(data))
 
-	// Write tag (1 byte) - use Write for raw bytes
-	output.Write([]byte{tag})
+	// Build complete message: tag (1) + length (4) + value
+	msg := make([]byte, 5+length)
+	msg[0] = tag
+	binary.BigEndian.PutUint32(msg[1:], uint32(length))
+	copy(msg[5:], data)
 
-	// Write length (4 bytes, big-endian) - use Write for raw bytes
-	lenBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBytes, uint32(length))
-	output.Write(lenBytes)
-
-	// Write value
-	_, err := output.WriteString(value)
+	// Write complete message in one call
+	_, err := output.Write(msg)
 	return err
 }
 

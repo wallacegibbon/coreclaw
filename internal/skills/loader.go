@@ -9,8 +9,8 @@ import (
 
 // Manager handles skill discovery and loading
 type Manager struct {
-	skills      []Skill
-	skillDir    string
+	skills   []Skill
+	skillDir string
 }
 
 // NewManager creates a new skill manager

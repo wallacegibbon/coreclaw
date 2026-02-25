@@ -2,7 +2,7 @@
 
 A minimal AI Agent that can handle toolcalling, powered by Large Language Models. It provides multiple tools for file operations and shell execution.
 
-CoreClaw supports multiple providers (OpenAI, Anthropic, DeepSeek, ZAI, and any OpenAI-compatible or Anthropic-compatible server like Ollama) via a simple CLI interface.
+CoreClaw supports all OpenAI-compatible or Anthropic-compatible API servers.
 
 For this project, simplicity is more important than efficiency.
 
@@ -10,6 +10,7 @@ For this project, simplicity is more important than efficiency.
 
 ```bash
 go install github.com/wallacegibbon/coreclaw@latest
+go install github.com/wallacegibbon/coreclaw/cmd/coreclaw-web@latest
 ```
 
 Or build from source:
@@ -18,6 +19,7 @@ Or build from source:
 git clone https://github.com/wallacegibbon/coreclaw.git
 cd coreclaw
 go build
+go build -o coreclaw-web ./cmd/coreclaw-web/
 ```
 
 ## Usage
@@ -46,6 +48,22 @@ Running with skills
 coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --model gpt-oss:20b --skill ~/playground/coreclaw/misc/samples/skills/
 ```
 
+## Web Server
+
+`coreclaw-web` runs a WebSocket server with a built-in chat UI.
+
+```bash
+# Start WebSocket server
+coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+
+# Custom address
+coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 --addr :9090
+```
+
+- **Web UI**: Open `http://localhost:8080` in browser
+- **WebSocket**: `ws://localhost:8080/ws`
+- Each browser tab gets its own independent agent session
+
 ## Flags
 
 - `-type string` - Provider type: `anthropic` or `openai` (required)
@@ -73,6 +91,7 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 - Read prompts from files
 - API debug mode for HTTP requests and responses
 - Skills system (agentskills.io compatible)
+- Web server with WebSocket support and chat UI
 
 ## Project Status
 

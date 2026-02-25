@@ -1,4 +1,4 @@
-package terminal
+package adaptors
 
 import (
 	"bufio"
@@ -147,7 +147,7 @@ func NewOutputStream(w io.Writer) stream.Output {
 	if bw, ok := w.(*bufio.Writer); ok {
 		return &TLVWriter{Writer: bw}
 	}
-	return &GenericWriter{Writer: w}
+	return &stream.GenericWriter{Writer: w}
 }
 
 // NewInputStream creates an InputStream from an io.Reader
@@ -155,43 +155,5 @@ func NewInputStream(r io.Reader) stream.Input {
 	if br, ok := r.(*bufio.Reader); ok {
 		return &StdinReader{Reader: br}
 	}
-	return &GenericReader{Reader: r}
-}
-
-// GenericWriter wraps any io.Writer as a stream.Output
-type GenericWriter struct {
-	io.Writer
-}
-
-func (w *GenericWriter) WriteString(s string) (int, error) {
-	return w.Writer.Write([]byte(s))
-}
-
-func (w *GenericWriter) Flush() error {
-	if f, ok := w.Writer.(interface{ Flush() error }); ok {
-		return f.Flush()
-	}
-	return nil
-}
-
-// GenericReader wraps any io.Reader as a stream.Input
-type GenericReader struct {
-	io.Reader
-}
-
-// DiscardOutput is an Output that discards all output
-var DiscardOutput = &DiscardWriter{}
-
-type DiscardWriter struct{}
-
-func (d *DiscardWriter) Write(p []byte) (int, error) {
-	return len(p), nil
-}
-
-func (d *DiscardWriter) WriteString(s string) (int, error) {
-	return len(s), nil
-}
-
-func (d *DiscardWriter) Flush() error {
-	return nil
+	return &stream.GenericReader{Reader: r}
 }

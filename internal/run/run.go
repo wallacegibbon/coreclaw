@@ -11,26 +11,23 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/wallacegibbon/coreclaw/internal/agent"
-	"github.com/wallacegibbon/coreclaw/internal/terminal"
+	"github.com/wallacegibbon/coreclaw/internal/adaptors"
 )
 
 // Runner handles running the agent
 type Runner struct {
-	Processor   *agent.Processor
-	Adaptor     *terminal.Adaptor
-	Messages    []fantasy.Message
-	BaseURL     string
-	ModelName   string
-	TotalSpent  fantasy.Usage
-	ContextSize int64
+	Session   *agent.Session
+	Processor *agent.Processor
+	BaseURL   string
+	ModelName string
+	TotalSpent fantasy.Usage
 }
 
 // New creates a new Runner with a terminal adaptor
-func New(processor *agent.Processor, adaptor *terminal.Adaptor, baseURL, modelName string) *Runner {
+func New(processor *agent.Processor, adaptor *adaptors.Adaptor, baseURL, modelName string) *Runner {
 	return &Runner{
+		Session:   agent.NewSession(processor),
 		Processor: processor,
-		Adaptor:   adaptor,
-		Messages:  nil,
 		BaseURL:   baseURL,
 		ModelName: modelName,
 	}
@@ -38,13 +35,13 @@ func New(processor *agent.Processor, adaptor *terminal.Adaptor, baseURL, modelNa
 
 // RunSingle runs a single prompt and exits
 func (r *Runner) RunSingle(ctx context.Context, prompt string) error {
-	_, _, _, _, err := r.Processor.ProcessPrompt(ctx, prompt, r.Messages)
+	_, _, err := r.Session.ProcessPrompt(ctx, prompt)
 	return err
 }
 
 // RunInteractive starts the interactive REPL
 func (r *Runner) RunInteractive(ctx context.Context) error {
-	reader := bufio.NewReader(r.Adaptor.Input)
+	reader := bufio.NewReader(r.Processor.Input)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -73,7 +70,7 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 	for {
 		var userPrompt string
 
-		fmt.Fprint(os.Stderr, terminal.GetPrompt(r.BaseURL, r.ModelName))
+		fmt.Fprint(os.Stderr, adaptors.GetPrompt(r.BaseURL, r.ModelName))
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			return err
@@ -93,7 +90,7 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 				requestInProgress = true
 				mu.Unlock()
 
-				_, summaryMsg, usage, err := r.Processor.Summarize(ctx, r.Messages)
+				_, summaryMsg, usage, err := r.Processor.Summarize(ctx, r.Session.Messages)
 
 				mu.Lock()
 				requestInProgress = false
@@ -106,13 +103,13 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 				r.TotalSpent.ReasoningTokens += usage.ReasoningTokens
 
 				// Replace messages with summary to reduce token count
-				r.Messages = []fantasy.Message{summaryMsg}
+				r.Session.Messages = []fantasy.Message{summaryMsg}
 				// Context becomes the summarize output
-				r.ContextSize = usage.OutputTokens
+				ctxSize := usage.OutputTokens
 
 				// Print context size and total spent
 				fmt.Println()
-				printUsage(r.ContextSize, r.TotalSpent)
+				printUsage(ctxSize, r.TotalSpent)
 
 				if err != nil {
 					if ctx.Err() == context.Canceled {
@@ -132,15 +129,7 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 		requestInProgress = true
 		mu.Unlock()
 
-		// Add user message to history BEFORE processing (so it's preserved on Ctrl-C)
-		r.Messages = append(r.Messages, fantasy.NewUserMessage(userPrompt))
-
-		// Create a copy of messages to send to API (without the pending user message)
-		// This prevents duplication when Ctrl-C is pressed
-		messagesForAPI := make([]fantasy.Message, len(r.Messages)-1)
-		copy(messagesForAPI, r.Messages[:len(r.Messages)-1])
-
-		_, responseText, assistantMsg, usage, err := r.Processor.ProcessPrompt(ctx, userPrompt, messagesForAPI)
+		_, usage, err := r.Session.ProcessPrompt(ctx, userPrompt)
 
 		mu.Lock()
 		requestInProgress = false
@@ -162,22 +151,9 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 			continue
 		}
 
-		// Store assistant message with both text and tool calls
-		if assistantMsg.Role != "" {
-			r.Messages = append(r.Messages, assistantMsg)
-		} else if responseText != "" {
-			r.Messages = append(r.Messages, fantasy.Message{
-				Role:    fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: responseText}},
-			})
-		}
-
-		// Accumulate context size
-		r.ContextSize += usage.InputTokens
-
 		// Print context size and total spent
 		fmt.Println()
-		printUsage(r.ContextSize, r.TotalSpent)
+		printUsage(usage.InputTokens, r.TotalSpent)
 	}
 }
 

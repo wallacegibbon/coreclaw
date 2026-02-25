@@ -80,6 +80,8 @@ github.com/googleapis/enterprise-certificate-proxy v0.3.12 h1:Fg+zsqzYEs1Znvmczt
 github.com/googleapis/enterprise-certificate-proxy v0.3.12/go.mod h1:vqVt9yG9480NtzREnTlmGSBmFrA+bzb0yl0TxoBQXOg=
 github.com/googleapis/gax-go/v2 v2.17.0 h1:RksgfBpxqff0EZkDWYuz9q/uWsTVz+kf43LsZ1J6SMc=
 github.com/googleapis/gax-go/v2 v2.17.0/go.mod h1:mzaqghpQp4JDh3HvADwrat+6M3MOIDp5YKHhb9PAgDY=
+github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
+github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/kaptinlin/go-i18n v0.2.11 h1:OayNt8mWt8nDaqAOp09/C1VG9Y5u8LpQnnxbyGARDV4=
 github.com/kaptinlin/go-i18n v0.2.11/go.mod h1:pVcu9qsW5pOIOoZFJXesRYmLos1vMQrby70JPAoWmJU=
 github.com/kaptinlin/jsonpointer v0.4.16 h1:Ux4w4FY+uLv+K+TxaCJtM/TpPv+1+eS6gH4Z9/uhOuA=

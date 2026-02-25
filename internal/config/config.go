@@ -23,6 +23,7 @@ type Settings struct {
 	ProviderType string
 	Prompt       string
 	Skills       []string
+	Addr         string
 }
 
 // Parse parses CLI flags and returns settings
@@ -37,6 +38,7 @@ func Parse() *Settings {
 	modelName := flag.String("model", "", "Model name to use (defaults to provider default)")
 	providerType := flag.String("type", "", "Provider type: anthropic, openai (overrides auto-detection)")
 	skill := flag.String("skill", "", "Skill path (can be specified multiple times)")
+	addr := flag.String("addr", ":8080", "Server address to listen on (for web server)")
 	flag.Parse()
 
 	// Collect skill paths
@@ -56,6 +58,7 @@ func Parse() *Settings {
 		ModelName:    *modelName,
 		ProviderType: *providerType,
 		Skills:       skillPaths,
+		Addr:         *addr,
 	}
 
 	// Get prompt from file or args
