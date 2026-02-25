@@ -10,27 +10,26 @@ import (
 	"os/signal"
 	"strings"
 
-	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
 // TerminalAdaptor connects stdio to the agent processor
 type TerminalAdaptor struct {
-	Input       stream.Input
-	Output      stream.Output
+	Input        stream.Input
+	Output       stream.Output
 	AgentFactory AgentFactory
-	BaseURL     string
-	ModelName   string
+	BaseURL      string
+	ModelName    string
 }
 
 // NewTerminalAdaptor creates a new terminal adaptor with stdio
 func NewTerminalAdaptor(factory AgentFactory, baseURL, modelName string) *TerminalAdaptor {
 	return &TerminalAdaptor{
-		Input:       &StdinReader{Reader: bufio.NewReader(os.Stdin)},
-		Output:      &TLVWriter{Writer: bufio.NewWriter(os.Stdout)},
+		Input:        &StdinReader{Reader: bufio.NewReader(os.Stdin)},
+		Output:       &TLVWriter{Writer: bufio.NewWriter(os.Stdout)},
 		AgentFactory: factory,
-		BaseURL:     baseURL,
-		ModelName:   modelName,
+		BaseURL:      baseURL,
+		ModelName:    modelName,
 	}
 }
 
@@ -39,10 +38,6 @@ func (a *TerminalAdaptor) Start() {
 	agent := a.AgentFactory()
 	session, runner := NewSession(agent, a.BaseURL, a.ModelName, a.Input, a.Output)
 
-	a.runInteractive(session, runner)
-}
-
-func (a *TerminalAdaptor) runInteractive(session *agentpkg.Session, syncRunner *agentpkg.SyncRunner) {
 	reader := bufio.NewReader(a.Input)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -53,7 +48,7 @@ func (a *TerminalAdaptor) runInteractive(session *agentpkg.Session, syncRunner *
 
 	go func() {
 		for range sigChan {
-			if syncRunner.IsInProgress() {
+			if runner.IsInProgress() {
 				cancel()
 				fmt.Println("\nRequest cancelled.")
 			}
@@ -87,9 +82,9 @@ func (a *TerminalAdaptor) runInteractive(session *agentpkg.Session, syncRunner *
 			continue
 		}
 
-		syncRunner.SetInProgress(true)
+		runner.SetInProgress(true)
 		session.ProcessPrompt(ctx, userPrompt)
-		syncRunner.SetInProgress(false)
+		runner.SetInProgress(false)
 		session.SendUsage()
 
 		if ctx.Err() == context.Canceled {
@@ -171,7 +166,7 @@ func (w *TLVWriter) writeColored(tag byte, value string) {
 	case stream.TagError:
 		colored = Dim(value)
 	case stream.TagUsage:
-		colored = "\n" + Dim("Tokens: " + value) + "\n"
+		colored = "\n" + Dim("Tokens: "+value) + "\n"
 	default:
 		colored = value
 	}

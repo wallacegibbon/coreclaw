@@ -6,8 +6,8 @@ import (
 
 // SyncRunner tracks request state for cancel support
 type SyncRunner struct {
-	Session *Session
-	mu       sync.Mutex
+	Session    *Session
+	mu         sync.Mutex
 	inProgress bool
 
 	// OnDone is called after each request completes
