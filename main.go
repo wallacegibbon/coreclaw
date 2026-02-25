@@ -15,6 +15,7 @@ import (
 	debugpkg "github.com/wallacegibbon/coreclaw/internal/debug"
 	"github.com/wallacegibbon/coreclaw/internal/run"
 	"github.com/wallacegibbon/coreclaw/internal/skills"
+	"github.com/wallacegibbon/coreclaw/internal/terminal"
 	"github.com/wallacegibbon/coreclaw/internal/tools"
 )
 
@@ -87,8 +88,12 @@ func main() {
 		fantasy.WithSystemPrompt(systemPrompt),
 	)
 
-	processor := agentpkg.NewProcessor(agent)
-	runner := run.New(processor, providerConfig.BaseURL, providerConfig.ModelName)
+	// Create terminal adaptor for stdio
+	adaptor := terminal.NewAdaptor()
+
+	// Create processor with terminal output stream
+	processor := agentpkg.NewProcessorWithIO(agent, adaptor.Input, adaptor.Output)
+	runner := run.New(processor, adaptor, providerConfig.BaseURL, providerConfig.ModelName)
 
 	ctx := context.Background()
 

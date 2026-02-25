@@ -4,22 +4,34 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"charm.land/fantasy"
-	"github.com/wallacegibbon/coreclaw/internal/terminal"
+	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
 // Processor handles prompt processing with streaming
 type Processor struct {
-	Agent fantasy.Agent
+	Agent  fantasy.Agent
+	Output stream.Output
+	Input  stream.Input
 }
 
 // NewProcessor creates a new prompt processor
 func NewProcessor(agent fantasy.Agent) *Processor {
 	return &Processor{
-		Agent: agent,
+		Agent:  agent,
+		Output: &stream.NopOutput{},
+		Input:  &stream.NopInput{},
+	}
+}
+
+// NewProcessorWithIO creates a new prompt processor with custom input/output streams
+func NewProcessorWithIO(agent fantasy.Agent, input stream.Input, output stream.Output) *Processor {
+	return &Processor{
+		Agent:  agent,
+		Output: output,
+		Input:  input,
 	}
 }
 
@@ -40,13 +52,15 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	streamCall.OnTextDelta = func(id, text string) error {
 		responseText.WriteString(text)
-		fmt.Print(terminal.Bright(text))
+		stream.WriteTLV(p.Output, stream.TagText, text)
+		p.Output.Flush()
 		return nil
 	}
 
 	// Handle reasoning/thinking content (Anthropic)
 	streamCall.OnReasoningDelta = func(id, text string) error {
-		fmt.Print(terminal.Dim(text))
+		stream.WriteTLV(p.Output, stream.TagReasoning, text)
+		p.Output.Flush()
 		return nil
 	}
 
@@ -55,12 +69,14 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	streamCall.OnTextStart = func(id string) error {
-		fmt.Println()
+		stream.WriteTLV(p.Output, stream.TagText, "\n")
+		p.Output.Flush()
 		return nil
 	}
 
 	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
-		printToolCall(tc)
+		p.handleToolCall(tc)
+		p.Output.Flush()
 		return nil
 	}
 
@@ -70,9 +86,13 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	agentResult, err := p.Agent.Stream(ctx, streamCall)
 	if err != nil {
-		fmt.Fprintln(os.Stdout, terminal.Dim(fmt.Sprintf("Error: %v", err)))
+		stream.WriteTLV(p.Output, stream.TagError, fmt.Sprintf("Error: %v\n", err))
+		p.Output.Flush()
 		return nil, "", fantasy.Message{}, fantasy.Usage{}, err
 	}
+
+	// Flush output buffer
+	p.Output.Flush()
 
 	assistantMsg := extractAssistantMessage(agentResult)
 	return agentResult, responseText.String(), assistantMsg, agentResult.TotalUsage, nil
@@ -137,30 +157,36 @@ func formatCommon(cmd string) string {
 	return cmd
 }
 
-// printToolCall displays tool call info in uniform format
-func printToolCall(tc fantasy.ToolCallContent) {
+// handleToolCall sends tool call info via TLV as text
+func (p *Processor) handleToolCall(tc fantasy.ToolCallContent) {
+	var value string
+
 	switch tc.ToolName {
 	case "bash":
 		cmd := extractBashCommand(tc.Input)
 		if cmd != "" {
 			displayCmd := formatCommon(cmd)
-			fmt.Printf("\n%s %s: %s\n", terminal.Yellow("→"), terminal.Yellow("bash"), terminal.Green(displayCmd))
+			value = fmt.Sprintf("%s: %s", tc.ToolName, displayCmd)
 		}
 	case "activate_skill":
 		name := extractSkillName(tc.Input)
 		if name != "" {
-			fmt.Printf("\n%s %s: %s\n", terminal.Yellow("→"), terminal.Yellow("activate_skill"), terminal.Green(name))
+			value = fmt.Sprintf("%s: %s", tc.ToolName, name)
 		}
 	case "read_file":
 		path := extractReadFilePath(tc.Input)
 		if path != "" {
-			fmt.Printf("\n%s %s: %s\n", terminal.Yellow("→"), terminal.Yellow("read_file"), terminal.Green(path))
+			value = fmt.Sprintf("%s: %s", tc.ToolName, path)
 		}
 	case "write_file":
 		path := extractWriteFilePath(tc.Input)
 		if path != "" {
-			fmt.Printf("\n%s %s: %s\n", terminal.Yellow("→"), terminal.Yellow("write_file"), terminal.Green(path))
+			value = fmt.Sprintf("%s: %s", tc.ToolName, path)
 		}
+	}
+
+	if value != "" {
+		stream.WriteTLV(p.Output, stream.TagTool, value)
 	}
 }
 

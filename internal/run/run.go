@@ -17,6 +17,7 @@ import (
 // Runner handles running the agent
 type Runner struct {
 	Processor   *agent.Processor
+	Adaptor     *terminal.Adaptor
 	Messages    []fantasy.Message
 	BaseURL     string
 	ModelName   string
@@ -24,10 +25,11 @@ type Runner struct {
 	ContextSize int64
 }
 
-// New creates a new Runner
-func New(processor *agent.Processor, baseURL, modelName string) *Runner {
+// New creates a new Runner with a terminal adaptor
+func New(processor *agent.Processor, adaptor *terminal.Adaptor, baseURL, modelName string) *Runner {
 	return &Runner{
 		Processor: processor,
+		Adaptor:   adaptor,
 		Messages:  nil,
 		BaseURL:   baseURL,
 		ModelName: modelName,
@@ -42,7 +44,7 @@ func (r *Runner) RunSingle(ctx context.Context, prompt string) error {
 
 // RunInteractive starts the interactive REPL
 func (r *Runner) RunInteractive(ctx context.Context) error {
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(r.Adaptor.Input)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
