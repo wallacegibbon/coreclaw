@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// Create WebSocket adaptor
-	adaptor := adaptors.NewWebSocketAdaptor(port, appCfg.AgentFactory())
+	adaptor := adaptors.NewWebSocketAdaptor(port, appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName)
 	adaptor.Start()
 
 	// Wait for interrupt
@@ -52,10 +52,10 @@ Flags:
   -base-url string   API endpoint URL (required)
   -api-key string    API key for the provider (required)
   -model string      Model name to use
-  -addr string       Server address to listen on (default ":8080")
-  -debug-api         Show raw API requests and responses
   -system string     Override system prompt
   -skill string      Skills directory path (can be specified multiple times)
+  -addr string       Server address to listen on (default ":8080")
+  -debug-api         Show raw API requests and responses
   -version           Show version information
   -help              Show help information
 

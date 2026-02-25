@@ -28,35 +28,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	agent := appCfg.CreateAgent()
-
-	// Create terminal adaptor and start (single prompt or interactive)
-	adaptor := adaptors.NewTerminalAdaptor(agent, appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName, cfg.Prompt)
+	// Create terminal adaptor and start in interactive mode
+	adaptor := adaptors.NewTerminalAdaptor(appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName)
 	adaptor.Start()
 }
 
 func printHelp() {
-	fmt.Print(`CoreClaw - A minimal AI Agent with bash tool access
+	fmt.Print(`CoreClaw - A minimal AI Agent
 
 Usage:
-  coreclaw [prompt]    Execute a single prompt
-  coreclaw             Run in interactive mode
-
-Examples:
-  coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "hello"
-  coreclaw --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 "hello"
-  coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 "hello"
+  coreclaw [flags]
 
 Flags:
   -type string        Provider type: anthropic, openai (required)
   -base-url string    API endpoint URL (required)
   -api-key string     API key for the provider (required)
   -model string       Model name to use
-  -version            Show version information
-  -help               Show help information
-  -debug-api          Show raw API requests and responses
-  -file string        Read prompt from file
   -system string      Override system prompt
   -skill string       Skills directory path (can be specified multiple times)
+  -debug-api          Show raw API requests and responses
+  -version            Show version information
+  -help               Show help information
+
+Examples:
+  coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+  coreclaw --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514
+  coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3
+
 `)
 }

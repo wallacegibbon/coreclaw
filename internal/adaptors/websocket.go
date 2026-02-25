@@ -25,21 +25,23 @@ type AgentFactory func() fantasy.Agent
 // WebSocketAdaptor connects WebSocket to the agent processor
 type WebSocketAdaptor struct {
 	AgentFactory AgentFactory
+	BaseURL      string
+	ModelName    string
 	Server       *http.Server
 }
 
 // NewWebSocketAdaptor creates a new WebSocket adaptor that listens on the given port
 // Each client gets its own agent session
-func NewWebSocketAdaptor(port string, factory AgentFactory) *WebSocketAdaptor {
-	return NewWebSocketAdaptorWithStatic(port, factory, nil)
+func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName string) *WebSocketAdaptor {
+	return NewWebSocketAdaptorWithStatic(port, factory, baseURL, modelName, nil)
 }
 
 // NewWebSocketAdaptorWithStatic creates a WebSocket adaptor with optional static file server
-func NewWebSocketAdaptorWithStatic(port string, factory AgentFactory, staticFS http.FileSystem) *WebSocketAdaptor {
+func NewWebSocketAdaptorWithStatic(port string, factory AgentFactory, baseURL, modelName string, staticFS http.FileSystem) *WebSocketAdaptor {
 	mux := http.NewServeMux()
 
 	// Handle WebSocket
-	mux.HandleFunc("/ws", handleWebSocket(factory))
+	mux.HandleFunc("/ws", handleWebSocket(factory, baseURL, modelName))
 
 	// Handle static files or embedded index.html
 	if staticFS != nil {
@@ -55,6 +57,8 @@ func NewWebSocketAdaptorWithStatic(port string, factory AgentFactory, staticFS h
 
 	return &WebSocketAdaptor{
 		AgentFactory: factory,
+		BaseURL:      baseURL,
+		ModelName:    modelName,
 		Server:       server,
 	}
 }
@@ -73,7 +77,7 @@ func (a *WebSocketAdaptor) Start() {
 }
 
 // handleWebSocket handles WebSocket connections with per-client sessions
-func handleWebSocket(factory AgentFactory) func(http.ResponseWriter, *http.Request) {
+func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -91,7 +95,7 @@ func handleWebSocket(factory AgentFactory) func(http.ResponseWriter, *http.Reque
 
 		// Create a new agent, processor, and session for this client
 		agent := factory()
-		session, runner := NewSession(agent, input, output)
+		session, runner := NewSession(agent, baseURL, modelName, input, output)
 
 		// Create cancellable context for this client
 		ctx, cancel := context.WithCancel(context.Background())

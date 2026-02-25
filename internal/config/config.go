@@ -2,8 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
-	"os"
 
 	"github.com/wallacegibbon/coreclaw/internal/provider"
 )
@@ -15,13 +13,11 @@ type Settings struct {
 	ShowVersion  bool
 	ShowHelp     bool
 	DebugAPI     bool
-	PromptFile   string
 	SystemPrompt string
 	APIKey       string
 	BaseURL      string
 	ModelName    string
 	ProviderType string
-	Prompt       string
 	Skills       []string
 	Addr         string
 }
@@ -31,7 +27,6 @@ func Parse() *Settings {
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
 	debugAPI := flag.Bool("debug-api", false, "Show raw API requests and responses")
-	promptFile := flag.String("file", "", "Read prompt from file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
 	apiKey := flag.String("api-key", "", "API key for the provider (required when using --base-url)")
 	baseURL := flag.String("base-url", "", "Base URL for the API endpoint (requires --api-key, ignores env vars)")
@@ -51,7 +46,6 @@ func Parse() *Settings {
 		ShowVersion:  *showVersion,
 		ShowHelp:     *showHelp,
 		DebugAPI:     *debugAPI,
-		PromptFile:   *promptFile,
 		SystemPrompt: *systemPrompt,
 		APIKey:       *apiKey,
 		BaseURL:      *baseURL,
@@ -59,18 +53,6 @@ func Parse() *Settings {
 		ProviderType: *providerType,
 		Skills:       skillPaths,
 		Addr:         *addr,
-	}
-
-	// Get prompt from file or args
-	if s.PromptFile != "" {
-		content, err := os.ReadFile(s.PromptFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read prompt file: %v\n", err)
-			os.Exit(1)
-		}
-		s.Prompt = string(content)
-	} else if flag.NArg() > 0 {
-		s.Prompt = flag.Arg(0)
 	}
 
 	return s

@@ -17,34 +17,33 @@ import (
 
 // TerminalAdaptor connects stdio to the agent processor
 type TerminalAdaptor struct {
-	Input     stream.Input
-	Output    stream.Output
-	Agent     fantasy.Agent
-	BaseURL   string
-	ModelName string
-	Prompt    string
+	Input       stream.Input
+	Output      stream.Output
+	AgentFactory AgentFactory
+	BaseURL     string
+	ModelName   string
 }
 
 // NewTerminalAdaptor creates a new terminal adaptor with stdio
-func NewTerminalAdaptor(agent fantasy.Agent, baseURL, modelName, prompt string) *TerminalAdaptor {
+func NewTerminalAdaptor(factory AgentFactory, baseURL, modelName string) *TerminalAdaptor {
 	return &TerminalAdaptor{
-		Input:     &StdinReader{Reader: bufio.NewReader(os.Stdin)},
-		Output:    &TLVWriter{Writer: bufio.NewWriter(os.Stdout)},
-		Agent:     agent,
-		BaseURL:   baseURL,
-		ModelName: modelName,
-		Prompt:    prompt,
+		Input:       &StdinReader{Reader: bufio.NewReader(os.Stdin)},
+		Output:      &TLVWriter{Writer: bufio.NewWriter(os.Stdout)},
+		AgentFactory: factory,
+		BaseURL:     baseURL,
+		ModelName:   modelName,
 	}
 }
 
 // NewSession creates a processor, session, and runner with common setup
 func NewSession(
 	agent fantasy.Agent,
+	baseURL, modelName string,
 	input stream.Input,
 	output stream.Output,
 ) (*agentpkg.Session, *agentpkg.SyncRunner) {
 	processor := agentpkg.NewProcessorWithIO(agent, input, output)
-	session := agentpkg.NewSession(processor)
+	session := agentpkg.NewSession(agent, baseURL, modelName, processor)
 	runner := agentpkg.NewSyncRunner(session)
 
 	session.OnCommandDone = func() {
@@ -54,31 +53,19 @@ func NewSession(
 	return session, runner
 }
 
-// Start runs the terminal adaptor - single prompt mode or interactive loop
+// Start runs the terminal adaptor in interactive mode
 func (a *TerminalAdaptor) Start() {
-	session, _ := NewSession(a.Agent, a.Input, a.Output)
+	agent := a.AgentFactory()
+	session, runner := NewSession(agent, a.BaseURL, a.ModelName, a.Input, a.Output)
 
-	ctx := context.Background()
-
-	if a.Prompt != "" {
-		session.ProcessPrompt(ctx, a.Prompt)
-		return
-	}
-
-	a.runInteractive(session)
+	a.runInteractive(session, runner)
 }
 
-func (a *TerminalAdaptor) runInteractive(session *agentpkg.Session) {
+func (a *TerminalAdaptor) runInteractive(session *agentpkg.Session, syncRunner *agentpkg.SyncRunner) {
 	reader := bufio.NewReader(a.Input)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	syncRunner := agentpkg.NewSyncRunner(session)
-
-	session.OnCommandDone = func() {
-		session.SendUsage()
-	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
@@ -97,7 +84,7 @@ func (a *TerminalAdaptor) runInteractive(session *agentpkg.Session) {
 	for {
 		var userPrompt string
 
-		fmt.Fprint(os.Stderr, GetPrompt(a.BaseURL, a.ModelName))
+		fmt.Fprint(os.Stderr, Green("> "))
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			return

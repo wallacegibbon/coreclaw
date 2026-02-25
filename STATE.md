@@ -65,7 +65,7 @@ For this project, simplicity is more important than efficiency.
   - Properly handles Ctrl-C to prevent process termination
 - ✅ Refactored codebase for better maintainability
   - Extracted CLI flag parsing to `internal/config` package
-  - Extracted run logic to `internal/run` package
+  - Moved runner logic to `internal/adaptors/terminal.go`
   - Simplified main.go to ~80 lines of minimal glue code
 - ✅ CLI-based provider configuration
   - All config via CLI flags: --type, --base-url, --api-key, --model
@@ -73,7 +73,7 @@ For this project, simplicity is more important than efficiency.
   - Supports anthropic and openai provider types
 - ✅ Fixed tool_use messages being lost in conversation history
   - Changed Processor.ProcessPrompt to return assistant message including tool calls
-  - Updated run.go to store full assistant message (text + tool calls) in history
+  - Updated session to store full assistant message (text + tool calls) in history
   - Previously only text was stored, losing tool calls between requests
 - ✅ Debug API now shows Anthropic content blocks
   - Added parsing for Anthropic streaming format (content as array)
@@ -129,7 +129,6 @@ internal/
   config/      - CLI flags and settings parsing
   debug/       - Debug HTTP transport for API debugging
   provider/    - Provider configuration (API keys, endpoints)
-  run/         - Runner for single prompt and interactive modes
   skills/      - Skills system (discovery, parsing, activation)
   stream/      - IOStream interfaces and TLV protocol
   tools/       - Tool implementations (bash, read_file, write_file, activate_skill)
@@ -155,28 +154,25 @@ main.go        - coreclaw entry point
 ### Usage
 ```bash
 # OpenAI API
-./coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "hello"
+./coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
 # Anthropic API
-./coreclaw --type anthropic --base-url https://api.Anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 "hello"
+./coreclaw --type anthropic --base-url https://api.Anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514
 
 # Local AI server (e.g., Ollama)
-./coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 "hello"
+./coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3
 
 # Run with API debug
-./coreclaw --debug-api --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "List files"
-
-# Run with prompt from file
-./coreclaw --file prompt.txt --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+./coreclaw --debug-api --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
 # Run with custom system prompt
-./coreclaw --system "You are a code reviewer" --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "Review this code"
+./coreclaw --system "You are a code reviewer" --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
 # Run interactively
 ./coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
 # Run with skills
-./coreclaw --skill ./skills --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o "extract text from document.pdf"
+./coreclaw --skill ./skills --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
 # Show help
 ./coreclaw --help

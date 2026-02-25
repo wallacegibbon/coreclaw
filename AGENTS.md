@@ -19,6 +19,7 @@ For this project, simplicity is more important than efficiency.
 
 ```bash
 go install github.com/wallacegibbon/coreclaw@latest
+go install github.com/wallacegibbon/coreclaw/cmd/coreclaw-web@latest
 ```
 
 Or build from source:
@@ -27,8 +28,8 @@ Or build from source:
 git clone https://github.com/wallacegibbon/coreclaw.git
 cd coreclaw
 go build
+go build ./cmd/coreclaw-web/
 ```
-
 
 ## Usage
 
@@ -36,19 +37,19 @@ All configuration must be specified via command line flags:
 
 ```bash
 # Local Ollama OpenAI-compatible server
-coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 "hello"
+coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3
 
 # Local Ollama Anthropic-compatible server
-coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --model gpt-oss:20b "hello"
+coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --model gpt-oss:20b
 
 # MiniMax (Anthropic-compatible)
-coreclaw --type anthropic --base-url $MINIMAXI_API_URL --api-key $MINIMAXI_API_KEY --model MiniMax-M2.5 "hello"
+coreclaw --type anthropic --base-url $MINIMAXI_API_URL --api-key $MINIMAXI_API_KEY --model MiniMax-M2.5
 
 # DeepSeek (OpenAI-compatible)
-coreclaw --type openai --base-url $DEEPSEEK_API_URL --api-key $DEEPSEEK_API_KEY --model deepseek-chat "hello"
+coreclaw --type openai --base-url $DEEPSEEK_API_URL --api-key $DEEPSEEK_API_KEY --model deepseek-chat
 
 # ZAI (OpenAI-compatible)
-coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GLM-4.7 "hello"
+coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GLM-4.7
 ```
 
 Running with skills
@@ -66,7 +67,6 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 - `-version` - Show version information
 - `-help` - Show help information
 - `-debug-api` - Show raw API requests and responses (to stderr)
-- `-file string` - Read prompt from file
 - `-system string` - Override system prompt
 - `-skill string` - Skills directory path (can be specified multiple times)
 

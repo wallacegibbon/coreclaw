@@ -13,6 +13,13 @@ type Session struct {
 	Processor *Processor
 	Messages  []fantasy.Message
 
+	// Agent is the fantasy agent instance
+	Agent fantasy.Agent
+
+	// BaseURL and ModelName store provider configuration
+	BaseURL   string
+	ModelName string
+
 	// TotalSpent tracks total tokens used across all requests
 	TotalSpent fantasy.Usage
 
@@ -24,10 +31,13 @@ type Session struct {
 }
 
 // NewSession creates a new session with the given processor
-func NewSession(processor *Processor) *Session {
+func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor) *Session {
 	return &Session{
 		Processor: processor,
 		Messages:  nil,
+		Agent:     agent,
+		BaseURL:   baseURL,
+		ModelName: modelName,
 	}
 }
 
