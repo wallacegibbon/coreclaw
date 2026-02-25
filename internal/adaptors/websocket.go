@@ -8,7 +8,6 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/gorilla/websocket"
-	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 
 	_ "embed"
@@ -92,21 +91,13 @@ func handleWebSocket(factory AgentFactory) func(http.ResponseWriter, *http.Reque
 
 		// Create a new agent, processor, and session for this client
 		agent := factory()
-		processor := agentpkg.NewProcessorWithIO(agent, input, output)
-		session := agentpkg.NewSession(processor)
+		session, runner := NewSession(agent, input, output)
 
 		// Create cancellable context for this client
 		ctx, cancel := context.WithCancel(context.Background())
 
-		// Create runner for tracking request state
-		runner := agentpkg.NewSyncRunner(session)
 		runner.OnDone = func() {
 			stream.WriteTLV(output, 'D', "")
-		}
-
-		// Set up command callback to send usage info
-		session.OnCommandDone = func() {
-			session.SendUsage()
 		}
 
 		// Send welcome message

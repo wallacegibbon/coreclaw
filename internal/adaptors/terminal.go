@@ -37,10 +37,26 @@ func NewTerminalAdaptor(agent fantasy.Agent, baseURL, modelName, prompt string) 
 	}
 }
 
+// NewSession creates a processor, session, and runner with common setup
+func NewSession(
+	agent fantasy.Agent,
+	input stream.Input,
+	output stream.Output,
+) (*agentpkg.Session, *agentpkg.SyncRunner) {
+	processor := agentpkg.NewProcessorWithIO(agent, input, output)
+	session := agentpkg.NewSession(processor)
+	runner := agentpkg.NewSyncRunner(session)
+
+	session.OnCommandDone = func() {
+		session.SendUsage()
+	}
+
+	return session, runner
+}
+
 // Start runs the terminal adaptor - single prompt mode or interactive loop
 func (a *TerminalAdaptor) Start() {
-	processor := agentpkg.NewProcessorWithIO(a.Agent, a.Input, a.Output)
-	session := agentpkg.NewSession(processor)
+	session, _ := NewSession(a.Agent, a.Input, a.Output)
 
 	ctx := context.Background()
 
