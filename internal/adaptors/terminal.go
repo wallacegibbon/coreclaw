@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"strings"
 
-	"charm.land/fantasy"
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
@@ -33,24 +32,6 @@ func NewTerminalAdaptor(factory AgentFactory, baseURL, modelName string) *Termin
 		BaseURL:     baseURL,
 		ModelName:   modelName,
 	}
-}
-
-// NewSession creates a processor, session, and runner with common setup
-func NewSession(
-	agent fantasy.Agent,
-	baseURL, modelName string,
-	input stream.Input,
-	output stream.Output,
-) (*agentpkg.Session, *agentpkg.SyncRunner) {
-	processor := agentpkg.NewProcessorWithIO(agent, input, output)
-	session := agentpkg.NewSession(agent, baseURL, modelName, processor)
-	runner := agentpkg.NewSyncRunner(session)
-
-	session.OnCommandDone = func() {
-		session.SendUsage()
-	}
-
-	return session, runner
 }
 
 // Start runs the terminal adaptor in interactive mode
