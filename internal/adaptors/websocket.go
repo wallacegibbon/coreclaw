@@ -2,7 +2,6 @@ package adaptors
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"sync"
