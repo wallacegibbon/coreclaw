@@ -4,7 +4,6 @@ go 1.26.0
 
 require (
 	charm.land/fantasy v0.10.0
-	github.com/chzyer/readline v1.5.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 

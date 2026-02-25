@@ -11,7 +11,7 @@ For this project, simplicity is more important than efficiency.
 ### Completed
 - ✅ Go module initialized (github.com/wallacegibbon/coreclaw)
 - ✅ fantasy dependency added (v0.8.0)
-- ✅ readline dependency added for terminal input handling
+- ✅ Direct stdin reading for terminal input
 - ✅ Basic agent structure with OpenAI provider
 - ✅ Bash tool implementation with `fantasy.NewAgentTool`
 - ✅ Command-line interface with prompt input
@@ -62,7 +62,7 @@ For this project, simplicity is more important than efficiency.
   - Does nothing (continues waiting) if no request is in progress (at the prompt)
   - Uses context cancellation to stop ongoing API calls
   - Displays "Request cancelled." message when a request is interrupted
-  - Properly handles readline.ErrInterrupt to prevent process termination
+  - Properly handles Ctrl-C to prevent process termination
 - ✅ Refactored codebase for better maintainability
   - Extracted CLI flag parsing to `internal/config` package
   - Extracted run logic to `internal/run` package
@@ -114,7 +114,7 @@ internal/
   provider/    - Provider configuration (API keys, endpoints)
   run/         - Runner for single prompt and interactive modes
   skills/      - Skills system (discovery, parsing, activation)
-  terminal/    - Terminal utilities (colors, prompts, readline)
+  terminal/    - Terminal utilities (colors, prompts)
   tools/       - Tool implementations (bash)
 main.go       - Entry point, minimal glue code
 ```
@@ -129,7 +129,7 @@ main.go       - Entry point, minimal glue code
 - Provider types: anthropic, openai
 - Color-coded output for better readability
 - Command history for interactive sessions
-- Robust terminal input handling with readline (backspace, delete, Ctrl-C)
+- Direct stdin reading for terminal input
 - Proper conversation history management for multi-turn tool calls
 
 ### Usage

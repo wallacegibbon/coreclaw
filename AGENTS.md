@@ -12,7 +12,6 @@ For this project, simplicity is more important than efficiency.
 - Binary: `coreclaw`
 - Dependencies:
   - `charm.land/fantasy` - Agent framework
-  - `github.com/chzyer/readline` - Terminal input handling
 
 
 ## Installation

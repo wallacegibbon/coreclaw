@@ -3,7 +3,6 @@ package run
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -11,7 +10,6 @@ import (
 	"sync"
 
 	"charm.land/fantasy"
-	"github.com/chzyer/readline"
 	"github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/terminal"
 )
@@ -46,18 +44,7 @@ func (r *Runner) RunSingle(ctx context.Context, prompt string) error {
 
 // RunInteractive starts the interactive REPL
 func (r *Runner) RunInteractive(ctx context.Context) error {
-	isTTY := terminal.IsTerminal()
-
-	var rl interface {
-		Readline() (string, error)
-	}
-	var err error
-	if isTTY {
-		rl, err = terminal.ReadlineInstance(r.BaseURL, r.ModelName, r.VimMode)
-		if err != nil {
-			return fmt.Errorf("failed to initialize readline: %w", err)
-		}
-	}
+	reader := bufio.NewReader(os.Stdin)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -86,25 +73,12 @@ func (r *Runner) RunInteractive(ctx context.Context) error {
 	for {
 		var userPrompt string
 
-		if isTTY {
-			fmt.Print(terminal.GetBracketedLine(r.BaseURL, r.ModelName))
-			userPrompt, err = rl.Readline()
-			if err != nil {
-				if errors.Is(err, readline.ErrInterrupt) {
-					continue
-				}
-				return err
-			}
-			userPrompt = strings.TrimSpace(userPrompt)
-		} else {
-			fmt.Fprint(os.Stderr, terminal.GetPrompt(r.BaseURL, r.ModelName))
-			reader := bufio.NewReader(os.Stdin)
-			input, _ := reader.ReadString('\n')
-			userPrompt = strings.TrimSpace(input)
-			if userPrompt == "" {
-				return nil
-			}
+		fmt.Fprint(os.Stderr, terminal.GetPrompt(r.BaseURL, r.ModelName))
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return err
 		}
+		userPrompt = strings.TrimSpace(input)
 
 		if userPrompt == "" {
 			continue
