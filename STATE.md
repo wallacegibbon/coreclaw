@@ -45,11 +45,11 @@ For this project, simplicity is more important than efficiency.
 - ✅ Prompt formatting with cyan brackets, green usernames, and consistent background
   - Format: «USER@LOCALHOSTNAME — MODEL@API_URL»
   - Background color applied to bracketed section only
-  - Newline before green ❯ prompt character with single space
+  - Newline before green > prompt character with single space
 - ✅ Fixed prompt duplication bug
   - Separated bracketed status line from input prompt
   - Bracketed line prints once at session start
-  - Input prompt shows green ❯ with reset for clean input
+  - Input prompt shows green > with reset for clean input
 - ✅ Bash command visibility
   - Commands printed when they start with arrow prefix (→)
   - Command text in green, arrow in dim color
