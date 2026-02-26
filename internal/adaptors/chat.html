@@ -49,17 +49,20 @@
         #input-area {
             display: flex;
             gap: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #fff;
         }
         #prompt {
             flex: 1;
             padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            border: none;
             background: #fff;
             color: #333;
             font-size: 16px;
         }
-        #prompt:focus { outline: none; border-color: #666; }
+        #prompt:focus { outline: none; }
         #send {
             padding: 12px 24px;
             min-width: 80px;
@@ -71,7 +74,6 @@
             cursor: pointer;
         }
         #send:hover { background: #555; }
-        #send:disabled { background: #999; cursor: not-allowed; }
         #cancel {
             padding: 12px 20px;
             background: #c62828;
@@ -80,11 +82,8 @@
             color: #fff;
             font-weight: bold;
             cursor: pointer;
-            display: none;
         }
         #cancel:hover { background: #d32f2f; }
-        #cancel:disabled { background: #e57373; opacity: 0.6; cursor: not-allowed; }
-        #cancel.visible { display: block; }
         pre { white-space: pre-wrap; word-wrap: break-word; }
     </style>
 </head>
@@ -107,7 +106,6 @@
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = protocol + '//' + location.host + '/ws';
         let ws = null;
-        let waitingForResponse = false;
 
         // Buffer for accumulating incoming binary data
         let buffer = [];
@@ -126,15 +124,11 @@
             ws.onopen = () => {
                 status.textContent = 'Connected';
                 status.className = 'connected';
-                send.disabled = false;
             };
 
             ws.onclose = () => {
                 status.textContent = 'Disconnected';
                 status.className = 'disconnected';
-                send.disabled = true;
-                waitingForResponse = false;
-                updateSendButton();
                 setTimeout(connect, 3000);
             };
 
@@ -186,11 +180,6 @@
                 } else {
                     currentTextElement = addMessageElement('assistant', currentTextValue);
                 }
-                // Response received, update button state
-                if (waitingForResponse && currentTextValue.length > 0) {
-                    waitingForResponse = false;
-                    updateSendButton();
-                }
             } else if (tag === 'R') {
                 // Reasoning: accumulate in separate element
                 currentReasoningValue += value;
@@ -207,8 +196,6 @@
                 // Error: flush current text/reasoning, show error
                 flushCurrentText();
                 addMessage('error', value);
-                waitingForResponse = false;
-                updateSendButton();
             } else if (tag === 'U') {
                 // Usage: show as system message (dim text)
                 flushCurrentText();
@@ -218,21 +205,14 @@
                 flushCurrentText();
                 addMessage('system', value);
             } else if (tag === 'P') {
-                // Prompt started: show user message + enable cancel
+                // Prompt started: show user message
                 addMessage('user', value);
-                waitingForResponse = true;
-                cancel.classList.add('visible');
-                send.disabled = true;
             } else if (tag === 'D') {
-                // Done: request completed (success or canceled)
-                // Also shows status messages like "[Queued]" when prompts are queued
+                // Done: request completed
                 if (value && value.length > 0) {
                     flushCurrentText();
                     addMessage('system', value);
                 }
-                waitingForResponse = false;
-                send.disabled = false;
-                hideCancelButton();
             } else if (tag === 'G') {
                 // Stream Gap: add line break to separate content
                 flushCurrentText();
@@ -297,15 +277,6 @@
             return div.innerHTML;
         }
 
-        function updateSendButton() {
-            // Send button always enabled (queue handles busy state)
-            send.disabled = false;
-        }
-
-        function hideCancelButton() {
-            cancel.classList.remove('visible');
-        }
-
         function sendMessage() {
             const text = prompt.value.trim();
             if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
@@ -313,12 +284,9 @@
             // Don't show user message here - it will be shown when 'P' tag is received
             ws.send(text + '\n');
             prompt.value = '';
-            // Don't enable cancel here - it will be enabled when 'P' tag is received
-            send.disabled = true;
         }
 
         function cancelRequest() {
-            cancel.disabled = true;
             ws.send('CANCEL\n');
         }
 

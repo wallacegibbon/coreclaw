@@ -22,28 +22,33 @@ type Session struct {
 
 	// TotalSpent tracks total tokens used across all requests
 	TotalSpent fantasy.Usage
-
 	// ContextTokens tracks context tokens used (grows with each request, shrinks after summarize)
 	ContextTokens int64
-
-	// OnCommandDone is called after a command (like /summarize) completes
-	OnCommandDone func()
 
 	// promptQueue buffers prompts submitted while agent is processing
 	promptQueue chan string
 
 	// inProgress tracks whether a prompt is currently being processed
 	inProgress bool
+	// cancelInProgress tracks whether a cancel operation is ongoing
+	cancelInProgress bool
 
 	// cancelCurrent is a function to cancel the current prompt
 	cancelCurrent func()
 }
 
 // CancelCurrent cancels the currently running prompt if any
-func (s *Session) CancelCurrent() {
-	if s.cancelCurrent != nil {
-		s.cancelCurrent()
+// Returns true if cancel was initiated, false if cancel is already in progress
+func (s *Session) CancelCurrent() bool {
+	if s.cancelInProgress {
+		return false // Ignore cancel if already cancelling
 	}
+	if s.cancelCurrent != nil {
+		s.cancelInProgress = true
+		s.cancelCurrent()
+		return true
+	}
+	return false
 }
 
 // IsInProgress returns true if a prompt is currently being processed
@@ -64,37 +69,33 @@ func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Proce
 }
 
 // HandleCommand processes special commands like /summarize
-// Returns (handled bool, error)
-func (s *Session) HandleCommand(ctx context.Context, cmd string) (bool, error) {
+func (s *Session) HandleCommand(cmd string) error {
+	ctx, _ := context.WithCancel(context.Background())
 	switch cmd {
 	case "summarize":
-		_, usage, err := s.Summarize(ctx)
-		s.TotalSpent.InputTokens += usage.InputTokens
-		s.TotalSpent.OutputTokens += usage.OutputTokens
-		s.TotalSpent.TotalTokens += usage.TotalTokens
-		s.TotalSpent.ReasoningTokens += usage.ReasoningTokens
-		// After summarize, context shrinks to the summary
-		s.ContextTokens = usage.OutputTokens
-		if s.OnCommandDone != nil {
-			s.OnCommandDone()
-		}
-		return true, err
+		return s.Summarize(ctx)
 	default:
-		return false, nil
+		return fmt.Errorf("unknown cmd <%s>", cmd)
 	}
 }
 
 // Summarize summarizes the conversation history
-func (s *Session) Summarize(ctx context.Context) (fantasy.Message, fantasy.Usage, error) {
+func (s *Session) Summarize(ctx context.Context) error {
 	summarizePrompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
 
 	assistantMsg, usage, err := s.Processor.ProcessPrompt(ctx, summarizePrompt, s.Messages)
 	if err != nil {
-		return fantasy.Message{}, fantasy.Usage{}, err
+		return err
 	}
 	// Replace messages with summary
 	s.Messages = []fantasy.Message{assistantMsg}
-	return assistantMsg, usage, nil
+	s.TotalSpent.InputTokens += usage.InputTokens
+	s.TotalSpent.OutputTokens += usage.OutputTokens
+	s.TotalSpent.TotalTokens += usage.TotalTokens
+	s.TotalSpent.ReasoningTokens += usage.ReasoningTokens
+	// After summarize, context shrinks to the summary
+	s.ContextTokens = usage.OutputTokens
+	return nil
 }
 
 // ProcessPrompt processes a user prompt and updates message history
@@ -146,36 +147,23 @@ func (s *Session) SendUsage() {
 // SubmitPrompt submits a prompt for processing, queueing if necessary
 // This is the main entry point for adaptors - handles all queue logic internally
 // Processing runs asynchronously so adaptors can continue receiving input
-func (s *Session) SubmitPrompt(ctx context.Context, prompt string) {
-	if s.inProgress {
-		// Try to queue the prompt
-		if s.queuePrompt(prompt) {
+func (s *Session) SubmitPrompt(prompt string) {
+	if s.queuePrompt(prompt) {
+		if s.inProgress {
 			s.writeStatus("[Queued] Previous task in progress. Will run after completion.")
-		} else {
-			s.writeStatus("[Busy] Cannot queue, try again shortly.")
+			return
 		}
-		return
+	} else {
+		s.writeStatus("[Busy] Cannot queue, try again shortly.")
 	}
 
 	// Start async processing
 	s.inProgress = true
-
-	// Get the cancel function from context if available
-	ctx, cancel := context.WithCancel(ctx)
-	go s.runAsync(ctx, cancel, prompt)
+	go s.runAsync()
 }
 
 // runAsync processes prompts asynchronously, including any queued prompts
-func (s *Session) runAsync(ctx context.Context, cancel context.CancelFunc, prompt string) {
-	// Set cancel function for the first prompt
-	s.cancelCurrent = cancel
-
-	// Signal prompt start (show user message + enable cancel)
-	s.signalPromptStart(prompt)
-
-	s.ProcessPrompt(ctx, prompt)
-	s.SendUsage()
-
+func (s *Session) runAsync() {
 	// Process any queued prompts
 	for {
 		if queuedPrompt, ok := s.getQueuedPrompt(); ok {
@@ -187,6 +175,12 @@ func (s *Session) runAsync(ctx context.Context, cancel context.CancelFunc, promp
 			s.signalPromptStart(queuedPrompt)
 
 			s.ProcessPrompt(promptCtx, queuedPrompt)
+
+			// Check if cancelled
+			if promptCtx.Err() == context.Canceled && s.cancelInProgress {
+				s.cancelInProgress = false
+			}
+
 			s.SendUsage()
 
 			// If context was cancelled, stop processing queued prompts
@@ -200,18 +194,23 @@ func (s *Session) runAsync(ctx context.Context, cancel context.CancelFunc, promp
 		}
 	}
 	s.inProgress = false
+	s.cancelInProgress = false
 }
 
 // signalPromptStart signals that a prompt has started processing
 func (s *Session) signalPromptStart(prompt string) {
 	if s.Processor != nil && s.Processor.Output != nil {
+		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 		stream.WriteTLV(s.Processor.Output, stream.TagPromptStart, prompt)
+		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
+		s.Processor.Output.Flush()
 	}
 }
 
 // writeStatus writes a system status message to the output
 func (s *Session) writeStatus(msg string) {
 	if s.Processor != nil && s.Processor.Output != nil {
+		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 		stream.WriteTLV(s.Processor.Output, stream.TagSystem, msg)
 		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 		s.Processor.Output.Flush()
@@ -236,9 +235,4 @@ func (s *Session) getQueuedPrompt() (string, bool) {
 	default:
 		return "", false
 	}
-}
-
-// HandleCommandStr handles a command using background context (for Terminal)
-func (s *Session) HandleCommandStr(cmd string) {
-	s.HandleCommand(context.Background(), cmd)
 }

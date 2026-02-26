@@ -1,13 +1,11 @@
 package adaptors
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"github.com/wallacegibbon/coreclaw/internal/stream"
 
 	_ "embed"
 )
@@ -84,9 +82,6 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 		agent := factory()
 		session := NewSession(agent, baseURL, modelName, input, output)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		conn.WriteMessage(websocket.TextMessage, []byte("Connected to CoreClaw"))
 
 		// Read loop - handles client input and cancel signals
@@ -94,7 +89,6 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 			for {
 				_, message, err := conn.ReadMessage()
 				if err != nil {
-					session.CancelCurrent()
 					return
 				}
 				if len(message) >= 6 && string(message[:6]) == "CANCEL" {
@@ -109,16 +103,12 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 
 				select {
 				case input.clientCh <- message:
-				case <-ctx.Done():
 				}
 			}
 		}()
 
 		// Interactive loop - synchronous like terminal
 		for {
-			// Reset client input state (enable "Send" button, etc.)
-			stream.WriteTLV(output, 'D', "")
-
 			line, err := input.readLine()
 			if err != nil {
 				return
@@ -131,24 +121,12 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 			// Handle commands like /summarize
 			if strings.HasPrefix(userPrompt, "/") {
 				command := strings.TrimPrefix(userPrompt, "/")
-				_, err := session.HandleCommand(ctx, command)
-				if err != nil && ctx.Err() == context.Canceled {
-					ctx, cancel = context.WithCancel(context.Background())
-					defer cancel()
-				}
+				session.HandleCommand(command)
 				continue
 			}
 
 			// Submit prompt - Session handles queue internally
-			session.SubmitPrompt(ctx, userPrompt)
-
-			// Signal done for UI
-			stream.WriteTLV(output, 'D', "")
-
-			if ctx.Err() == context.Canceled {
-				ctx, cancel = context.WithCancel(context.Background())
-				defer cancel()
-			}
+			session.SubmitPrompt(userPrompt)
 		}
 	}
 }

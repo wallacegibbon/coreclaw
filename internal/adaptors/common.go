@@ -25,11 +25,6 @@ func NewSession(
 ) *agentpkg.Session {
 	processor := agentpkg.NewProcessorWithIO(agent, input, output)
 	session := agentpkg.NewSession(agent, baseURL, modelName, processor)
-
-	session.OnCommandDone = func() {
-		session.SendUsage()
-	}
-
 	return session
 }
 

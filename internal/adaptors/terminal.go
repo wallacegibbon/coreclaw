@@ -1,7 +1,6 @@
 package adaptors
 
 import (
-	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -11,8 +10,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
@@ -55,20 +54,14 @@ type TerminalAdaptor struct {
 	ModelName    string
 	processor    *agentpkg.Processor
 	session      *agentpkg.Session
-
-	ctx    context.Context
-	cancel context.CancelFunc
 }
 
 // NewTerminalAdaptor creates a new Terminal adaptor
 func NewTerminalAdaptor(agentFactory AgentFactory, baseURL, modelName string) *TerminalAdaptor {
-	ctx, cancel := context.WithCancel(context.Background())
 	return &TerminalAdaptor{
 		AgentFactory: agentFactory,
 		BaseURL:      baseURL,
 		ModelName:    modelName,
-		ctx:          ctx,
-		cancel:       cancel,
 	}
 }
 
@@ -82,7 +75,7 @@ func (a *TerminalAdaptor) Start() {
 	a.processor = processor
 	a.session = agentpkg.NewSession(agent, a.BaseURL, a.ModelName, processor)
 
-	t := NewTerminal(a.session, a.ctx, a.cancel, terminalOutput)
+	t := NewTerminal(a.session, terminalOutput)
 	p := tea.NewProgram(t, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
 	return
@@ -93,20 +86,22 @@ type terminalOutput struct {
 	display *DisplayBuffer
 	buffer  []byte
 
-	textStyle      lipgloss.Style
-	toolStyle      lipgloss.Style
-	reasoningStyle lipgloss.Style
-	errorStyle     lipgloss.Style
-	systemStyle    lipgloss.Style
-	promptStyle    lipgloss.Style
+	textStyle        lipgloss.Style
+	toolStyle        lipgloss.Style
+	toolContentStyle lipgloss.Style
+	reasoningStyle   lipgloss.Style
+	errorStyle       lipgloss.Style
+	systemStyle      lipgloss.Style
+	promptStyle      lipgloss.Style
 }
 
 func newTerminalOutput() *terminalOutput {
 	return &terminalOutput{
-		display:       NewDisplayBuffer(),
-		textStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")),
+		display:        NewDisplayBuffer(),
+		textStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Bold(true),
 		toolStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")),
-		reasoningStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")),
+		toolContentStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")),
+		reasoningStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")).Italic(true),
 		errorStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")),
 		systemStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")),
 		promptStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true),
@@ -156,14 +151,13 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 	case stream.TagError:
 		output = w.errorStyle.Render(value)
 	case stream.TagUsage:
-		output = w.systemStyle.Render("Tokens: "+value)
+		output = w.systemStyle.Render("Tokens: " + value)
 	case stream.TagSystem:
 		output = w.systemStyle.Render(value)
+	case stream.TagPromptStart:
+		output = w.promptStyle.Render("> ") + w.textStyle.Render(value)
 	case stream.TagStreamGap:
 		output = "\n"
-	case stream.TagPromptStart:
-		// Prompt started - display as user prompt with styled ">" prefix
-		output = "\n" + w.promptStyle.Render("> ") + w.textStyle.Render(value) + "\n"
 	default:
 		output = value
 	}
@@ -175,57 +169,62 @@ func (w *terminalOutput) colorizeTool(value string) string {
 	if colonIdx > 0 {
 		toolName := value[:colonIdx]
 		rest := value[colonIdx:]
-		return w.toolStyle.Render(toolName) + w.textStyle.Render(rest)
+		return w.toolStyle.Render(toolName) + w.toolContentStyle.Render(rest)
 	}
 	return w.toolStyle.Render(value)
 }
 
 // Terminal is the main Terminal model
 type Terminal struct {
-	session   *agentpkg.Session
-	ctx       context.Context
-	cancel    context.CancelFunc
+	session        *agentpkg.Session
 	terminalOutput *terminalOutput
-	display   viewport.Model
-	input     textinput.Model
-	status    string
-	quitting  bool
+	display        viewport.Model
+	input          textinput.Model
+	status         string
+	quitting       bool
+	confirmDialog  bool
 
 	inputStyle  lipgloss.Style
 	promptStyle lipgloss.Style
 	statusStyle lipgloss.Style
+	borderStyle lipgloss.Style
+	displayBorderStyle lipgloss.Style
 }
 
 // NewTerminal creates a new Terminal model
-func NewTerminal(session *agentpkg.Session, ctx context.Context, cancel context.CancelFunc, terminalOutput *terminalOutput) *Terminal {
+func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Terminal {
 	input := textinput.New()
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
 	input.Prompt = "> "
 
-	inputStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#89b4fa"))
+	inputStyle := lipgloss.NewStyle()
 	promptStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#a6e3a1")).
 		Bold(true)
 	statusStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#45475a")).
 		Foreground(lipgloss.Color("#cdd6f4"))
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#45475a"))
 
 	display := viewport.New(80, 20)
 	display.SetContent("Welcome to CoreClaw Terminal!\n\nType your prompt below and press Enter to send.\n\n")
 
 	return &Terminal{
-		session:     session,
-		ctx:         ctx,
-		cancel:      cancel,
-		terminalOutput:   terminalOutput,
-		display:     display,
-		input:       input,
-		status:      "Ready",
-		inputStyle:  inputStyle,
+		session:        session,
+		terminalOutput: terminalOutput,
+		display:        display,
+		input:          input,
+		status:         "Ready",
+		inputStyle:     inputStyle,
 		promptStyle:    promptStyle,
 		statusStyle:    statusStyle,
+		borderStyle:    borderStyle,
+		displayBorderStyle: lipgloss.NewStyle().
+					Border(lipgloss.RoundedBorder()).
+					BorderForeground(lipgloss.Color("#45475a")),
 	}
 }
 
@@ -251,10 +250,6 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return tickMsg(t)
 			})
 		}
-		// Done processing - check if context was cancelled and recreate if needed
-		if m.ctx.Err() == context.Canceled {
-			m.ctx, m.cancel = context.WithCancel(context.Background())
-		}
 		m.updateDisplayContent()
 		m.updateStatus()
 		return m, nil
@@ -262,7 +257,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKeyMsg(msg)
 	case tea.WindowSizeMsg:
 		m.display.Width = msg.Width
-		m.display.Height = msg.Height - 2 // Leave room for input and status
+		m.display.Height = msg.Height - 6 // Leave room for input, status, and display border
 		return m, nil
 	}
 
@@ -272,15 +267,29 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle confirm dialog
+	if m.confirmDialog {
+		switch msg.String() {
+		case "y", "Y":
+			m.quitting = true
+			return m, tea.Quit
+		case "n", "N", "esc", "ctrl+c":
+			m.confirmDialog = false
+			return m, nil
+		}
+		return m, nil
+	}
+
 	switch msg.Type {
 	case tea.KeyCtrlC, tea.KeyEsc:
-		m.quitting = true
-		return m, tea.Quit
+		m.confirmDialog = true
+		return m, nil
 	case tea.KeyCtrlG:
 		// Cancel the current request if one is in progress
 		if m.session.IsInProgress() {
-			m.session.CancelCurrent()
-			m.terminalOutput.display.Append("\n" + m.statusStyle.Render("Request cancelled.") + "\n")
+			if m.session.CancelCurrent() {
+				// Cancel initiated successfully - message will be shown via TLV
+			}
 		}
 		return m, nil
 	case tea.KeyEnter:
@@ -292,14 +301,14 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Handle commands
 		if strings.HasPrefix(prompt, "/") {
 			command := strings.TrimPrefix(prompt, "/")
-			m.session.HandleCommandStr(command)
 			m.input.SetValue("")
+			m.session.HandleCommand(command)
 			m.display.GotoBottom()
 			return m, nil
 		}
 
 		// Submit prompt - session handles queuing
-		m.session.SubmitPrompt(m.ctx, prompt)
+		m.session.SubmitPrompt(prompt)
 
 		m.input.SetValue("")
 		m.updateStatus()
@@ -326,7 +335,7 @@ func (m *Terminal) updateStatus() {
 
 func (m *Terminal) updateDisplayContent() {
 	newContent := m.terminalOutput.display.GetAll()
-	width := m.display.Width
+	width := m.display.Width - 5
 	if width > 0 {
 		newContent = wordwrap(newContent, width)
 	}
@@ -336,30 +345,35 @@ func (m *Terminal) updateDisplayContent() {
 
 // View renders the Terminal
 func (m *Terminal) View() string {
-	// Update display content from buffer with word wrapping
-	newContent := m.terminalOutput.display.GetAll()
+	// Display content is already updated via updateDisplayContent()
+	// Just get the current width for styling
 	width := m.display.Width
-	if width > 0 {
-		newContent = wordwrap(newContent, width)
-	}
-	m.display.SetContent(newContent)
-	m.display.GotoBottom()
 
 	// Style input and status to match viewport width
-	inputStyle := m.inputStyle.Width(width)
-	statusStyle := m.statusStyle.Width(width)
+	inputStyle := m.inputStyle.Width(width - 6)
+	statusStyle := m.statusStyle.Width(width).Padding(0, 1)
+	borderStyle := m.borderStyle.Width(width - 2).Padding(0, 1)
+	displayBorderStyle := m.displayBorderStyle.Width(width - 2).Padding(0, 1)
 
 	statusBar := statusStyle.Render(m.status)
 
 	// Build the view
 	var sb strings.Builder
 
-	// Display area
-	sb.WriteString(m.display.View())
+	// Display area with border
+	sb.WriteString(displayBorderStyle.Render(m.display.View()))
 
-	// Input area
+	// Input area with border
 	sb.WriteString("\n")
-	sb.WriteString(inputStyle.Render(m.input.View()))
+	if m.confirmDialog {
+		confirmStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#f9e2af")).
+			Bold(true)
+		sb.WriteString(borderStyle.Render(confirmStyle.Render("Confirm exit? Press y/n")))
+	} else {
+		inputContent := inputStyle.Render(m.input.View())
+		sb.WriteString(borderStyle.Render(inputContent))
+	}
 
 	// Status bar
 	sb.WriteString("\n")

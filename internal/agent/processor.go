@@ -49,6 +49,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	streamCall.OnTextDelta = func(id, text string) error {
+		stream.WriteTLV(p.Output, stream.TagText, text)
 		p.Output.Flush()
 		return nil
 	}
@@ -73,7 +74,6 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 		stream.WriteTLV(p.Output, stream.TagStreamGap, "")
 		return nil
 	}
-
 
 	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
 		p.handleToolCall(tc)
@@ -199,4 +199,3 @@ func (p *Processor) handleToolCall(tc fantasy.ToolCallContent) {
 		stream.WriteTLV(p.Output, stream.TagTool, value)
 	}
 }
-
