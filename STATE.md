@@ -107,7 +107,7 @@ For this project, simplicity is more important than efficiency.
   - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E', TagUsage='U', TagSystem='S')
   - Buffered reads/writes with Flush() method
 - ✅ Adaptors in internal/adaptors/
-  - common.go - ANSI color styling and isValidTag helper
+  - terminal.go - Terminal adaptor with TUI (lipgloss/bubbletea)
   - websocket.go - WebSocket server with per-client sessions
   - colors.go - ANSI color styling
   - chat.html - Embedded chat UI
