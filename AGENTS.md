@@ -99,9 +99,9 @@ CoreClaw provides the following tools (ordered from safest to most dangerous):
 | `posix_shell` | Execute shell commands |
 
 
-## TUI Controls
+## Terminal Controls
 
-When running the TUI version:
+When running the Terminal version:
 
 | Key | Action |
 |-----|--------|

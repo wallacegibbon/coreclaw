@@ -62,7 +62,7 @@ For this project, simplicity is more important than efficiency.
   - Uses context cancellation to stop ongoing API calls
   - Displays "Request cancelled." message when a request is interrupted
   - Properly handles Ctrl-C to prevent process termination
-- ✅ Ctrl-G handling in TUI mode
+- ✅ Ctrl-G handling in Terminal mode
   - Cancels current request when Ctrl-G is pressed
   - Works similar to the cancel button in WebSocket client
   - Context is automatically recreated after cancellation for subsequent requests
@@ -107,7 +107,7 @@ For this project, simplicity is more important than efficiency.
   - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E', TagUsage='U', TagSystem='S')
   - Buffered reads/writes with Flush() method
 - ✅ Adaptors in internal/adaptors/
-  - terminal.go - Terminal adaptor with TUI (lipgloss/bubbletea)
+  - terminal.go - Terminal adaptor with Terminal (lipgloss/bubbletea)
   - websocket.go - WebSocket server with per-client sessions
   - colors.go - ANSI color styling
   - chat.html - Embedded chat UI

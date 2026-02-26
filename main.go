@@ -28,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	adaptor := adaptors.NewTUIAdaptor(appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName)
+	adaptor := adaptors.NewTerminalAdaptor(appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName)
 	adaptor.Start()
 }
 

@@ -241,7 +241,7 @@ func (s *Session) getQueuedPrompt() (string, bool) {
 	}
 }
 
-// HandleCommandStr handles a command using background context (for TUI)
+// HandleCommandStr handles a command using background context (for Terminal)
 func (s *Session) HandleCommandStr(cmd string) {
 	s.HandleCommand(context.Background(), cmd)
 }

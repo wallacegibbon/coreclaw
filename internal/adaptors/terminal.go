@@ -18,7 +18,7 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
-// DisplayBuffer holds text to display in TUI
+// DisplayBuffer holds text to display in Terminal
 type DisplayBuffer struct {
 	mu       sync.Mutex
 	Messages []string
@@ -45,11 +45,11 @@ func (d *DisplayBuffer) GetAll() string {
 	return strings.Join(d.Messages, "")
 }
 
-// Display is the display buffer for TUI
+// Display is the display buffer for Terminal
 var Display = NewDisplayBuffer()
 
-// TUIAdaptor is a terminal adaptor with a TUI interface
-type TUIAdaptor struct {
+// TerminalAdaptor is a terminal adaptor with a Terminal interface
+type TerminalAdaptor struct {
 	AgentFactory AgentFactory
 	BaseURL      string
 	ModelName    string
@@ -60,10 +60,10 @@ type TUIAdaptor struct {
 	cancel context.CancelFunc
 }
 
-// NewTUIAdaptor creates a new TUI adaptor
-func NewTUIAdaptor(agentFactory AgentFactory, baseURL, modelName string) *TUIAdaptor {
+// NewTerminalAdaptor creates a new Terminal adaptor
+func NewTerminalAdaptor(agentFactory AgentFactory, baseURL, modelName string) *TerminalAdaptor {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &TUIAdaptor{
+	return &TerminalAdaptor{
 		AgentFactory: agentFactory,
 		BaseURL:      baseURL,
 		ModelName:    modelName,
@@ -72,24 +72,24 @@ func NewTUIAdaptor(agentFactory AgentFactory, baseURL, modelName string) *TUIAda
 	}
 }
 
-// Start runs the TUI
-func (a *TUIAdaptor) Start() {
+// Start runs the Terminal
+func (a *TerminalAdaptor) Start() {
 	agent := a.AgentFactory()
 
 	// Create a custom output that writes to display buffer with TLV support
-	tuiOutput := newTUIOutput()
-	processor := agentpkg.NewProcessorWithIO(agent, &stream.NopInput{}, tuiOutput)
+	terminalOutput := newTerminalOutput()
+	processor := agentpkg.NewProcessorWithIO(agent, &stream.NopInput{}, terminalOutput)
 	a.processor = processor
 	a.session = agentpkg.NewSession(agent, a.BaseURL, a.ModelName, processor)
 
-	tui := NewTUI(a.session, a.ctx, a.cancel, tuiOutput)
+	tui := NewTerminal(a.session, a.ctx, a.cancel, terminalOutput)
 	p := tea.NewProgram(tui, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
 	return
 }
 
-// tuiOutput writes to the TUI display with TLV support
-type tuiOutput struct {
+// terminalOutput writes to the Terminal display with TLV support
+type terminalOutput struct {
 	display *DisplayBuffer
 	buffer  []byte
 
@@ -101,8 +101,8 @@ type tuiOutput struct {
 	promptStyle    lipgloss.Style
 }
 
-func newTUIOutput() *tuiOutput {
-	return &tuiOutput{
+func newTerminalOutput() *terminalOutput {
+	return &terminalOutput{
 		display:       NewDisplayBuffer(),
 		textStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")),
 		toolStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")),
@@ -113,21 +113,21 @@ func newTUIOutput() *tuiOutput {
 	}
 }
 
-func (w *tuiOutput) Write(p []byte) (n int, err error) {
+func (w *terminalOutput) Write(p []byte) (n int, err error) {
 	w.buffer = append(w.buffer, p...)
 	w.processBuffer()
 	return len(p), nil
 }
 
-func (w *tuiOutput) WriteString(s string) (int, error) {
+func (w *terminalOutput) WriteString(s string) (int, error) {
 	return w.Write([]byte(s))
 }
 
-func (w *tuiOutput) Flush() error {
+func (w *terminalOutput) Flush() error {
 	return nil
 }
 
-func (w *tuiOutput) processBuffer() {
+func (w *terminalOutput) processBuffer() {
 	for len(w.buffer) >= 5 {
 		tag := w.buffer[0]
 		if !isValidTag(tag) {
@@ -149,7 +149,7 @@ func (w *tuiOutput) processBuffer() {
 	}
 }
 
-func (w *tuiOutput) writeColored(tag byte, value string) {
+func (w *terminalOutput) writeColored(tag byte, value string) {
 	var output string
 	switch tag {
 	case stream.TagText:
@@ -175,7 +175,7 @@ func (w *tuiOutput) writeColored(tag byte, value string) {
 	w.display.Append(output)
 }
 
-func (w *tuiOutput) colorizeTool(value string) string {
+func (w *terminalOutput) colorizeTool(value string) string {
 	colonIdx := strings.Index(value, ":")
 	if colonIdx > 0 {
 		toolName := value[:colonIdx]
@@ -185,12 +185,12 @@ func (w *tuiOutput) colorizeTool(value string) string {
 	return w.toolStyle.Render(value)
 }
 
-// TUI is the main TUI model
-type TUI struct {
+// Terminal is the main Terminal model
+type Terminal struct {
 	session   *agentpkg.Session
 	ctx       context.Context
 	cancel    context.CancelFunc
-	tuiOutput *tuiOutput
+	terminalOutput *terminalOutput
 	display   viewport.Model
 	input     textinput.Model
 	status    string
@@ -201,8 +201,8 @@ type TUI struct {
 	statusStyle lipgloss.Style
 }
 
-// NewTUI creates a new TUI model
-func NewTUI(session *agentpkg.Session, ctx context.Context, cancel context.CancelFunc, tuiOutput *tuiOutput) *TUI {
+// NewTerminal creates a new Terminal model
+func NewTerminal(session *agentpkg.Session, ctx context.Context, cancel context.CancelFunc, terminalOutput *terminalOutput) *Terminal {
 	input := textinput.New()
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
@@ -218,13 +218,13 @@ func NewTUI(session *agentpkg.Session, ctx context.Context, cancel context.Cance
 		Foreground(lipgloss.Color("#cdd6f4"))
 
 	display := viewport.New(80, 20)
-	display.SetContent("Welcome to CoreClaw TUI!\n\nType your prompt below and press Enter to send.\n\n")
+	display.SetContent("Welcome to CoreClaw Terminal!\n\nType your prompt below and press Enter to send.\n\n")
 
-	return &TUI{
+	return &Terminal{
 		session:     session,
 		ctx:         ctx,
 		cancel:      cancel,
-		tuiOutput:   tuiOutput,
+		terminalOutput:   terminalOutput,
 		display:     display,
 		input:       input,
 		status:      "Ready",
@@ -234,8 +234,8 @@ func NewTUI(session *agentpkg.Session, ctx context.Context, cancel context.Cance
 	}
 }
 
-// Init initializes the TUI
-func (m *TUI) Init() tea.Cmd {
+// Init initializes the Terminal
+func (m *Terminal) Init() tea.Cmd {
 	// Tick every 100ms to refresh display during processing
 	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg(t)
@@ -245,7 +245,7 @@ func (m *TUI) Init() tea.Cmd {
 type tickMsg time.Time
 
 // Update handles messages
-func (m *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
 		// Check if still processing
@@ -276,7 +276,7 @@ func (m *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *TUI) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyCtrlC, tea.KeyEsc:
 		m.quitting = true
@@ -285,7 +285,7 @@ func (m *TUI) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Cancel the current request if one is in progress
 		if m.session.IsInProgress() {
 			m.session.CancelCurrent()
-			m.tuiOutput.display.Append("\n" + m.statusStyle.Render("Request cancelled.") + "\n")
+			m.terminalOutput.display.Append("\n" + m.statusStyle.Render("Request cancelled.") + "\n")
 		}
 		return m, nil
 	case tea.KeyEnter:
@@ -319,7 +319,7 @@ func (m *TUI) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *TUI) updateStatus() {
+func (m *Terminal) updateStatus() {
 	if m.session != nil && m.session.IsInProgress() {
 		m.status = "Processing..."
 	} else if m.session != nil {
@@ -329,8 +329,8 @@ func (m *TUI) updateStatus() {
 	}
 }
 
-func (m *TUI) updateDisplayContent() {
-	newContent := m.tuiOutput.display.GetAll()
+func (m *Terminal) updateDisplayContent() {
+	newContent := m.terminalOutput.display.GetAll()
 	width := m.display.Width
 	if width > 0 {
 		newContent = wordwrap(newContent, width)
@@ -339,10 +339,10 @@ func (m *TUI) updateDisplayContent() {
 	m.display.GotoBottom()
 }
 
-// View renders the TUI
-func (m *TUI) View() string {
+// View renders the Terminal
+func (m *Terminal) View() string {
 	// Update display content from buffer with word wrapping
-	newContent := m.tuiOutput.display.GetAll()
+	newContent := m.terminalOutput.display.GetAll()
 	width := m.display.Width
 	if width > 0 {
 		newContent = wordwrap(newContent, width)
@@ -374,7 +374,7 @@ func (m *TUI) View() string {
 }
 
 var (
-	_ tea.Model = (*TUI)(nil)
+	_ tea.Model = (*Terminal)(nil)
 )
 
 // wordwrap wraps text to fit the given width using display width
