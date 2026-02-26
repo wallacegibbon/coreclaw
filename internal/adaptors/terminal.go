@@ -97,14 +97,14 @@ type terminalOutput struct {
 
 func newTerminalOutput() *terminalOutput {
 	return &terminalOutput{
-		display:        NewDisplayBuffer(),
-		textStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Bold(true),
-		toolStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")),
+		display:          NewDisplayBuffer(),
+		textStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Bold(true),
+		toolStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")),
 		toolContentStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")),
-		reasoningStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")).Italic(true),
-		errorStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")),
-		systemStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")),
-		promptStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true),
+		reasoningStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")).Italic(true),
+		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")),
+		systemStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")),
+		promptStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true),
 	}
 }
 
@@ -184,10 +184,10 @@ type Terminal struct {
 	quitting       bool
 	confirmDialog  bool
 
-	inputStyle  lipgloss.Style
-	promptStyle lipgloss.Style
-	statusStyle lipgloss.Style
-	borderStyle lipgloss.Style
+	inputStyle         lipgloss.Style
+	promptStyle        lipgloss.Style
+	statusStyle        lipgloss.Style
+	borderStyle        lipgloss.Style
 	displayBorderStyle lipgloss.Style
 }
 
@@ -223,8 +223,8 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 		statusStyle:    statusStyle,
 		borderStyle:    borderStyle,
 		displayBorderStyle: lipgloss.NewStyle().
-					Border(lipgloss.RoundedBorder()).
-					BorderForeground(lipgloss.Color("#45475a")),
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#45475a")),
 	}
 }
 
@@ -352,8 +352,8 @@ func (m *Terminal) View() string {
 	// Style input and status to match viewport width
 	inputStyle := m.inputStyle.Width(width - 6)
 	statusStyle := m.statusStyle.Width(width).Padding(0, 1)
-	borderStyle := m.borderStyle.Width(width - 2).Padding(0, 1)
-	displayBorderStyle := m.displayBorderStyle.Width(width - 2).Padding(0, 1)
+	borderStyle := m.borderStyle.Width(width-2).Padding(0, 1)
+	displayBorderStyle := m.displayBorderStyle.Width(width-2).Padding(0, 1)
 
 	statusBar := statusStyle.Render(m.status)
 

@@ -157,41 +157,39 @@ func (s *Session) SubmitPrompt(prompt string) {
 		s.writeStatus("[Busy] Cannot queue, try again shortly.")
 	}
 
-	// Start async processing
-	s.inProgress = true
 	go s.runAsync()
 }
 
 // runAsync processes prompts asynchronously, including any queued prompts
 func (s *Session) runAsync() {
-	// Process any queued prompts
+	s.inProgress = true
 	for {
-		if queuedPrompt, ok := s.getQueuedPrompt(); ok {
-			// Create a fresh context for each queued prompt
-			promptCtx, promptCancel := context.WithCancel(context.Background())
-			s.cancelCurrent = promptCancel
-
-			// Signal queued prompt start
-			s.signalPromptStart(queuedPrompt)
-
-			s.ProcessPrompt(promptCtx, queuedPrompt)
-
-			// Check if cancelled
-			if promptCtx.Err() == context.Canceled && s.cancelInProgress {
-				s.cancelInProgress = false
-			}
-
-			s.SendUsage()
-
-			// If context was cancelled, stop processing queued prompts
-			if promptCtx.Err() == context.Canceled {
-				s.cancelCurrent = nil
-				break
-			}
-			s.cancelCurrent = nil
-		} else {
+		queuedPrompt, ok := s.getQueuedPrompt()
+		if !ok {
 			break
 		}
+		// Create a fresh context for each queued prompt
+		promptCtx, promptCancel := context.WithCancel(context.Background())
+		s.cancelCurrent = promptCancel
+
+		// Signal queued prompt start
+		s.signalPromptStart(queuedPrompt)
+
+		s.ProcessPrompt(promptCtx, queuedPrompt)
+
+		// Check if cancelled
+		if promptCtx.Err() == context.Canceled && s.cancelInProgress {
+			s.cancelInProgress = false
+		}
+
+		s.SendUsage()
+
+		// If context was cancelled, stop processing queued prompts
+		if promptCtx.Err() == context.Canceled {
+			s.cancelCurrent = nil
+			continue
+		}
+		s.cancelCurrent = nil
 	}
 	s.inProgress = false
 	s.cancelInProgress = false
