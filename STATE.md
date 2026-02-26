@@ -1,8 +1,8 @@
 # CoreClaw Project Status
 
 ## Overview
-CoreClaw is a minimal AI Agent that can handle toolcalling. We only provide one tool: `posix_shell`.
-All skills are based on this only one tool. And all functionalities are built by skills.
+CoreClaw is a minimal AI Agent that can handle toolcalling. It provides four tools: `read_file`, `write_file`, `activate_skill`, and `posix_shell`.
+All skills are based on these tools.
 
 For this project, simplicity is more important than efficiency.
 
@@ -10,7 +10,7 @@ For this project, simplicity is more important than efficiency.
 
 ### Completed
 - ✅ Go module initialized (github.com/wallacegibbon/coreclaw)
-- ✅ fantasy dependency added (v0.8.0)
+- ✅ fantasy dependency added (v0.10.0)
 - ✅ Direct stdin reading for terminal input
 - ✅ Basic agent structure with OpenAI provider
 - ✅ Shell tool implementation with `fantasy.NewAgentTool`
@@ -120,10 +120,13 @@ For this project, simplicity is more important than efficiency.
   - Read loop now signals cancel via channel instead of calling cancel directly
   - Main loop listens on cancel channel and calls the current cancel function
   - This ensures cancel always works regardless of context recreation
+- ✅ Tab key to switch focus between display and input windows
+  - Focused window has bright border (#89d4fa), unfocused has dimmed border (#45475a)
+  - When display window is focused, j/k scrolls content like vim
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
-- **Tool**: posix_shell (executes shell commands)
+- **Tools**: read_file, write_file, activate_skill, posix_shell
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 - **Stream Protocol**: TLV (Tag-Length-Value) for structured output

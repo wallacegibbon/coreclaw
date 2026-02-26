@@ -12,7 +12,9 @@ For this project, simplicity is more important than efficiency.
 - Binary: `coreclaw`
 - Dependencies:
   - `charm.land/fantasy` - Agent framework
+  - `github.com/charmbracelet/bubbletea` - Terminal UI framework
   - `github.com/gorilla/websocket` - WebSocket server
+  - `mvdan.cc/sh/v3` - Shell interpreter
 
 
 ## Installation
@@ -105,7 +107,12 @@ When running the Terminal version:
 
 | Key | Action |
 |-----|--------|
-| `Enter` | Submit prompt |
+| `Tab` | Switch focus between display and input window |
+| `Enter` | Submit prompt (when input focused) |
+| `j` | Scroll down 1 line (when display focused) |
+| `k` | Scroll up 1 line (when display focused) |
+| `Ctrl+D` | Scroll down half page (when display focused) |
+| `Ctrl+U` | Scroll up half page (when display focused) |
 | `Ctrl+G` | Cancel current request |
 | `Ctrl+C` / `Esc` | Exit |
 
