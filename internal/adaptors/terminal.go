@@ -333,8 +333,15 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Handle commands
 		if strings.HasPrefix(prompt, "/") {
 			command := strings.TrimPrefix(prompt, "/")
-			m.input.SetValue("")
-			m.session.HandleCommand(command)
+			if command == "quit" {
+				m.confirmDialog = true
+			} else {
+				m.session.HandleCommand(command)
+				m.input.SetValue("")
+			}
+			//return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+			//return tickMsg(t)
+
 			m.display.GotoBottom()
 			return m, nil
 		}

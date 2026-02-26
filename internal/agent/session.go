@@ -51,6 +51,18 @@ func (s *Session) CancelCurrent() bool {
 	return false
 }
 
+// Cancel handles the /cancel command
+// Returns error if nothing to cancel
+func (s *Session) Cancel() error {
+	if !s.inProgress {
+		return fmt.Errorf("nothing to cancel")
+	}
+	if s.CancelCurrent() {
+		return nil
+	}
+	return fmt.Errorf("cancel already in progress")
+}
+
 // IsInProgress returns true if a prompt is currently being processed
 func (s *Session) IsInProgress() bool {
 	return s.inProgress
@@ -68,14 +80,18 @@ func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Proce
 	}
 }
 
-// HandleCommand processes special commands like /summarize
+// HandleCommand processes special commands like /summarize, /cancel
 func (s *Session) HandleCommand(cmd string) error {
-	ctx, _ := context.WithCancel(context.Background())
 	switch cmd {
 	case "summarize":
+		ctx, _ := context.WithCancel(context.Background())
 		return s.Summarize(ctx)
+	case "cancel":
+		return s.Cancel()
 	default:
-		return fmt.Errorf("unknown cmd <%s>", cmd)
+		err := fmt.Errorf("unknown cmd <%s>", cmd)
+		s.writeError(err.Error())
+		return err
 	}
 }
 
@@ -210,6 +226,16 @@ func (s *Session) writeStatus(msg string) {
 	if s.Processor != nil && s.Processor.Output != nil {
 		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 		stream.WriteTLV(s.Processor.Output, stream.TagSystem, msg)
+		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
+		s.Processor.Output.Flush()
+	}
+}
+
+// writeError writes an error message to the output
+func (s *Session) writeError(msg string) {
+	if s.Processor != nil && s.Processor.Output != nil {
+		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
+		stream.WriteTLV(s.Processor.Output, stream.TagError, msg)
 		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 		s.Processor.Output.Flush()
 	}
