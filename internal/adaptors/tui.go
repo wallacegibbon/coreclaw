@@ -1,6 +1,7 @@
 package adaptors
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -54,14 +55,20 @@ type TUIAdaptor struct {
 	ModelName    string
 	processor    *agentpkg.Processor
 	session      *agentpkg.Session
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // NewTUIAdaptor creates a new TUI adaptor
 func NewTUIAdaptor(agentFactory AgentFactory, baseURL, modelName string) *TUIAdaptor {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &TUIAdaptor{
 		AgentFactory: agentFactory,
 		BaseURL:      baseURL,
 		ModelName:    modelName,
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 }
 
@@ -75,17 +82,8 @@ func (a *TUIAdaptor) Start() {
 	a.processor = processor
 	a.session = agentpkg.NewSession(agent, a.BaseURL, a.ModelName, processor)
 
-	// Create TUI and set up callback for prompt start
-	tui := NewTUI(a.session, tuiOutput)
-	a.session.OnPromptStart = tui.OnPromptStart
-
-	// Run the TUI
-	p := tea.NewProgram(
-		tui,
-		tea.WithAltScreen(),
-		tea.WithInput(os.Stdin),
-		tea.WithOutput(os.Stdout),
-	)
+	tui := NewTUI(a.session, a.ctx, a.cancel, tuiOutput)
+	p := tea.NewProgram(tui, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
 	return
 }
@@ -100,6 +98,7 @@ type tuiOutput struct {
 	reasoningStyle lipgloss.Style
 	errorStyle     lipgloss.Style
 	systemStyle    lipgloss.Style
+	promptStyle    lipgloss.Style
 }
 
 func newTUIOutput() *tuiOutput {
@@ -110,6 +109,7 @@ func newTUIOutput() *tuiOutput {
 		reasoningStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")),
 		errorStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")),
 		systemStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")),
+		promptStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true),
 	}
 }
 
@@ -166,6 +166,9 @@ func (w *tuiOutput) writeColored(tag byte, value string) {
 		output = w.systemStyle.Render(value)
 	case stream.TagStreamGap:
 		output = "\n"
+	case stream.TagPromptStart:
+		// Prompt started - display as user prompt with styled ">" prefix
+		output = "\n" + w.promptStyle.Render("> ") + w.textStyle.Render(value) + "\n"
 	default:
 		output = value
 	}
@@ -185,6 +188,8 @@ func (w *tuiOutput) colorizeTool(value string) string {
 // TUI is the main TUI model
 type TUI struct {
 	session   *agentpkg.Session
+	ctx       context.Context
+	cancel    context.CancelFunc
 	tuiOutput *tuiOutput
 	display   viewport.Model
 	input     textinput.Model
@@ -197,7 +202,7 @@ type TUI struct {
 }
 
 // NewTUI creates a new TUI model
-func NewTUI(session *agentpkg.Session, tuiOutput *tuiOutput) *TUI {
+func NewTUI(session *agentpkg.Session, ctx context.Context, cancel context.CancelFunc, tuiOutput *tuiOutput) *TUI {
 	input := textinput.New()
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
@@ -216,12 +221,14 @@ func NewTUI(session *agentpkg.Session, tuiOutput *tuiOutput) *TUI {
 	display.SetContent("Welcome to CoreClaw TUI!\n\nType your prompt below and press Enter to send.\n\n")
 
 	return &TUI{
-		session:    session,
-		tuiOutput:  tuiOutput,
-		display:    display,
-		input:      input,
-		status:     "Ready",
-		inputStyle: inputStyle,
+		session:     session,
+		ctx:         ctx,
+		cancel:      cancel,
+		tuiOutput:   tuiOutput,
+		display:     display,
+		input:       input,
+		status:      "Ready",
+		inputStyle:  inputStyle,
 		promptStyle:    promptStyle,
 		statusStyle:    statusStyle,
 	}
@@ -249,7 +256,10 @@ func (m *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return tickMsg(t)
 			})
 		}
-		// Done processing
+		// Done processing - check if context was cancelled and recreate if needed
+		if m.ctx.Err() == context.Canceled {
+			m.ctx, m.cancel = context.WithCancel(context.Background())
+		}
 		m.updateDisplayContent()
 		m.updateStatus()
 		return m, nil
@@ -271,6 +281,13 @@ func (m *TUI) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyCtrlC, tea.KeyEsc:
 		m.quitting = true
 		return m, tea.Quit
+	case tea.KeyCtrlG:
+		// Cancel the current request if one is in progress
+		if m.session.IsInProgress() {
+			m.session.CancelCurrent()
+			m.tuiOutput.display.Append("\n" + m.statusStyle.Render("Request cancelled.") + "\n")
+		}
+		return m, nil
 	case tea.KeyEnter:
 		prompt := m.input.Value()
 		if prompt == "" {
@@ -287,12 +304,7 @@ func (m *TUI) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		// Submit prompt - session handles queuing
-		m.session.SubmitPromptStr(prompt)
-
-		// Only display prompt if not queued (session not in progress)
-		if !m.session.IsInProgress() {
-			m.OnPromptStart(prompt)
-		}
+		m.session.SubmitPrompt(m.ctx, prompt)
 
 		m.input.SetValue("")
 		m.updateStatus()
@@ -307,16 +319,6 @@ func (m *TUI) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *TUI) submitPrompt(prompt string) {
-	m.session.SubmitPromptStr(prompt)
-}
-
-// OnPromptStart is called when a prompt starts being processed
-func (m *TUI) OnPromptStart(prompt string) {
-	styledPrompt := fmt.Sprintf("%s %s\n", m.promptStyle.Render(">"), m.promptStyle.Render(prompt))
-	m.tuiOutput.display.Append(styledPrompt)
-}
-
 func (m *TUI) updateStatus() {
 	if m.session != nil && m.session.IsInProgress() {
 		m.status = "Processing..."
@@ -329,18 +331,30 @@ func (m *TUI) updateStatus() {
 
 func (m *TUI) updateDisplayContent() {
 	newContent := m.tuiOutput.display.GetAll()
+	width := m.display.Width
+	if width > 0 {
+		newContent = wordwrap(newContent, width)
+	}
 	m.display.SetContent(newContent)
 	m.display.GotoBottom()
 }
 
 // View renders the TUI
 func (m *TUI) View() string {
-	// Update display content from buffer
+	// Update display content from buffer with word wrapping
 	newContent := m.tuiOutput.display.GetAll()
+	width := m.display.Width
+	if width > 0 {
+		newContent = wordwrap(newContent, width)
+	}
 	m.display.SetContent(newContent)
 	m.display.GotoBottom()
 
-	statusBar := m.statusStyle.Render(m.status)
+	// Style input and status to match viewport width
+	inputStyle := m.inputStyle.Width(width)
+	statusStyle := m.statusStyle.Width(width)
+
+	statusBar := statusStyle.Render(m.status)
 
 	// Build the view
 	var sb strings.Builder
@@ -350,7 +364,7 @@ func (m *TUI) View() string {
 
 	// Input area
 	sb.WriteString("\n")
-	sb.WriteString(m.input.View())
+	sb.WriteString(inputStyle.Render(m.input.View()))
 
 	// Status bar
 	sb.WriteString("\n")
@@ -362,3 +376,44 @@ func (m *TUI) View() string {
 var (
 	_ tea.Model = (*TUI)(nil)
 )
+
+// wordwrap wraps text to fit the given width using display width
+func wordwrap(text string, width int) string {
+	if width <= 0 || strings.TrimSpace(text) == "" {
+		return text
+	}
+
+	var result strings.Builder
+	lines := strings.Split(text, "\n")
+
+	for _, line := range lines {
+		if lipgloss.Width(line) <= width {
+			result.WriteString(line)
+			result.WriteString("\n")
+			continue
+		}
+
+		// Wrap the line
+		words := strings.Fields(line)
+		currentLen := 0
+
+		for _, word := range words {
+			wordLen := lipgloss.Width(word)
+			if currentLen == 0 {
+				result.WriteString(word)
+				currentLen = wordLen
+			} else if currentLen+1+wordLen <= width {
+				result.WriteString(" ")
+				result.WriteString(word)
+				currentLen += 1 + wordLen
+			} else {
+				result.WriteString("\n")
+				result.WriteString(word)
+				currentLen = wordLen
+			}
+		}
+		result.WriteString("\n")
+	}
+
+	return result.String()
+}

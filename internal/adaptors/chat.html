@@ -217,6 +217,12 @@
                 // System: show status messages (queue status, etc.)
                 flushCurrentText();
                 addMessage('system', value);
+            } else if (tag === 'P') {
+                // Prompt started: show user message + enable cancel
+                addMessage('user', value);
+                waitingForResponse = true;
+                cancel.classList.add('visible');
+                send.disabled = true;
             } else if (tag === 'D') {
                 // Done: request completed (success or canceled)
                 // Also shows status messages like "[Queued]" when prompts are queued
@@ -226,7 +232,7 @@
                 }
                 waitingForResponse = false;
                 send.disabled = false;
-                updateSendButton();
+                hideCancelButton();
             } else if (tag === 'G') {
                 // Stream Gap: add line break to separate content
                 flushCurrentText();
@@ -294,25 +300,21 @@
         function updateSendButton() {
             // Send button always enabled (queue handles busy state)
             send.disabled = false;
-            // Cancel button shows when processing
-            if (waitingForResponse) {
-                cancel.classList.add('visible');
-            } else {
-                cancel.classList.remove('visible');
-            }
+        }
+
+        function hideCancelButton() {
+            cancel.classList.remove('visible');
         }
 
         function sendMessage() {
             const text = prompt.value.trim();
             if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
 
-            // Show user message in dialog
-            addMessage('user', text);
-
+            // Don't show user message here - it will be shown when 'P' tag is received
             ws.send(text + '\n');
             prompt.value = '';
-            waitingForResponse = true;
-            updateSendButton();
+            // Don't enable cancel here - it will be enabled when 'P' tag is received
+            send.disabled = true;
         }
 
         function cancelRequest() {

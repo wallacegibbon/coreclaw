@@ -205,7 +205,7 @@ func (w *TLVWriter) Close() error {
 // isValidTag checks if a byte is a valid TLV tag
 func isValidTag(b byte) bool {
 	switch b {
-	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagUsage, stream.TagSystem, stream.TagStreamGap:
+	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagUsage, stream.TagSystem, stream.TagStreamGap, stream.TagPromptStart:
 		return true
 	}
 	return false

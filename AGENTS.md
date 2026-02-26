@@ -99,6 +99,17 @@ CoreClaw provides the following tools (ordered from safest to most dangerous):
 | `posix_shell` | Execute shell commands |
 
 
+## TUI Controls
+
+When running the TUI version:
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Submit prompt |
+| `Ctrl+G` | Cancel current request |
+| `Ctrl+C` / `Esc` | Exit |
+
+
 ## Skills System
 
 CoreClaw supports the Agent Skills specification from [agentskills.io](https://agentskills.io). Skills are packages of instructions, scripts, and resources that agents can discover and use to perform specific tasks.

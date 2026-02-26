@@ -94,11 +94,11 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 			for {
 				_, message, err := conn.ReadMessage()
 				if err != nil {
-					cancel()
+					session.CancelCurrent()
 					return
 				}
 				if len(message) >= 6 && string(message[:6]) == "CANCEL" {
-					cancel()
+					session.CancelCurrent()
 					continue
 				}
 

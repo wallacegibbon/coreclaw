@@ -62,6 +62,11 @@ For this project, simplicity is more important than efficiency.
   - Uses context cancellation to stop ongoing API calls
   - Displays "Request cancelled." message when a request is interrupted
   - Properly handles Ctrl-C to prevent process termination
+- ✅ Ctrl-G handling in TUI mode
+  - Cancels current request when Ctrl-G is pressed
+  - Works similar to the cancel button in WebSocket client
+  - Context is automatically recreated after cancellation for subsequent requests
+  - Displays "Request cancelled." message when interrupted
 - ✅ Refactored codebase for better maintainability
   - Extracted CLI flag parsing to `internal/config` package
   - Moved runner logic to `internal/adaptors/terminal.go`

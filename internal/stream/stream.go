@@ -7,13 +7,14 @@ import (
 
 // Message tags for TLV protocol
 const (
-	TagText      = 'T' // Regular text output
-	TagTool      = 't' // Tool call output
-	TagReasoning = 'R' // Reasoning/thinking content
-	TagError     = 'E' // Error messages
-	TagUsage     = 'U' // Usage info (context size, tokens spent)
-	TagSystem    = 'S' // System messages (queue status, etc.)
-	TagStreamGap = 'G' // Stream gap to separate data
+	TagText       = 'T' // Regular text output
+	TagTool       = 't' // Tool call output
+	TagReasoning  = 'R' // Reasoning/thinking content
+	TagError      = 'E' // Error messages
+	TagUsage      = 'U' // Usage info (context size, tokens spent)
+	TagSystem     = 'S' // System messages (queue status, etc.)
+	TagStreamGap  = 'G' // Stream gap to separate data
+	TagPromptStart = 'P' // Prompt started processing (show user message + cancel button)
 )
 
 // WriteTLV writes a TLV message to the output

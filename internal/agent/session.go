@@ -29,14 +29,21 @@ type Session struct {
 	// OnCommandDone is called after a command (like /summarize) completes
 	OnCommandDone func()
 
-	// OnPromptStart is called when a prompt starts being processed
-	OnPromptStart func(prompt string)
-
 	// promptQueue buffers prompts submitted while agent is processing
 	promptQueue chan string
 
 	// inProgress tracks whether a prompt is currently being processed
 	inProgress bool
+
+	// cancelCurrent is a function to cancel the current prompt
+	cancelCurrent func()
+}
+
+// CancelCurrent cancels the currently running prompt if any
+func (s *Session) CancelCurrent() {
+	if s.cancelCurrent != nil {
+		s.cancelCurrent()
+	}
 }
 
 // IsInProgress returns true if a prompt is currently being processed
@@ -155,30 +162,54 @@ func (s *Session) SubmitPrompt(ctx context.Context, prompt string) {
 
 	// Start async processing
 	s.inProgress = true
-	go s.runAsync(ctx, prompt)
+
+	// Get the cancel function from context if available
+	ctx, cancel := context.WithCancel(ctx)
+	go s.runAsync(ctx, cancel, prompt)
 }
 
 // runAsync processes prompts asynchronously, including any queued prompts
-func (s *Session) runAsync(ctx context.Context, prompt string) {
-	if s.OnPromptStart != nil {
-		s.OnPromptStart(prompt)
-	}
+func (s *Session) runAsync(ctx context.Context, cancel context.CancelFunc, prompt string) {
+	// Set cancel function for the first prompt
+	s.cancelCurrent = cancel
+
+	// Signal prompt start (show user message + enable cancel)
+	s.signalPromptStart(prompt)
+
 	s.ProcessPrompt(ctx, prompt)
 	s.SendUsage()
 
 	// Process any queued prompts
 	for {
 		if queuedPrompt, ok := s.getQueuedPrompt(); ok {
-			if s.OnPromptStart != nil {
-				s.OnPromptStart(queuedPrompt)
-			}
-			s.ProcessPrompt(ctx, queuedPrompt)
+			// Create a fresh context for each queued prompt
+			promptCtx, promptCancel := context.WithCancel(context.Background())
+			s.cancelCurrent = promptCancel
+
+			// Signal queued prompt start
+			s.signalPromptStart(queuedPrompt)
+
+			s.ProcessPrompt(promptCtx, queuedPrompt)
 			s.SendUsage()
+
+			// If context was cancelled, stop processing queued prompts
+			if promptCtx.Err() == context.Canceled {
+				s.cancelCurrent = nil
+				break
+			}
+			s.cancelCurrent = nil
 		} else {
 			break
 		}
 	}
 	s.inProgress = false
+}
+
+// signalPromptStart signals that a prompt has started processing
+func (s *Session) signalPromptStart(prompt string) {
+	if s.Processor != nil && s.Processor.Output != nil {
+		stream.WriteTLV(s.Processor.Output, stream.TagPromptStart, prompt)
+	}
 }
 
 // writeStatus writes a system status message to the output
@@ -208,11 +239,6 @@ func (s *Session) getQueuedPrompt() (string, bool) {
 	default:
 		return "", false
 	}
-}
-
-// SubmitPromptStr submits a prompt using background context (for TUI)
-func (s *Session) SubmitPromptStr(prompt string) {
-	s.SubmitPrompt(context.Background(), prompt)
 }
 
 // HandleCommandStr handles a command using background context (for TUI)
