@@ -227,6 +227,13 @@
                 waitingForResponse = false;
                 send.disabled = false;
                 updateSendButton();
+            } else if (tag === 'G') {
+                // Stream Gap: add line break to separate content
+                flushCurrentText();
+                currentTextValue += '\n';
+                if (currentTextElement) {
+                    updateMessageContent(currentTextElement, 'assistant', currentTextValue);
+                }
             }
         }
 

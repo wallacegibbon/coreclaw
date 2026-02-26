@@ -11,6 +11,11 @@ import (
 // AgentFactory creates a new agent for each client session
 type AgentFactory func() fantasy.Agent
 
+// Adaptor is the interface for terminal adaptors
+type Adaptor interface {
+	Start()
+}
+
 // NewSession creates a processor, session, and runner with common setup
 func NewSession(
 	agent fantasy.Agent,

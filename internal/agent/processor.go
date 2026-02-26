@@ -52,8 +52,16 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	streamCall.OnTextDelta = func(id, text string) error {
 		responseText.WriteString(text)
-		stream.WriteTLV(p.Output, stream.TagText, text)
 		p.Output.Flush()
+		return nil
+	}
+
+	streamCall.OnTextEnd = func(id string) error {
+		stream.WriteTLV(p.Output, stream.TagStreamGap, "")
+		return nil
+	}
+
+	streamCall.OnReasoningStart = func(id string, reasoning fantasy.ReasoningContent) error {
 		return nil
 	}
 
@@ -65,17 +73,14 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	streamCall.OnReasoningEnd = func(id string, reasoning fantasy.ReasoningContent) error {
+		stream.WriteTLV(p.Output, stream.TagStreamGap, "")
 		return nil
 	}
 
-	streamCall.OnTextStart = func(id string) error {
-		stream.WriteTLV(p.Output, stream.TagText, "\n")
-		p.Output.Flush()
-		return nil
-	}
 
 	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
 		p.handleToolCall(tc)
+		stream.WriteTLV(p.Output, stream.TagStreamGap, "")
 		p.Output.Flush()
 		return nil
 	}
@@ -86,7 +91,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	agentResult, err := p.Agent.Stream(ctx, streamCall)
 	if err != nil {
-		stream.WriteTLV(p.Output, stream.TagError, fmt.Sprintf("Error: %v\n", err))
+		stream.WriteTLV(p.Output, stream.TagError, fmt.Sprintf("Error: %v", err))
 		p.Output.Flush()
 		return nil, "", fantasy.Message{}, fantasy.Usage{}, err
 	}

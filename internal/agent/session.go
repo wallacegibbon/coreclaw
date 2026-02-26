@@ -29,6 +29,9 @@ type Session struct {
 	// OnCommandDone is called after a command (like /summarize) completes
 	OnCommandDone func()
 
+	// OnPromptStart is called when a prompt starts being processed
+	OnPromptStart func(prompt string)
+
 	// promptQueue buffers prompts submitted while agent is processing
 	promptQueue chan string
 
@@ -132,6 +135,7 @@ func (s *Session) SendUsage() {
 	}
 	msg := fmt.Sprintf("context=%d, spent=%d", s.ContextTokens, s.TotalSpent.TotalTokens)
 	stream.WriteTLV(s.Processor.Output, stream.TagUsage, msg)
+	stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 	s.Processor.Output.Flush()
 }
 
@@ -142,9 +146,9 @@ func (s *Session) SubmitPrompt(ctx context.Context, prompt string) {
 	if s.inProgress {
 		// Try to queue the prompt
 		if s.queuePrompt(prompt) {
-			s.writeStatus("[Queued] Previous task in progress. Will run after completion.\n")
+			s.writeStatus("[Queued] Previous task in progress. Will run after completion.")
 		} else {
-			s.writeStatus("[Busy] Cannot queue, try again shortly.\n")
+			s.writeStatus("[Busy] Cannot queue, try again shortly.")
 		}
 		return
 	}
@@ -156,12 +160,18 @@ func (s *Session) SubmitPrompt(ctx context.Context, prompt string) {
 
 // runAsync processes prompts asynchronously, including any queued prompts
 func (s *Session) runAsync(ctx context.Context, prompt string) {
+	if s.OnPromptStart != nil {
+		s.OnPromptStart(prompt)
+	}
 	s.ProcessPrompt(ctx, prompt)
 	s.SendUsage()
 
 	// Process any queued prompts
 	for {
 		if queuedPrompt, ok := s.getQueuedPrompt(); ok {
+			if s.OnPromptStart != nil {
+				s.OnPromptStart(queuedPrompt)
+			}
 			s.ProcessPrompt(ctx, queuedPrompt)
 			s.SendUsage()
 		} else {
@@ -175,6 +185,7 @@ func (s *Session) runAsync(ctx context.Context, prompt string) {
 func (s *Session) writeStatus(msg string) {
 	if s.Processor != nil && s.Processor.Output != nil {
 		stream.WriteTLV(s.Processor.Output, stream.TagSystem, msg)
+		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 		s.Processor.Output.Flush()
 	}
 }
@@ -197,4 +208,14 @@ func (s *Session) getQueuedPrompt() (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+// SubmitPromptStr submits a prompt using background context (for TUI)
+func (s *Session) SubmitPromptStr(prompt string) {
+	s.SubmitPrompt(context.Background(), prompt)
+}
+
+// HandleCommandStr handles a command using background context (for TUI)
+func (s *Session) HandleCommandStr(cmd string) {
+	s.HandleCommand(context.Background(), cmd)
 }

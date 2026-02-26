@@ -28,8 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create terminal adaptor and start in interactive mode
-	adaptor := adaptors.NewTerminalAdaptor(appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName)
+	adaptor := adaptors.NewTUIAdaptor(appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName)
 	adaptor.Start()
 }
 

@@ -13,6 +13,7 @@ const (
 	TagError     = 'E' // Error messages
 	TagUsage     = 'U' // Usage info (context size, tokens spent)
 	TagSystem    = 'S' // System messages (queue status, etc.)
+	TagStreamGap = 'G' // Stream gap to separate data
 )
 
 // WriteTLV writes a TLV message to the output

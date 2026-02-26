@@ -87,7 +87,7 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		conn.WriteMessage(websocket.TextMessage, []byte("Connected to CoreClaw\n"))
+		conn.WriteMessage(websocket.TextMessage, []byte("Connected to CoreClaw"))
 
 		// Read loop - handles client input and cancel signals
 		go func() {
