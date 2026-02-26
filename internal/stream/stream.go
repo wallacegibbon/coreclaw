@@ -12,6 +12,7 @@ const (
 	TagReasoning = 'R' // Reasoning/thinking content
 	TagError     = 'E' // Error messages
 	TagUsage     = 'U' // Usage info (context size, tokens spent)
+	TagSystem    = 'S' // System messages (queue status, etc.)
 )
 
 // WriteTLV writes a TLV message to the output

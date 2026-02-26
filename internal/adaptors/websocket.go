@@ -82,7 +82,7 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 
 		// Create a new agent, processor, and session for this client
 		agent := factory()
-		session, runner := NewSession(agent, baseURL, modelName, input, output)
+		session, _ := NewSession(agent, baseURL, modelName, input, output)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -102,6 +102,11 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 					continue
 				}
 
+				msgStr := strings.TrimSpace(string(message))
+				if msgStr == "" {
+					continue
+				}
+
 				select {
 				case input.clientCh <- message:
 				case <-ctx.Done():
@@ -111,8 +116,6 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 
 		// Interactive loop - synchronous like terminal
 		for {
-			var userPrompt string
-
 			// Reset client input state (enable "Send" button, etc.)
 			stream.WriteTLV(output, 'D', "")
 
@@ -120,7 +123,7 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 			if err != nil {
 				return
 			}
-			userPrompt = strings.TrimSpace(line)
+			userPrompt := strings.TrimSpace(line)
 			if userPrompt == "" {
 				continue
 			}
@@ -136,10 +139,11 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 				continue
 			}
 
-			runner.SetInProgress(true)
-			session.ProcessPrompt(ctx, userPrompt)
-			runner.SetInProgress(false)
-			session.SendUsage()
+			// Submit prompt - Session handles queue internally
+			session.SubmitPrompt(ctx, userPrompt)
+
+			// Signal done for UI
+			stream.WriteTLV(output, 'D', "")
 
 			if ctx.Err() == context.Canceled {
 				ctx, cancel = context.WithCancel(context.Background())

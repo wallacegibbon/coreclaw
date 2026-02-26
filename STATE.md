@@ -99,7 +99,7 @@ For this project, simplicity is more important than efficiency.
   - Test coverage for parsing, discovery, and activation
 - ✅ IOStream abstraction layer
   - Input/Output interfaces in internal/stream/stream.go
-  - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E')
+  - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E', TagUsage='U', TagSystem='S')
   - Buffered reads/writes with Flush() method
 - ✅ Adaptors in internal/adaptors/
   - terminal.go - Terminal adaptor connecting stdio to agent processor

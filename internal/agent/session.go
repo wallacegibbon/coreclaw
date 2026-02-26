@@ -28,16 +28,28 @@ type Session struct {
 
 	// OnCommandDone is called after a command (like /summarize) completes
 	OnCommandDone func()
+
+	// promptQueue buffers prompts submitted while agent is processing
+	promptQueue chan string
+
+	// inProgress tracks whether a prompt is currently being processed
+	inProgress bool
+}
+
+// IsInProgress returns true if a prompt is currently being processed
+func (s *Session) IsInProgress() bool {
+	return s.inProgress
 }
 
 // NewSession creates a new session with the given processor
 func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor) *Session {
 	return &Session{
-		Processor: processor,
-		Messages:  nil,
-		Agent:     agent,
-		BaseURL:   baseURL,
-		ModelName: modelName,
+		Processor:   processor,
+		Messages:    nil,
+		Agent:       agent,
+		BaseURL:     baseURL,
+		ModelName:   modelName,
+		promptQueue: make(chan string, 10),
 	}
 }
 
@@ -121,4 +133,68 @@ func (s *Session) SendUsage() {
 	msg := fmt.Sprintf("context=%d, spent=%d", s.ContextTokens, s.TotalSpent.TotalTokens)
 	stream.WriteTLV(s.Processor.Output, stream.TagUsage, msg)
 	s.Processor.Output.Flush()
+}
+
+// SubmitPrompt submits a prompt for processing, queueing if necessary
+// This is the main entry point for adaptors - handles all queue logic internally
+// Processing runs asynchronously so adaptors can continue receiving input
+func (s *Session) SubmitPrompt(ctx context.Context, prompt string) {
+	if s.inProgress {
+		// Try to queue the prompt
+		if s.queuePrompt(prompt) {
+			s.writeStatus("[Queued] Previous task in progress. Will run after completion.\n")
+		} else {
+			s.writeStatus("[Busy] Cannot queue, try again shortly.\n")
+		}
+		return
+	}
+
+	// Start async processing
+	s.inProgress = true
+	go s.runAsync(ctx, prompt)
+}
+
+// runAsync processes prompts asynchronously, including any queued prompts
+func (s *Session) runAsync(ctx context.Context, prompt string) {
+	s.ProcessPrompt(ctx, prompt)
+	s.SendUsage()
+
+	// Process any queued prompts
+	for {
+		if queuedPrompt, ok := s.getQueuedPrompt(); ok {
+			s.ProcessPrompt(ctx, queuedPrompt)
+			s.SendUsage()
+		} else {
+			break
+		}
+	}
+	s.inProgress = false
+}
+
+// writeStatus writes a system status message to the output
+func (s *Session) writeStatus(msg string) {
+	if s.Processor != nil && s.Processor.Output != nil {
+		stream.WriteTLV(s.Processor.Output, stream.TagSystem, msg)
+		s.Processor.Output.Flush()
+	}
+}
+
+// queuePrompt adds a prompt to the queue (non-blocking)
+func (s *Session) queuePrompt(prompt string) bool {
+	select {
+	case s.promptQueue <- prompt:
+		return true
+	default:
+		return false
+	}
+}
+
+// getQueuedPrompt tries to get a queued prompt (non-blocking)
+func (s *Session) getQueuedPrompt() (string, bool) {
+	select {
+	case prompt, ok := <-s.promptQueue:
+		return prompt, ok
+	default:
+		return "", false
+	}
 }

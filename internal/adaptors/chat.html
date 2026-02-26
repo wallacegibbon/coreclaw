@@ -72,9 +72,19 @@
         }
         #send:hover { background: #555; }
         #send:disabled { background: #999; cursor: not-allowed; }
-        #send.cancel { background: #c62828; }
-        #send.cancel:hover { background: #d32f2f; }
-        #send.cancel:disabled { background: #e57373; opacity: 0.6; cursor: not-allowed; }
+        #cancel {
+            padding: 12px 20px;
+            background: #c62828;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            display: none;
+        }
+        #cancel:hover { background: #d32f2f; }
+        #cancel:disabled { background: #e57373; opacity: 0.6; cursor: not-allowed; }
+        #cancel.visible { display: block; }
         pre { white-space: pre-wrap; word-wrap: break-word; }
     </style>
 </head>
@@ -84,12 +94,14 @@
     <div id="input-area">
         <input type="text" id="prompt" placeholder="Type your message..." autocomplete="off">
         <button id="send">Send</button>
+        <button id="cancel">Cancel</button>
     </div>
 
     <script>
         const messages = document.getElementById('messages');
         const prompt = document.getElementById('prompt');
         const send = document.getElementById('send');
+        const cancel = document.getElementById('cancel');
         const status = document.getElementById('status');
 
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -201,8 +213,17 @@
                 // Usage: show as system message (dim text)
                 flushCurrentText();
                 addMessage('system', 'Tokens: ' + value);
+            } else if (tag === 'S') {
+                // System: show status messages (queue status, etc.)
+                flushCurrentText();
+                addMessage('system', value);
             } else if (tag === 'D') {
                 // Done: request completed (success or canceled)
+                // Also shows status messages like "[Queued]" when prompts are queued
+                if (value && value.length > 0) {
+                    flushCurrentText();
+                    addMessage('system', value);
+                }
                 waitingForResponse = false;
                 send.disabled = false;
                 updateSendButton();
@@ -264,23 +285,17 @@
         }
 
         function updateSendButton() {
+            // Send button always enabled (queue handles busy state)
+            send.disabled = false;
+            // Cancel button shows when processing
             if (waitingForResponse) {
-                send.textContent = 'Cancel';
-                send.classList.add('cancel');
+                cancel.classList.add('visible');
             } else {
-                send.textContent = 'Send';
-                send.classList.remove('cancel');
+                cancel.classList.remove('visible');
             }
         }
 
         function sendMessage() {
-            if (waitingForResponse) {
-                // Cancel: send cancel signal to stop current request
-                send.disabled = true;
-                ws.send('CANCEL\n');
-                return;
-            }
-
             const text = prompt.value.trim();
             if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
 
@@ -293,7 +308,13 @@
             updateSendButton();
         }
 
+        function cancelRequest() {
+            cancel.disabled = true;
+            ws.send('CANCEL\n');
+        }
+
         send.addEventListener('click', sendMessage);
+        cancel.addEventListener('click', cancelRequest);
         prompt.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
         });

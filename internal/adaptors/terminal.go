@@ -36,7 +36,7 @@ func NewTerminalAdaptor(factory AgentFactory, baseURL, modelName string) *Termin
 // Start runs the terminal adaptor in interactive mode
 func (a *TerminalAdaptor) Start() {
 	agent := a.AgentFactory()
-	session, runner := NewSession(agent, a.BaseURL, a.ModelName, a.Input, a.Output)
+	session, _ := NewSession(agent, a.BaseURL, a.ModelName, a.Input, a.Output)
 
 	reader := bufio.NewReader(a.Input)
 
@@ -49,7 +49,7 @@ func (a *TerminalAdaptor) Start() {
 
 	go func() {
 		for range sigChan {
-			if runner.IsInProgress() {
+			if session.IsInProgress() {
 				cancel()
 			}
 		}
@@ -57,14 +57,12 @@ func (a *TerminalAdaptor) Start() {
 
 	// Interactive loop
 	for {
-		var userPrompt string
-
 		fmt.Fprint(os.Stderr, Green("> "))
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			return
 		}
-		userPrompt = strings.TrimSpace(input)
+		userPrompt := strings.TrimSpace(input)
 		if userPrompt == "" {
 			continue
 		}
@@ -80,10 +78,8 @@ func (a *TerminalAdaptor) Start() {
 			continue
 		}
 
-		runner.SetInProgress(true)
-		session.ProcessPrompt(ctx, userPrompt)
-		runner.SetInProgress(false)
-		session.SendUsage()
+		// Submit prompt - Session handles queue internally
+		session.SubmitPrompt(ctx, userPrompt)
 
 		if ctx.Err() == context.Canceled {
 			ctx, cancel = context.WithCancel(context.Background())
@@ -164,6 +160,8 @@ func (w *TLVWriter) writeColored(tag byte, value string) {
 		colored = Dim(value)
 	case stream.TagUsage:
 		colored = "\n" + Dim("Tokens: "+value) + "\n"
+	case stream.TagSystem:
+		colored = "\n" + Dim(value) + "\n"
 	default:
 		colored = value
 	}
@@ -207,7 +205,7 @@ func (w *TLVWriter) Close() error {
 // isValidTag checks if a byte is a valid TLV tag
 func isValidTag(b byte) bool {
 	switch b {
-	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagUsage:
+	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagUsage, stream.TagSystem:
 		return true
 	}
 	return false
