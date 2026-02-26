@@ -82,8 +82,8 @@ func (a *TerminalAdaptor) Start() {
 	a.processor = processor
 	a.session = agentpkg.NewSession(agent, a.BaseURL, a.ModelName, processor)
 
-	tui := NewTerminal(a.session, a.ctx, a.cancel, terminalOutput)
-	p := tea.NewProgram(tui, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
+	t := NewTerminal(a.session, a.ctx, a.cancel, terminalOutput)
+	p := tea.NewProgram(t, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
 	return
 }
@@ -130,11 +130,6 @@ func (w *terminalOutput) Flush() error {
 func (w *terminalOutput) processBuffer() {
 	for len(w.buffer) >= 5 {
 		tag := w.buffer[0]
-		if !isValidTag(tag) {
-			w.display.Append(string(w.buffer[0]))
-			w.buffer = w.buffer[1:]
-			continue
-		}
 
 		length := int32(binary.BigEndian.Uint32(w.buffer[1:5]))
 

@@ -82,11 +82,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 
 // CreateAgent creates a new fantasy agent with the configured tools and system prompt
 func (c *Config) CreateAgent() fantasy.Agent {
-	return fantasy.NewAgent(
-		c.Model,
-		fantasy.WithTools(c.AgentTools...),
-		fantasy.WithSystemPrompt(c.SystemPrompt),
-	)
+	return fantasy.NewAgent(c.Model, fantasy.WithTools(c.AgentTools...), fantasy.WithSystemPrompt(c.SystemPrompt))
 }
 
 // AgentFactory returns a function that creates new agents (for WebSocket)

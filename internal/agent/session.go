@@ -86,7 +86,9 @@ func (s *Session) HandleCommand(ctx context.Context, cmd string) (bool, error) {
 
 // Summarize summarizes the conversation history
 func (s *Session) Summarize(ctx context.Context) (fantasy.Message, fantasy.Usage, error) {
-	_, assistantMsg, usage, err := s.Processor.Summarize(ctx, s.Messages)
+	summarizePrompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
+
+	assistantMsg, usage, err := s.Processor.ProcessPrompt(ctx, summarizePrompt, s.Messages)
 	if err != nil {
 		return fantasy.Message{}, fantasy.Usage{}, err
 	}
@@ -107,7 +109,7 @@ func (s *Session) ProcessPrompt(ctx context.Context, prompt string) (fantasy.Mes
 	copy(messagesForAPI, s.Messages[:len(s.Messages)-1])
 
 	// Process the prompt
-	_, responseText, assistantMsg, usage, err := s.Processor.ProcessPrompt(ctx, prompt, messagesForAPI)
+	assistantMsg, usage, err := s.Processor.ProcessPrompt(ctx, prompt, messagesForAPI)
 
 	// Track usage
 	s.TotalSpent.InputTokens += usage.InputTokens
@@ -122,14 +124,9 @@ func (s *Session) ProcessPrompt(ctx context.Context, prompt string) (fantasy.Mes
 		return fantasy.Message{}, fantasy.Usage{}, err
 	}
 
-	// Store assistant message
+	// If there is an assistant message, store it.
 	if assistantMsg.Role != "" {
 		s.Messages = append(s.Messages, assistantMsg)
-	} else if responseText != "" {
-		s.Messages = append(s.Messages, fantasy.Message{
-			Role:    fantasy.MessageRoleAssistant,
-			Content: []fantasy.MessagePart{fantasy.TextPart{Text: responseText}},
-		})
 	}
 
 	return assistantMsg, usage, nil

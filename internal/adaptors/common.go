@@ -16,22 +16,21 @@ type Adaptor interface {
 	Start()
 }
 
-// NewSession creates a processor, session, and runner with common setup
+// NewSession creates a processor and session with common setup
 func NewSession(
 	agent fantasy.Agent,
 	baseURL, modelName string,
 	input stream.Input,
 	output stream.Output,
-) (*agentpkg.Session, *agentpkg.SyncRunner) {
+) *agentpkg.Session {
 	processor := agentpkg.NewProcessorWithIO(agent, input, output)
 	session := agentpkg.NewSession(agent, baseURL, modelName, processor)
-	runner := agentpkg.NewSyncRunner(session)
 
 	session.OnCommandDone = func() {
 		session.SendUsage()
 	}
 
-	return session, runner
+	return session
 }
 
 // Dim returns text in dim gray color
@@ -52,13 +51,4 @@ func Green(text string) string {
 // Yellow returns text in yellow color
 func Yellow(text string) string {
 	return fmt.Sprintf("\x1b[38;2;249;226;175m%s\x1b[0m", text)
-}
-
-// isValidTag checks if a byte is a valid TLV tag
-func isValidTag(b byte) bool {
-	switch b {
-	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagUsage, stream.TagSystem, stream.TagStreamGap, stream.TagPromptStart:
-		return true
-	}
-	return false
 }

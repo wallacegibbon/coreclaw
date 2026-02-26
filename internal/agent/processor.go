@@ -36,7 +36,7 @@ func NewProcessorWithIO(agent fantasy.Agent, input stream.Input, output stream.O
 }
 
 // ProcessPrompt handles a single prompt with streaming
-func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages []fantasy.Message) (*fantasy.AgentResult, string, fantasy.Message, fantasy.Usage, error) {
+func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages []fantasy.Message) (fantasy.Message, fantasy.Usage, error) {
 	streamCall := fantasy.AgentStreamCall{
 		Prompt: prompt,
 	}
@@ -44,14 +44,11 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 		streamCall.Messages = messages
 	}
 
-	responseText := &strings.Builder{}
-
 	streamCall.OnTextStart = func(id string) error {
 		return nil
 	}
 
 	streamCall.OnTextDelta = func(id, text string) error {
-		responseText.WriteString(text)
 		p.Output.Flush()
 		return nil
 	}
@@ -95,22 +92,28 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 		stream.WriteTLV(p.Output, stream.TagError, fmt.Sprintf("Error: %v", err))
 		stream.WriteTLV(p.Output, stream.TagStreamGap, "")
 		p.Output.Flush()
-		return nil, "", fantasy.Message{}, fantasy.Usage{}, err
+		return fantasy.Message{}, fantasy.Usage{}, err
 	}
 
 	// Flush output buffer
 	p.Output.Flush()
 
-	assistantMsg := extractAssistantMessage(agentResult)
-	return agentResult, responseText.String(), assistantMsg, agentResult.TotalUsage, nil
-}
+	// Extract assistant message from result
 
-// Summarize handles summarizing the conversation history
-func (p *Processor) Summarize(ctx context.Context, messages []fantasy.Message) (string, fantasy.Message, fantasy.Usage, error) {
-	summarizePrompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
+	// Some API protocol do not support thinking_text sign, it's better to fetch
+	// the last message and treat it as the final answer.
+	var assistantMsg fantasy.Message
+	if agentResult != nil && len(agentResult.Steps) > 0 {
+		lastStep := agentResult.Steps[len(agentResult.Steps)-1]
+		for _, msg := range lastStep.Messages {
+			if msg.Role == fantasy.MessageRoleAssistant {
+				assistantMsg = msg
+				break
+			}
+		}
+	}
 
-	_, responseText, assistantMsg, usage, err := p.ProcessPrompt(ctx, summarizePrompt, messages)
-	return responseText, assistantMsg, usage, err
+	return assistantMsg, agentResult.TotalUsage, nil
 }
 
 // extractPosixShellCommand extracts the command from posix_shell tool input JSON
@@ -197,17 +200,3 @@ func (p *Processor) handleToolCall(tc fantasy.ToolCallContent) {
 	}
 }
 
-// extractAssistantMessage extracts the assistant message from agent result
-func extractAssistantMessage(agentResult *fantasy.AgentResult) fantasy.Message {
-	if agentResult == nil || len(agentResult.Steps) == 0 {
-		return fantasy.Message{}
-	}
-
-	lastStep := agentResult.Steps[len(agentResult.Steps)-1]
-	for _, msg := range lastStep.Messages {
-		if msg.Role == fantasy.MessageRoleAssistant {
-			return msg
-		}
-	}
-	return fantasy.Message{}
-}

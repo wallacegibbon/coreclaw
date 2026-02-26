@@ -82,7 +82,7 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 
 		// Create a new agent, processor, and session for this client
 		agent := factory()
-		session, _ := NewSession(agent, baseURL, modelName, input, output)
+		session := NewSession(agent, baseURL, modelName, input, output)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
