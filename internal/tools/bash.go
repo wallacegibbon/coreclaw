@@ -1,11 +1,17 @@
 package tools
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"os/exec"
+	"os"
+	"strings"
 
 	"charm.land/fantasy"
+	"mvdan.cc/sh/v3/expand"
+	"mvdan.cc/sh/v3/interp"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 // BashInput represents the input for the bash tool
@@ -24,20 +30,44 @@ func NewBashTool() fantasy.AgentTool {
 				return fantasy.NewTextErrorResponse("command is required"), nil
 			}
 
-			execCmd := exec.CommandContext(ctx, "bash", "-c", cmd)
-			output, err := execCmd.CombinedOutput()
+			var stdout, stderr bytes.Buffer
 
-			// Get exit status
-			exitStatus := 0
+			parser := syntax.NewParser()
+			prog, err := parser.Parse(strings.NewReader(cmd), "")
 			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitStatus = exitErr.ExitCode()
-				}
-				// Include exit status in error response
-				return fantasy.NewTextErrorResponse(fmt.Sprintf("[%d] %s", exitStatus, string(output))), nil
+				return fantasy.NewTextErrorResponse("parse error: " + err.Error()), nil
 			}
 
-			return fantasy.NewTextResponse(string(output)), nil
+			runner, err := interp.New(
+				interp.Dir("/"),
+				interp.Env(expand.ListEnviron(os.Environ()...)),
+				interp.StdIO(os.Stdin, &stdout, &stderr),
+			)
+			if err != nil {
+				return fantasy.NewTextErrorResponse("failed to create runner: " + err.Error()), nil
+			}
+
+			err = runner.Run(ctx, prog)
+			output := stdout.String()
+			if stderr.Len() > 0 {
+				if output != "" {
+					output += "\n"
+				}
+				output += stderr.String()
+			}
+
+			if err != nil {
+				var exitStatus interp.ExitStatus
+				if errors.As(err, &exitStatus) {
+					return fantasy.NewTextErrorResponse(fmt.Sprintf("[%d] %s", exitStatus, output)), nil
+				}
+				if output != "" {
+					return fantasy.NewTextErrorResponse(fmt.Sprintf("%s\n%s", err.Error(), output)), nil
+				}
+				return fantasy.NewTextErrorResponse(err.Error()), nil
+			}
+
+			return fantasy.NewTextResponse(output), nil
 		},
 	)
 }
