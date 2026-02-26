@@ -1,7 +1,7 @@
 # CoreClaw Project Status
 
 ## Overview
-CoreClaw is a minimal AI Agent that can handle toolcalling. We only provide one tool: `bash`.
+CoreClaw is a minimal AI Agent that can handle toolcalling. We only provide one tool: `posix_shell`.
 All skills are based on this only one tool. And all functionalities are built by skills.
 
 For this project, simplicity is more important than efficiency.
@@ -13,9 +13,9 @@ For this project, simplicity is more important than efficiency.
 - ✅ fantasy dependency added (v0.8.0)
 - ✅ Direct stdin reading for terminal input
 - ✅ Basic agent structure with OpenAI provider
-- ✅ Bash tool implementation with `fantasy.NewAgentTool`
+- ✅ Shell tool implementation with `fantasy.NewAgentTool`
 - ✅ Command-line interface with prompt input
-- ✅ Tool calling support with bash command execution
+- ✅ Tool calling support with posix_shell command execution
 - ✅ Tool result display
 - ✅ Usage statistics (input/output/total tokens)
 - ✅ Multi-provider support (OpenAI, Anthropic, DeepSeek, ZAI)
@@ -35,7 +35,7 @@ For this project, simplicity is more important than efficiency.
   - Ctrl-C interruption support
 - ✅ Real-time streaming output
   - All text (including thinking) displays immediately
-  - Interleaved with bash command outputs
+  - Interleaved with posix_shell command outputs
 - ✅ API debug mode (--debug-api)
   - Logs raw API requests and responses to stderr
   - Shows HTTP method, URL, headers (with sensitive data masked), and body
@@ -49,7 +49,7 @@ For this project, simplicity is more important than efficiency.
   - Separated bracketed status line from input prompt
   - Bracketed line prints once at session start
   - Input prompt shows green > with reset for clean input
-- ✅ Bash command visibility
+- ✅ Shell command visibility
   - Commands printed when they start with arrow prefix (→)
   - Command text in green, arrow in dim color
   - Newlines and tabs escaped for clean single-line display
@@ -118,7 +118,7 @@ For this project, simplicity is more important than efficiency.
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
-- **Tool**: bash (executes shell commands)
+- **Tool**: posix_shell (executes shell commands)
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 - **Stream Protocol**: TLV (Tag-Length-Value) for structured output
@@ -133,13 +133,13 @@ internal/
   provider/    - Provider configuration (API keys, endpoints)
   skills/      - Skills system (discovery, parsing, activation)
   stream/      - IOStream interfaces and TLV protocol
-  tools/       - Tool implementations (bash, read_file, write_file, activate_skill)
+  tools/       - Tool implementations (posix_shell, read_file, write_file, activate_skill)
 cmd/coreclaw-web/       - coreclaw-web entry point
 main.go        - coreclaw entry point
 ```
 
 ### Features
-- Execute bash commands through the AI agent
+- Execute posix_shell commands through the AI agent
 - Multi-step conversations with tool calls
 - Token usage tracking
 - Error handling for command execution
@@ -154,7 +154,7 @@ main.go        - coreclaw entry point
 - Web server with WebSocket support and chat UI
 
 ### Usage
-```bash
+```sh
 # OpenAI API
 ./coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
@@ -181,7 +181,7 @@ main.go        - coreclaw entry point
 ```
 
 ### coreclaw-web (WebSocket Server)
-```bash
+```sh
 # Start WebSocket server
 ./coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
@@ -193,4 +193,4 @@ main.go        - coreclaw entry point
 ```
 
 ## Next Steps
-- Add more sophisticated skills built on bash tool
+- Add more sophisticated skills built on posix_shell tool

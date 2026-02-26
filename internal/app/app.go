@@ -15,7 +15,7 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/tools"
 )
 
-const DefaultSystemPrompt = `You are an AI assistant with bash tool access.
+const DefaultSystemPrompt = `You are an AI assistant with POSIX shell and some other tool access.
 
 RULES:
 - Never assume - verify with tools
@@ -69,13 +69,13 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	readFileTool := tools.NewReadFileTool()
 	writeFileTool := tools.NewWriteFileTool()
 	activateSkillTool := tools.NewActivateSkillTool(skillsManager)
-	bashTool := tools.NewBashTool()
+	posixShellTool := tools.NewPosixShellTool()
 
 	return &Config{
 		Cfg:          cfg,
 		Model:        model,
 		SkillsMgr:    skillsManager,
-		AgentTools:   []fantasy.AgentTool{readFileTool, writeFileTool, activateSkillTool, bashTool},
+		AgentTools:   []fantasy.AgentTool{readFileTool, writeFileTool, activateSkillTool, posixShellTool},
 		SystemPrompt: systemPrompt,
 	}, nil
 }

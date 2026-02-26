@@ -74,6 +74,7 @@
         #send:disabled { background: #999; cursor: not-allowed; }
         #send.cancel { background: #c62828; }
         #send.cancel:hover { background: #d32f2f; }
+        #send.cancel:disabled { background: #e57373; opacity: 0.6; cursor: not-allowed; }
         pre { white-space: pre-wrap; word-wrap: break-word; }
     </style>
 </head>
@@ -203,6 +204,7 @@
             } else if (tag === 'D') {
                 // Done: request completed (success or canceled)
                 waitingForResponse = false;
+                send.disabled = false;
                 updateSendButton();
             }
         }
@@ -274,7 +276,7 @@
         function sendMessage() {
             if (waitingForResponse) {
                 // Cancel: send cancel signal to stop current request
-                waitingForResponse = false;
+                send.disabled = true;
                 ws.send('CANCEL\n');
                 return;
             }

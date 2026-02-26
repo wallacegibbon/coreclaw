@@ -9,7 +9,7 @@ Get weather information using the weather script.
 
 ## Usage
 
-```bash
+```sh
 ./scripts/weather.sh [-n N] "City name"
 ```
 
@@ -25,7 +25,7 @@ Forecast: `date | condition | temp°C`
 
 ## Example
 
-```bash
+```sh
 ./scripts/weather.sh "New York"
 ```
 

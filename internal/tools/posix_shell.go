@@ -14,17 +14,17 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// BashInput represents the input for the bash tool
-type BashInput struct {
-	Command string `json:"command" description:"The bash command to execute"`
+// PosixShellInput represents the input for the posix_shell tool
+type PosixShellInput struct {
+	Command string `json:"command" description:"The shell command to execute"`
 }
 
-// NewBashTool creates a new bash tool for executing shell commands
-func NewBashTool() fantasy.AgentTool {
+// NewPosixShellTool creates a new posix_shell tool for executing shell commands
+func NewPosixShellTool() fantasy.AgentTool {
 	return fantasy.NewAgentTool(
-		"bash",
-		"Execute a bash command in the shell",
-		func(ctx context.Context, input BashInput, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
+		"posix_shell",
+		"Execute a shell command in the terminal",
+		func(ctx context.Context, input PosixShellInput, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			cmd := input.Command
 			if cmd == "" {
 				return fantasy.NewTextErrorResponse("command is required"), nil

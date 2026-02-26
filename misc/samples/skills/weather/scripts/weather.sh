@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Weather script - concise output for AI
 
 MAX_RETRIES=3
@@ -46,13 +46,15 @@ fetch_weather() {
 	echo "$DATA" | jq -r '.weather[0,1,2] | "\(.date) | \(.hourly[3].weatherDesc[0].value) | \(.hourly[3].tempC)°C"'
 }
 
-for i in $(seq 1 $MAX_RETRIES); do
+i=1
+while [ $i -le "$MAX_RETRIES" ]; do
 	if fetch_weather "$@"; then
 		exit 0
 	fi
-	if [ $i -lt $MAX_RETRIES ]; then
+	if [ "$i" -lt "$MAX_RETRIES" ]; then
 		sleep 1
 	fi
+	i=$((i + 1))
 done
 
 echo "Error: Failed after $MAX_RETRIES attempts" >&2

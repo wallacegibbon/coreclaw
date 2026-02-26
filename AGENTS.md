@@ -17,14 +17,14 @@ For this project, simplicity is more important than efficiency.
 
 ## Installation
 
-```bash
+```sh
 go install github.com/wallacegibbon/coreclaw@latest
 go install github.com/wallacegibbon/coreclaw/cmd/coreclaw-web@latest
 ```
 
 Or build from source:
 
-```bash
+```sh
 git clone https://github.com/wallacegibbon/coreclaw.git
 cd coreclaw
 go build
@@ -35,7 +35,7 @@ go build ./cmd/coreclaw-web/
 
 All configuration must be specified via command line flags:
 
-```bash
+```sh
 # Local Ollama OpenAI-compatible server
 coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3
 
@@ -53,7 +53,7 @@ coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GL
 ```
 
 Running with skills
-```bash
+```sh
 coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --model gpt-oss:20b --skill ~/playground/coreclaw/misc/samples/skills/
 ```
 
@@ -75,7 +75,7 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 
 `coreclaw-web` runs a WebSocket server with a built-in chat UI.
 
-```bash
+```sh
 # Start WebSocket server
 coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
@@ -96,7 +96,7 @@ CoreClaw provides the following tools (ordered from safest to most dangerous):
 | `read_file` | Read the contents of a file |
 | `write_file` | Create a new file or replace entire file content |
 | `activate_skill` | Load and execute a skill |
-| `bash` | Execute shell commands |
+| `posix_shell` | Execute shell commands |
 
 
 ## Skills System
@@ -105,7 +105,7 @@ CoreClaw supports the Agent Skills specification from [agentskills.io](https://a
 
 ### Usage
 
-```bash
+```sh
 # With skills directory
 coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --skill ./skills "extract text from document.pdf"
 ```
@@ -176,4 +176,4 @@ Tools must be ordered from safest to most dangerous:
 1. `read_file` - Read file contents
 2. `write_file` - Create or replace files (full overwrite)
 3. `activate_skill` - Load and execute skills
-4. `bash` - Execute shell commands (most dangerous)
+4. `posix_shell` - Execute shell commands (most dangerous)

@@ -106,15 +106,15 @@ func (p *Processor) Summarize(ctx context.Context, messages []fantasy.Message) (
 	return responseText, assistantMsg, usage, err
 }
 
-// extractBashCommand extracts the command from bash tool input JSON
-func extractBashCommand(input string) string {
-	var bashInput struct {
+// extractPosixShellCommand extracts the command from posix_shell tool input JSON
+func extractPosixShellCommand(input string) string {
+	var posixShellInput struct {
 		Command string `json:"command"`
 	}
-	if err := json.Unmarshal([]byte(input), &bashInput); err != nil {
+	if err := json.Unmarshal([]byte(input), &posixShellInput); err != nil {
 		return ""
 	}
-	return bashInput.Command
+	return posixShellInput.Command
 }
 
 // extractSkillName extracts the skill name from activate_skill tool input JSON
@@ -162,8 +162,8 @@ func (p *Processor) handleToolCall(tc fantasy.ToolCallContent) {
 	var value string
 
 	switch tc.ToolName {
-	case "bash":
-		cmd := extractBashCommand(tc.Input)
+	case "posix_shell":
+		cmd := extractPosixShellCommand(tc.Input)
 		if cmd != "" {
 			displayCmd := formatCommon(cmd)
 			value = fmt.Sprintf("%s: %s", tc.ToolName, displayCmd)
