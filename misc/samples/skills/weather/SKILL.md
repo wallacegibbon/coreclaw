@@ -10,10 +10,9 @@ Get weather information using the weather script.
 ## Usage
 
 ```sh
-./scripts/weather.sh [-n N] "City name"
+./scripts/weather.sh "City name"
 ```
 
-- `-n N` - Number of retries on failure (default: 3)
 - **Note**: Use English city names (e.g., "Wuhan" not "武汉")
 
 The script fetches weather data from wttr.in in JSON format.

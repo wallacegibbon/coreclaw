@@ -42,6 +42,7 @@ func NewPosixShellTool() fantasy.AgentTool {
 				interp.Dir("/"),
 				interp.Env(expand.ListEnviron(os.Environ()...)),
 				interp.StdIO(os.Stdin, &stdout, &stderr),
+				interp.ExecHandlers(),
 			)
 			if err != nil {
 				return fantasy.NewTextErrorResponse("failed to create runner: " + err.Error()), nil
