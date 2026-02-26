@@ -53,3 +53,12 @@ func Green(text string) string {
 func Yellow(text string) string {
 	return fmt.Sprintf("\x1b[38;2;249;226;175m%s\x1b[0m", text)
 }
+
+// isValidTag checks if a byte is a valid TLV tag
+func isValidTag(b byte) bool {
+	switch b {
+	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagUsage, stream.TagSystem, stream.TagStreamGap, stream.TagPromptStart:
+		return true
+	}
+	return false
+}

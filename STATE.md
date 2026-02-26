@@ -69,7 +69,7 @@ For this project, simplicity is more important than efficiency.
   - Displays "Request cancelled." message when interrupted
 - ✅ Refactored codebase for better maintainability
   - Extracted CLI flag parsing to `internal/config` package
-  - Moved runner logic to `internal/adaptors/terminal.go`
+  - Removed terminal.go (consolidated isValidTag into common.go)
   - Simplified main.go to ~80 lines of minimal glue code
 - ✅ CLI-based provider configuration
   - All config via CLI flags: --type, --base-url, --api-key, --model
@@ -107,7 +107,7 @@ For this project, simplicity is more important than efficiency.
   - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E', TagUsage='U', TagSystem='S')
   - Buffered reads/writes with Flush() method
 - ✅ Adaptors in internal/adaptors/
-  - terminal.go - Terminal adaptor connecting stdio to agent processor
+  - common.go - ANSI color styling and isValidTag helper
   - websocket.go - WebSocket server with per-client sessions
   - colors.go - ANSI color styling
   - chat.html - Embedded chat UI
