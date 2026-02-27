@@ -90,7 +90,7 @@
         <input type="text" id="prompt" placeholder="Enter your prompt..." autocomplete="off">
         <button id="send">Send</button>
     </div>
-    <div id="status">Ready</div>
+    <div id="status">Context: 0 | Total: 0</div>
 
     <script>
         const messages = document.getElementById('messages');
@@ -171,12 +171,22 @@
                 flushCurrentText();
                 addMessage('system', value);
             } else if (tag === 'P') {
-                status.textContent = 'Processing...';
+                // Format: "prompt" (context/total sent separately via 'U')
+                // Just show user message in dialog, status updated via periodic 'U'
                 addMessage('user', value);
-            } else if (tag === 'D') {
-                if (value && value.length > 0) {
-                    flushCurrentText();
-                    addMessage('system', value);
+            } else if (tag === 'U') {
+                // Format: "context=X|total=Y" - periodic status update
+                const parts = value.split('|');
+                let statusText = '';
+                for (const part of parts) {
+                    if (part.startsWith('context=')) {
+                        statusText += ' | ' + part.replace('context=', 'Context: ');
+                    } else if (part.startsWith('total=')) {
+                        statusText += ' | ' + part.replace('total=', 'Total: ');
+                    }
+                }
+                if (statusText) {
+                    status.textContent = statusText.substring(3);
                 }
             } else if (tag === 'G') {
                 flushCurrentText();

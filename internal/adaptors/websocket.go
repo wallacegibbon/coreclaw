@@ -1,13 +1,18 @@
 package adaptors
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 
 	_ "embed"
+
+	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
+	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
 var upgrader = websocket.Upgrader{
@@ -75,12 +80,18 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 			clientCh: make(chan []byte, 10),
 		}
 		output := &clientOutput{
-			conn: conn,
+			conn:    conn,
+			closeCh: make(chan struct{}),
 		}
+		defer close(output.closeCh)
 
 		// Create a new agent, processor, and session for this client
 		agent := factory()
 		session := NewSession(agent, baseURL, modelName, input, output)
+
+		// Set session on output and start status updater
+		output.session = session
+		go output.startStatusUpdater()
 
 		// Read loop - handles client input
 		go func() {
@@ -94,10 +105,7 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 				if msgStr == "" {
 					continue
 				}
-
-				select {
-				case input.clientCh <- message:
-				}
+				input.clientCh <- message
 			}
 		}()
 
@@ -115,7 +123,9 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 			// Handle commands like /summarize
 			if strings.HasPrefix(userPrompt, "/") {
 				command := strings.TrimPrefix(userPrompt, "/")
-				session.SubmitCommand(command)
+				if err := session.SubmitCommand(command); err != nil {
+					stream.WriteTLV(session.Processor.Output, stream.TagError, err.Error())
+				}
 				continue
 			}
 
@@ -159,7 +169,7 @@ func (i *clientInput) readLine() (string, error) {
 	}
 }
 
-// Read implements stream.Input (used by processor but we use readLine instead)
+// Read implements stream.Input interface (used by processor)
 func (i *clientInput) Read(p []byte) (n int, err error) {
 	if len(i.buf) > 0 {
 		n = copy(p, i.buf)
@@ -180,8 +190,11 @@ func (i *clientInput) Read(p []byte) (n int, err error) {
 
 // clientOutput implements stream.Output for a single WebSocket client
 type clientOutput struct {
-	conn *websocket.Conn
-	mu   sync.Mutex
+	conn       *websocket.Conn
+	session    *agentpkg.Session
+	mu         sync.Mutex
+	closeCh    chan struct{}
+	lastStatus string
 }
 
 // Write implements stream.Output
@@ -203,6 +216,32 @@ func (o *clientOutput) WriteString(s string) (int, error) {
 // Flush implements stream.Output
 func (o *clientOutput) Flush() error {
 	return nil
+}
+
+// startStatusUpdater periodically sends status updates to the client
+// NOTE: Just a quick and dirty workaround since websocket client can not get session data directly like terminal client.
+func (o *clientOutput) startStatusUpdater() {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			o.mu.Lock()
+			if o.session != nil {
+				status := fmt.Sprintf("context=%d|total=%d", o.session.ContextTokens, o.session.TotalSpent.TotalTokens)
+				if status != o.lastStatus {
+					o.lastStatus = status
+					// Send as binary TLV message (tag 'U' + length + value)
+					msg := []byte{'U', byte(len(status) >> 24), byte(len(status) >> 16), byte(len(status) >> 8), byte(len(status))}
+					msg = append(msg, status...)
+					o.conn.WriteMessage(websocket.BinaryMessage, msg)
+				}
+			}
+			o.mu.Unlock()
+		case <-o.closeCh:
+			return
+		}
+	}
 }
 
 //go:embed chat.html

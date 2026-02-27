@@ -13,8 +13,7 @@ const (
 	TagError       = 'E' // Error messages
 	TagSystem      = 'S' // System messages (queue status, etc.)
 	TagStreamGap   = 'G' // Stream gap to separate data
-	TagPromptStart = 'P' // Prompt started processing (show user message + cancel button)
-	TagUsage       = 'U' // Usage statistics (context tokens, total spent)
+	TagPromptStart = 'P' // Prompt started processing (show user message + context/total)
 )
 
 // WriteTLV writes a TLV message to the output

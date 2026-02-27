@@ -84,12 +84,12 @@ func (s *Session) IsInProgress() bool {
 // NewSession creates a new session with the given processor
 func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor) *Session {
 	return &Session{
-		Processor:  processor,
-		Messages:   nil,
-		Agent:      agent,
-		BaseURL:    baseURL,
-		ModelName:  modelName,
-		taskQueue:  make(chan Task, 10),
+		Processor: processor,
+		Messages:  nil,
+		Agent:     agent,
+		BaseURL:   baseURL,
+		ModelName: modelName,
+		taskQueue: make(chan Task, 10),
 	}
 }
 
@@ -169,8 +169,14 @@ func (s *Session) SubmitPrompt(prompt string) {
 }
 
 // SubmitCommand submits a command for async processing via the task queue
-func (s *Session) SubmitCommand(cmd string) {
-	s.SubmitTask(CommandPrompt{Command: cmd})
+func (s *Session) SubmitCommand(cmd string) error {
+	switch cmd {
+	case "submit":
+		s.SubmitTask(CommandPrompt{Command: cmd})
+		return nil
+	default:
+		return s.handleCommandSync(context.Background(), cmd)
+	}
 }
 
 // runAsync processes tasks asynchronously, including any queued tasks

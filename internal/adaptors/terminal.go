@@ -144,7 +144,7 @@ func (w *terminalOutput) processBuffer() {
 
 func (w *terminalOutput) writeColored(tag byte, value string) {
 	switch tag {
-	case stream.TagUsage, stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap:
+	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap:
 		// Notify that content changed (non-blocking)
 		select {
 		case w.updateChan <- struct{}{}:
@@ -228,7 +228,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 		terminalOutput: terminalOutput,
 		display:        display,
 		input:          input,
-		status:         "Ready",
+		status:         "Context: 0 | Total: 0",
 		inputStyle:     inputStyle,
 		promptStyle:    promptStyle,
 		statusStyle:    statusStyle,
@@ -238,11 +238,6 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 			BorderForeground(lipgloss.Color("#45475a")),
 		focusedWindow: "input",
 	}
-}
-
-// UpdateStatusFromUsage updates status bar from TagUsage TLV message
-func (m *Terminal) UpdateStatusFromUsage(value string) {
-	m.status = "Ready | " + value
 }
 
 // Init initializes the Terminal
@@ -355,7 +350,9 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if command == "quit" {
 				m.confirmDialog = true
 			} else {
-				m.session.SubmitCommand(command)
+				if err := m.session.SubmitCommand(command); err != nil {
+					m.terminalOutput.display.Append(m.terminalOutput.errorStyle.Render(err.Error()))
+				}
 				m.input.SetValue("")
 				// Start ticking to check for updates during command processing
 				return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
@@ -384,12 +381,10 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Terminal) updateStatus() {
-	if m.session != nil && m.session.IsInProgress() {
-		m.status = fmt.Sprintf("Processing... | Context: %d | Total: %d", m.session.ContextTokens, m.session.TotalSpent.TotalTokens)
-	} else if m.session != nil {
-		m.status = fmt.Sprintf("Ready | Context: %d | Total: %d", m.session.ContextTokens, m.session.TotalSpent.TotalTokens)
+	if m.session != nil {
+		m.status = fmt.Sprintf("Context: %d | Total: %d", m.session.ContextTokens, m.session.TotalSpent.TotalTokens)
 	} else {
-		m.status = "Ready"
+		m.status = ""
 	}
 }
 
