@@ -17,7 +17,7 @@ import (
 
 var (
 	debugWriter io.Writer
-	initOnce   sync.Once
+	initOnce    sync.Once
 )
 
 func Enable() {

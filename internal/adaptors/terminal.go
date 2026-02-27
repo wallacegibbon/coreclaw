@@ -186,15 +186,15 @@ func (w *terminalOutput) colorizeTool(value string) string {
 
 // Terminal is the main Terminal model
 type Terminal struct {
-	session        *agentpkg.Session
-	terminalOutput *terminalOutput
-	display        viewport.Model
-	input          textinput.Model
-	status         string
-	quitting       bool
-	confirmDialog  bool
-	focusedWindow  string // "display" or "input"
-	userScrolledAway bool // true after user manually scrolls up
+	session          *agentpkg.Session
+	terminalOutput   *terminalOutput
+	display          viewport.Model
+	input            textinput.Model
+	status           string
+	quitting         bool
+	confirmDialog    bool
+	focusedWindow    string // "display" or "input"
+	userScrolledAway bool   // true after user manually scrolls up
 
 	inputStyle         lipgloss.Style
 	promptStyle        lipgloss.Style
