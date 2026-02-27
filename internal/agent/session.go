@@ -82,6 +82,9 @@ func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Proce
 
 // HandleCommand processes special commands like /summarize, /cancel
 func (s *Session) HandleCommand(cmd string) error {
+	s.inProgress = true
+	defer func() { s.inProgress = false }()
+
 	switch cmd {
 	case "summarize":
 		ctx, _ := context.WithCancel(context.Background())
@@ -149,17 +152,6 @@ func (s *Session) ProcessPrompt(ctx context.Context, prompt string) (fantasy.Mes
 	return assistantMsg, usage, nil
 }
 
-// SendUsage sends usage info (context size and total tokens spent) via TLV
-func (s *Session) SendUsage() {
-	if s.Processor == nil || s.Processor.Output == nil {
-		return
-	}
-	msg := fmt.Sprintf("context=%d, spent=%d", s.ContextTokens, s.TotalSpent.TotalTokens)
-	stream.WriteTLV(s.Processor.Output, stream.TagUsage, msg)
-	stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-	s.Processor.Output.Flush()
-}
-
 // SubmitPrompt submits a prompt for processing, queueing if necessary
 // This is the main entry point for adaptors - handles all queue logic internally
 // Processing runs asynchronously so adaptors can continue receiving input
@@ -179,6 +171,11 @@ func (s *Session) SubmitPrompt(prompt string) {
 // runAsync processes prompts asynchronously, including any queued prompts
 func (s *Session) runAsync() {
 	s.inProgress = true
+	defer func() {
+		s.inProgress = false
+		s.cancelInProgress = false
+	}()
+
 	for {
 		queuedPrompt, ok := s.getQueuedPrompt()
 		if !ok {
@@ -198,8 +195,6 @@ func (s *Session) runAsync() {
 			s.cancelInProgress = false
 		}
 
-		s.SendUsage()
-
 		// If context was cancelled, stop processing queued prompts
 		if promptCtx.Err() == context.Canceled {
 			s.cancelCurrent = nil
@@ -207,8 +202,6 @@ func (s *Session) runAsync() {
 		}
 		s.cancelCurrent = nil
 	}
-	s.inProgress = false
-	s.cancelInProgress = false
 }
 
 // signalPromptStart signals that a prompt has started processing

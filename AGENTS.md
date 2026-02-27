@@ -182,6 +182,7 @@ Skills metadata is injected into the system prompt using XML format:
 
 
 ## Agent Instructions
+- **Do NOT commit automatically** - wait for explicit user command
 - **Read STATE.md** at the start of every conversation
 - **Update STATE.md** after completing any meaningful work (features, bug fixes, etc.)
 - **Keep AGENTS.md and README.md in sync** - update both files together before commits

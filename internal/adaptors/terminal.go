@@ -69,13 +69,14 @@ func NewTerminalAdaptor(agentFactory AgentFactory, baseURL, modelName string) *T
 func (a *TerminalAdaptor) Start() {
 	agent := a.AgentFactory()
 
-	// Create a custom output that writes to display buffer with TLV support
+	// Create first (callback set after Terminal is created)
 	terminalOutput := newTerminalOutput()
 	processor := agentpkg.NewProcessorWithIO(agent, &stream.NopInput{}, terminalOutput)
 	a.processor = processor
 	a.session = agentpkg.NewSession(agent, a.BaseURL, a.ModelName, processor)
 
 	t := NewTerminal(a.session, terminalOutput)
+
 	p := tea.NewProgram(t, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
 	return
@@ -83,8 +84,9 @@ func (a *TerminalAdaptor) Start() {
 
 // terminalOutput writes to the Terminal display with TLV support
 type terminalOutput struct {
-	display *DisplayBuffer
-	buffer  []byte
+	display    *DisplayBuffer
+	buffer     []byte
+	updateChan chan struct{}
 
 	textStyle        lipgloss.Style
 	toolStyle        lipgloss.Style
@@ -98,6 +100,7 @@ type terminalOutput struct {
 func newTerminalOutput() *terminalOutput {
 	return &terminalOutput{
 		display:          NewDisplayBuffer(),
+		updateChan:       make(chan struct{}, 1),
 		textStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Bold(true),
 		toolStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")),
 		toolContentStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")),
@@ -140,6 +143,15 @@ func (w *terminalOutput) processBuffer() {
 }
 
 func (w *terminalOutput) writeColored(tag byte, value string) {
+	switch tag {
+	case stream.TagUsage, stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap:
+		// Notify that content changed (non-blocking)
+		select {
+		case w.updateChan <- struct{}{}:
+		default:
+		}
+	}
+
 	var output string
 	switch tag {
 	case stream.TagText:
@@ -150,8 +162,6 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 		output = w.reasoningStyle.Render(value)
 	case stream.TagError:
 		output = w.errorStyle.Render(value)
-	case stream.TagUsage:
-		output = w.systemStyle.Render("Tokens: " + value)
 	case stream.TagSystem:
 		output = w.systemStyle.Render(value)
 	case stream.TagPromptStart:
@@ -230,36 +240,43 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 	}
 }
 
-// Init initializes the Terminal
-func (m *Terminal) Init() tea.Cmd {
-	// Tick every 100ms to refresh display during processing
-	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-		return tickMsg(t)
-	})
+// UpdateStatusFromUsage updates status bar from TagUsage TLV message
+func (m *Terminal) UpdateStatusFromUsage(value string) {
+	m.status = "Ready | " + value
 }
 
-type tickMsg time.Time
+// Init initializes the Terminal
+func (m *Terminal) Init() tea.Cmd {
+	return nil
+}
+
+type tickMsg struct{}
 
 // Update handles messages
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tickMsg:
-		// Check if still processing
-		if m.session.IsInProgress() {
-			m.updateDisplayContent()
-			m.updateStatus()
-			return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-				return tickMsg(t)
-			})
-		}
+	// Non-blocking check for display updates
+	select {
+	case <-m.terminalOutput.updateChan:
 		m.updateDisplayContent()
 		m.updateStatus()
-		return m, nil
+	default:
+	}
+
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
 	case tea.WindowSizeMsg:
 		m.display.Width = msg.Width
 		m.display.Height = max(0, msg.Height-6) // Leave room for input, status, and display border
+		return m, nil
+	case tickMsg:
+		m.updateDisplayContent()
+		m.updateStatus()
+		if m.session != nil && m.session.IsInProgress() {
+			return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+				return tickMsg{}
+			})
+		}
 		return m, nil
 	}
 
@@ -267,6 +284,8 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.input, _ = m.input.Update(msg)
 	return m, nil
 }
+
+type updateMsg struct{}
 
 func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle confirm dialog
@@ -336,11 +355,13 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if command == "quit" {
 				m.confirmDialog = true
 			} else {
-				m.session.HandleCommand(command)
+				go m.session.HandleCommand(command)
 				m.input.SetValue("")
+				// Start ticking to check for updates during command processing
+				return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+					return tickMsg{}
+				})
 			}
-			//return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-			//return tickMsg(t)
 
 			m.display.GotoBottom()
 			return m, nil
@@ -352,9 +373,9 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.input.SetValue("")
 		m.updateStatus()
 
-		// Start ticking to refresh display
-		return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-			return tickMsg(t)
+		// Start ticking to check for updates during processing
+		return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+			return tickMsg{}
 		})
 	}
 
@@ -397,7 +418,7 @@ func (m *Terminal) View() string {
 	var inputBorderColor string
 	if m.focusedWindow == "display" {
 		displayBorderColor = "#89d4fa" // Bright cyan for focused
-		inputBorderColor = "#45475a"    // Dimmed for unfocused
+		inputBorderColor = "#45475a"   // Dimmed for unfocused
 	} else {
 		displayBorderColor = "#45475a" // Dimmed for unfocused
 		inputBorderColor = "#89d4fa"   // Bright cyan for focused
@@ -406,12 +427,12 @@ func (m *Terminal) View() string {
 	displayBorderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(displayBorderColor)).
-		Width(width - 2).Padding(0, 1)
+		Width(width-2).Padding(0, 1)
 
 	inputBorderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(inputBorderColor)).
-		Width(width - 2).Padding(0, 1)
+		Width(width-2).Padding(0, 1)
 
 	statusBar := statusStyle.Render(m.status)
 

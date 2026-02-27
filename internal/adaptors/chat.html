@@ -167,13 +167,6 @@
             } else if (tag === 'E') {
                 flushCurrentText();
                 addMessage('error', value);
-            } else if (tag === 'U') {
-                flushCurrentText();
-                // Format: "context=X, spent=Y" -> "Context: X | Total: Y"
-                const parts = value.split(', ');
-                const contextPart = parts[0] ? parts[0].replace('context=', 'Context: ') : '';
-                const totalPart = parts[1] ? parts[1].replace('spent=', 'Total: ') : '';
-                status.textContent = 'Ready | ' + contextPart + ' | ' + totalPart;
             } else if (tag === 'S') {
                 flushCurrentText();
                 addMessage('system', value);
