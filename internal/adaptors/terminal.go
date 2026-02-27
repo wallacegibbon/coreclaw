@@ -1,6 +1,7 @@
 package adaptors
 
 import (
+	_ "embed"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -16,6 +17,9 @@ import (
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
+
+//go:embed welcome.txt
+var welcomeText string
 
 // DisplayBuffer holds text to display in Terminal
 type DisplayBuffer struct {
@@ -220,8 +224,8 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#45475a"))
 
-	display := viewport.New(80, 20)
-	display.SetContent("Welcome to CoreClaw Terminal!\n\nType your prompt below and press Enter to send.\n\n")
+	var display = viewport.New(80, 20)
+	display.SetContent(welcomeText)
 
 	return &Terminal{
 		session:        session,
