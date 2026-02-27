@@ -259,7 +259,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKeyMsg(msg)
 	case tea.WindowSizeMsg:
 		m.display.Width = msg.Width
-		m.display.Height = msg.Height - 6 // Leave room for input, status, and display border
+		m.display.Height = max(0, msg.Height-6) // Leave room for input, status, and display border
 		return m, nil
 	}
 
