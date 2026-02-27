@@ -194,6 +194,7 @@ type Terminal struct {
 	quitting       bool
 	confirmDialog  bool
 	focusedWindow  string // "display" or "input"
+	userScrolledAway bool // true after user manually scrolls up
 
 	inputStyle         lipgloss.Style
 	promptStyle        lipgloss.Style
@@ -313,15 +314,36 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "j":
 			m.display.ScrollDown(1)
+			// Check if now at bottom
+			if m.display.AtBottom() {
+				m.userScrolledAway = false
+			} else {
+				m.userScrolledAway = true
+			}
 			return m, nil
 		case "k":
 			m.display.ScrollUp(1)
+			m.userScrolledAway = true
+			return m, nil
+		case "G":
+			m.display.GotoBottom()
+			m.userScrolledAway = false
+			return m, nil
+		case "g":
+			m.display.GotoTop()
+			m.userScrolledAway = true
 			return m, nil
 		case "ctrl+d":
 			m.display.ScrollDown(m.display.Height / 2)
+			if m.display.AtBottom() {
+				m.userScrolledAway = false
+			} else {
+				m.userScrolledAway = true
+			}
 			return m, nil
 		case "ctrl+u":
 			m.display.ScrollUp(m.display.Height / 2)
+			m.userScrolledAway = true
 			return m, nil
 		}
 	}
@@ -395,7 +417,10 @@ func (m *Terminal) updateDisplayContent() {
 		newContent = wordwrap(newContent, width)
 	}
 	m.display.SetContent(newContent)
-	m.display.GotoBottom()
+	// Auto-scroll by default, unless user has manually scrolled away
+	if !m.userScrolledAway {
+		m.display.GotoBottom()
+	}
 }
 
 // View renders the Terminal
