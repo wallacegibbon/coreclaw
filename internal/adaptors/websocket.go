@@ -84,16 +84,12 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 
 		conn.WriteMessage(websocket.TextMessage, []byte("Connected to CoreClaw"))
 
-		// Read loop - handles client input and cancel signals
+		// Read loop - handles client input
 		go func() {
 			for {
 				_, message, err := conn.ReadMessage()
 				if err != nil {
 					return
-				}
-				if len(message) >= 6 && string(message[:6]) == "CANCEL" {
-					session.CancelCurrent()
-					continue
 				}
 
 				msgStr := strings.TrimSpace(string(message))
