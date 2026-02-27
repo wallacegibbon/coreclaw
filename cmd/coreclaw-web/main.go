@@ -55,7 +55,7 @@ Flags:
   -system string     Override system prompt
   -skill string      Skills directory path (can be specified multiple times)
   -addr string       Server address to listen on (default ":8080")
-  -debug-api         Show raw API requests and responses
+  -debug-api         Write raw API requests and responses to log file
   -version           Show version information
   -help              Show help information
 

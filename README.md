@@ -72,7 +72,7 @@ coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $AN
 - `-model string` - Model name to use
 - `-version` - Show version information
 - `-help` - Show help information
-- `-debug-api` - Show raw API requests and responses
+- `-debug-api` - Write raw API requests and responses to log file
 - `-system string` - Override system prompt
 - `-skill string` - Skills directory path
 

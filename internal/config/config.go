@@ -26,7 +26,7 @@ type Settings struct {
 func Parse() *Settings {
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
-	debugAPI := flag.Bool("debug-api", false, "Show raw API requests and responses")
+	debugAPI := flag.Bool("debug-api", false, "Write raw API requests and responses to log file")
 	systemPrompt := flag.String("system", "", "Override system prompt")
 	apiKey := flag.String("api-key", "", "API key for the provider (required when using --base-url)")
 	baseURL := flag.String("base-url", "", "Base URL for the API endpoint (requires --api-key, ignores env vars)")

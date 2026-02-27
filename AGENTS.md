@@ -68,7 +68,7 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 - `-model string` - Model name to use
 - `-version` - Show version information
 - `-help` - Show help information
-- `-debug-api` - Show raw API requests and responses (to stderr)
+- `-debug-api` - Write raw API requests and responses to log file
 - `-system string` - Override system prompt
 - `-skill string` - Skills directory path (can be specified multiple times)
 

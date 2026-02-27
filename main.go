@@ -45,7 +45,7 @@ Flags:
   -model string       Model name to use
   -system string      Override system prompt
   -skill string       Skills directory path (can be specified multiple times)
-  -debug-api          Show raw API requests and responses
+  -debug-api          Write raw API requests and responses to log file
   -version            Show version information
   -help               Show help information
 

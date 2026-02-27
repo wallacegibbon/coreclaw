@@ -5,12 +5,68 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
+
+var (
+	debugWriter io.Writer
+	initOnce   sync.Once
+)
+
+func Enable() {
+	initOnce.Do(func() {
+		// Try to create log file in executable directory
+		execPath, err := os.Executable()
+		if err != nil {
+			// Fallback to current directory
+			execPath = "coreclaw"
+		}
+
+		execDir := filepath.Dir(execPath)
+		if execDir == "." {
+			execDir, _ = os.Getwd()
+		}
+
+		// Generate log file name: coreclaw-debug-api-N.log
+		baseName := "coreclaw-debug-api"
+
+		// Find next available log number
+		logNum := 0
+		var logFile *os.File
+		for i := 0; i < 100; i++ {
+			logName := fmt.Sprintf("%s-%d.log", baseName, i)
+			logPath := filepath.Join(execDir, logName)
+			f, err := os.OpenFile(logPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+			if err == nil {
+				logFile = f
+				logNum = i
+				break
+			}
+		}
+
+		if logFile != nil {
+			debugWriter = logFile
+			log.SetOutput(logFile)
+			log.Printf("Debug log started: coreclaw-debug-api-%d.log", logNum)
+		} else {
+			// Fallback to stderr if we can't create log file
+			debugWriter = os.Stderr
+		}
+	})
+}
+
+func writef(format string, args ...any) {
+	if debugWriter != nil {
+		fmt.Fprintf(debugWriter, format, args...)
+	}
+}
 
 // DebugTransport wraps an http.RoundTripper and logs requests and responses
 type DebugTransport struct {
@@ -69,15 +125,15 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 							name, _ := blockMap["name"].(string)
 							input, _ := blockMap["input"].(map[string]any)
 							inputJson, _ := json.Marshal(input)
-							fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"content\": { type: \"tool_use\", name: %q, input: %s } }\x1b[0m\n", name, inputJson)
+							writef("{ \"content\": { type: \"tool_use\", name: %q, input: %s } }\n", name, inputJson)
 						} else if blockType == "thinking" {
 							thinking, _ := blockMap["thinking"].(string)
 							if len(thinking) > 0 && dr.firstRead {
-								fmt.Fprintf(os.Stderr, "\x1b[38;2;203;166;247m<<< Response Stream\x1b[0m\n")
-								fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mChunks:\x1b[0m\n")
+								writef("<<< Response Stream\n")
+								writef("Chunks:\n")
 								dr.firstRead = false
 							}
-							fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m{ \"content\": { type: \"thinking\", ... } }\x1b[0m\n")
+							writef("{ \"content\": { type: \"thinking\", ... } }\n")
 						}
 					}
 				}
@@ -85,19 +141,19 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 				// Full format for final chunks or other cases
 				formatted, _ := json.MarshalIndent(jsonData, "", "  ")
 				if dr.firstRead {
-					fmt.Fprintf(os.Stderr, "\x1b[38;2;203;166;247m<<< Response Stream\x1b[0m\n")
-					fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mChunks:\x1b[0m\n")
+					writef("<<< Response Stream\n")
+					writef("Chunks:\n")
 					dr.firstRead = false
 				}
-				fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", formatted)
+				writef("%s\n", formatted)
 			} else if jsonStr != "[DONE]" {
 				// Not JSON and not [DONE], print raw line
 				if dr.firstRead {
-					fmt.Fprintf(os.Stderr, "\x1b[38;2;203;166;247m<<< Response Stream\x1b[0m\n")
-					fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mChunks:\x1b[0m\n")
+					writef("<<< Response Stream\n")
+					writef("Chunks:\n")
 					dr.firstRead = false
 				}
-				fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", line)
+				writef("%s\n", line)
 			}
 		}
 	}
@@ -125,25 +181,25 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			}
 
 			formattedBody, _ = json.MarshalIndent(formattedBody, "", "  ")
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;166;227;161m>>> Request\x1b[0m\n")
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;137;180;250m%s %s %s\x1b[0m\n", req.Method, req.URL.Path, req.URL.RawQuery)
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mHeaders:\x1b[0m\n")
+			writef(">>> Request\n")
+			writef("%s %s %s\n", req.Method, req.URL.Path, req.URL.RawQuery)
+			writef("Headers:\n")
 			for k, v := range req.Header {
 				if k == "Authorization" {
-					fmt.Fprintf(os.Stderr, "  %s: ***\n", k)
+					writef("  %s: ***\n", k)
 				} else {
-					fmt.Fprintf(os.Stderr, "  %s: %v\n", k, v)
+					writef("  %s: %v\n", k, v)
 				}
 			}
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;137;180;250m%s\x1b[0m\n", formattedBody)
+			writef("Body:\n")
+			writef("%s\n", formattedBody)
 		} else {
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;166;227;161m>>> Request\x1b[0m\n")
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;137;180;250m%s %s\x1b[0m\n", req.Method, req.URL)
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;137;180;250m%s\x1b[0m\n", string(requestBody))
+			writef(">>> Request\n")
+			writef("%s %s\n", req.Method, req.URL)
+			writef("Body:\n")
+			writef("%s\n", string(requestBody))
 		}
-		fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
+		writef("--------------------------------------------------\n")
 	}
 
 	start := time.Now()
@@ -151,16 +207,16 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Perform the request
 	resp, err := t.Transport.RoundTrip(req)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "\x1b[38;2;203;166;247m<<< Request failed after %v: %v\x1b[0m\n", time.Since(start), err)
+		writef("<<< Request failed after %v: %v\n", time.Since(start), err)
 		return nil, err
 	}
 
 	// Log response
-	fmt.Fprintf(os.Stderr, "\x1b[38;2;203;166;247m<<< Response\x1b[0m\n")
-	fmt.Fprintf(os.Stderr, "\x1b[38;2;137;180;250m%s %s\x1b[0m\n", resp.Proto, resp.Status)
-	fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mHeaders:\x1b[0m\n")
+	writef("<<< Response\n")
+	writef("%s %s\n", resp.Proto, resp.Status)
+	writef("Headers:\n")
 	for k, v := range resp.Header {
-		fmt.Fprintf(os.Stderr, "  %s: %v\n", k, v)
+		writef("  %s: %v\n", k, v)
 	}
 
 	// Check if it's a streaming response by looking at Content-Type
@@ -179,7 +235,7 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Check response content type to confirm streaming
 	contentType := resp.Header.Get("Content-Type")
 	if isStreaming && strings.Contains(contentType, "text/event-stream") {
-		fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
+		writef("Body:\n")
 		resp.Body = struct {
 			io.Reader
 			io.Closer
@@ -194,15 +250,15 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		var formattedBody any
 		if err := json.Unmarshal(responseBody, &formattedBody); err == nil {
 			formattedBody, _ = json.MarshalIndent(formattedBody, "", "  ")
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", formattedBody)
+			writef("Body:\n")
+			writef("%s\n", formattedBody)
 		} else {
 			dump, _ := httputil.DumpResponse(resp, false)
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mBody:\x1b[0m\n")
-			fmt.Fprintf(os.Stderr, "\x1b[38;2;249;226;175m%s\x1b[0m\n", dump)
+			writef("Body:\n")
+			writef("%s\n", dump)
 		}
-		fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134m--------------------------------------------------\x1b[0m\n")
-		fmt.Fprintf(os.Stderr, "\x1b[38;2;108;112;134mTime: %v\x1b[0m\n", time.Since(start))
+		writef("--------------------------------------------------\n")
+		writef("Time: %v\n", time.Since(start))
 	}
 
 	return resp, nil
@@ -210,6 +266,7 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // NewHTTPClient creates a new HTTP client with debug logging enabled
 func NewHTTPClient() *http.Client {
+	Enable()
 	return &http.Client{
 		Transport: &DebugTransport{
 			Transport: http.DefaultTransport,
