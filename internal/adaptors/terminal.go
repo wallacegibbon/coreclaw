@@ -48,9 +48,6 @@ func (d *DisplayBuffer) GetAll() string {
 	return strings.Join(d.Messages, "")
 }
 
-// Display is the display buffer for Terminal
-var Display = NewDisplayBuffer()
-
 // TerminalAdaptor is a terminal adaptor with a Terminal interface
 type TerminalAdaptor struct {
 	AgentFactory AgentFactory
@@ -83,7 +80,6 @@ func (a *TerminalAdaptor) Start() {
 
 	p := tea.NewProgram(t, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
-	return
 }
 
 // terminalOutput writes to the Terminal display with TLV support

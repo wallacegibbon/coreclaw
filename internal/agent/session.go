@@ -171,7 +171,7 @@ func (s *Session) SubmitPrompt(prompt string) {
 // SubmitCommand submits a command for async processing via the task queue
 func (s *Session) SubmitCommand(cmd string) error {
 	switch cmd {
-	case "submit":
+	case "summarize":
 		s.SubmitTask(CommandPrompt{Command: cmd})
 		return nil
 	default:
