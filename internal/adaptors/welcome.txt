@@ -1,17 +1,15 @@
-  ____ _     _____ _____ ____ _   _ 
- / ___| |   |_   _| ____/ ___| | | |
-| |  _| |     | | |  _|| |   | |_| |
-| |_| | |___  | | | |__| |___|  _  |
- \____|_____| |_| |_____\____|_| |_|
-                                    
-    CoreClaw Terminal
 
-Type your prompt below and press Enter to send.
+    _________                        _________ .__                 
+    \_   ___ \  ___________   ____   \_   ___ \|  | _____ __  _  __
+    /    \  \/ /  _ \_  __ \_/ __ \  /    \  \/|  | \__  \\ \/ \/ /
+    \     \___(  <_> )  | \/\  ___/  \     \___|  |__/ __ \\     / 
+     \______  /\____/|__|    \___  >  \______  /____(____  /\/\_/  
+            \/                   \/          \/          \/        
 
-Controls:
-  Tab    - Switch focus between display and input
-  j/k    - Scroll up/down (when display focused)
-  Ctrl+D - Scroll down half page
-  Ctrl+U - Scroll up half page
-  Ctrl+G - Cancel current request
-  Ctrl+C - Exit
+   Controls:
+        Tab    - Switch focus between display and input
+        j/k    - Scroll up/down (when display focused)
+        Ctrl+D - Scroll down half page
+        Ctrl+U - Scroll up half page
+        Ctrl+G - Cancel current request
+        Ctrl+C - Exit
