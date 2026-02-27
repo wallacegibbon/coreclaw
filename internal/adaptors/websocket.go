@@ -115,7 +115,7 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 			// Handle commands like /summarize
 			if strings.HasPrefix(userPrompt, "/") {
 				command := strings.TrimPrefix(userPrompt, "/")
-				go session.HandleCommand(command)
+				session.SubmitCommand(command)
 				continue
 			}
 

@@ -8,6 +8,19 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
+// Task represents a unit of work in the task queue
+type Task interface{ isTask() }
+
+type UserPrompt string
+
+func (UserPrompt) isTask() {}
+
+type CommandPrompt struct {
+	Command string
+}
+
+func (CommandPrompt) isTask() {}
+
 // Session manages message history and processes prompts
 type Session struct {
 	Processor *Processor
@@ -25,8 +38,8 @@ type Session struct {
 	// ContextTokens tracks context tokens used (grows with each request, shrinks after summarize)
 	ContextTokens int64
 
-	// promptQueue buffers prompts submitted while agent is processing
-	promptQueue chan string
+	// taskQueue buffers tasks submitted while agent is processing
+	taskQueue chan Task
 
 	// inProgress tracks whether a prompt is currently being processed
 	inProgress bool
@@ -71,30 +84,12 @@ func (s *Session) IsInProgress() bool {
 // NewSession creates a new session with the given processor
 func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor) *Session {
 	return &Session{
-		Processor:   processor,
-		Messages:    nil,
-		Agent:       agent,
-		BaseURL:     baseURL,
-		ModelName:   modelName,
-		promptQueue: make(chan string, 10),
-	}
-}
-
-// HandleCommand processes special commands like /summarize, /cancel
-func (s *Session) HandleCommand(cmd string) error {
-	s.inProgress = true
-	defer func() { s.inProgress = false }()
-
-	switch cmd {
-	case "summarize":
-		ctx, _ := context.WithCancel(context.Background())
-		return s.Summarize(ctx)
-	case "cancel":
-		return s.Cancel()
-	default:
-		err := fmt.Errorf("unknown cmd <%s>", cmd)
-		s.writeError(err.Error())
-		return err
+		Processor:  processor,
+		Messages:   nil,
+		Agent:      agent,
+		BaseURL:    baseURL,
+		ModelName:  modelName,
+		taskQueue:  make(chan Task, 10),
 	}
 }
 
@@ -152,23 +147,33 @@ func (s *Session) ProcessPrompt(ctx context.Context, prompt string) (fantasy.Mes
 	return assistantMsg, usage, nil
 }
 
-// SubmitPrompt submits a prompt for processing, queueing if necessary
-// This is the main entry point for adaptors - handles all queue logic internally
+// SubmitTask submits a task for async processing via the task queue
 // Processing runs asynchronously so adaptors can continue receiving input
-func (s *Session) SubmitPrompt(prompt string) {
-	if s.queuePrompt(prompt) {
+func (s *Session) SubmitTask(task Task) {
+	if s.queueTask(task) {
 		if s.inProgress {
 			s.writeStatus("[Queued] Previous task in progress. Will run after completion.")
-			return
+		}
+		if !s.inProgress {
+			go s.runAsync()
 		}
 	} else {
 		s.writeStatus("[Busy] Cannot queue, try again shortly.")
 	}
-
-	go s.runAsync()
 }
 
-// runAsync processes prompts asynchronously, including any queued prompts
+// SubmitPrompt submits a prompt for processing, queueing if necessary
+// This is the main entry point for adaptors - handles all queue logic internally
+func (s *Session) SubmitPrompt(prompt string) {
+	s.SubmitTask(UserPrompt(prompt))
+}
+
+// SubmitCommand submits a command for async processing via the task queue
+func (s *Session) SubmitCommand(cmd string) {
+	s.SubmitTask(CommandPrompt{Command: cmd})
+}
+
+// runAsync processes tasks asynchronously, including any queued tasks
 func (s *Session) runAsync() {
 	s.inProgress = true
 	defer func() {
@@ -177,26 +182,31 @@ func (s *Session) runAsync() {
 	}()
 
 	for {
-		queuedPrompt, ok := s.getQueuedPrompt()
+		queuedTask, ok := s.getQueuedTask()
 		if !ok {
 			break
 		}
-		// Create a fresh context for each queued prompt
-		promptCtx, promptCancel := context.WithCancel(context.Background())
-		s.cancelCurrent = promptCancel
+		// Create a fresh context for each queued task
+		taskCtx, taskCancel := context.WithCancel(context.Background())
+		s.cancelCurrent = taskCancel
 
-		// Signal queued prompt start
-		s.signalPromptStart(queuedPrompt)
-
-		s.ProcessPrompt(promptCtx, queuedPrompt)
+		// Handle different task types
+		switch task := queuedTask.(type) {
+		case UserPrompt:
+			s.signalPromptStart(string(task))
+			s.ProcessPrompt(taskCtx, string(task))
+		case CommandPrompt:
+			s.signalCommandStart(task.Command)
+			s.handleCommandSync(taskCtx, task.Command)
+		}
 
 		// Check if cancelled
-		if promptCtx.Err() == context.Canceled && s.cancelInProgress {
+		if taskCtx.Err() == context.Canceled && s.cancelInProgress {
 			s.cancelInProgress = false
 		}
 
-		// If context was cancelled, stop processing queued prompts
-		if promptCtx.Err() == context.Canceled {
+		// If context was cancelled, stop processing queued tasks
+		if taskCtx.Err() == context.Canceled {
 			s.cancelCurrent = nil
 			continue
 		}
@@ -211,6 +221,30 @@ func (s *Session) signalPromptStart(prompt string) {
 		stream.WriteTLV(s.Processor.Output, stream.TagPromptStart, prompt)
 		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 		s.Processor.Output.Flush()
+	}
+}
+
+// signalCommandStart signals that a command has started processing
+func (s *Session) signalCommandStart(cmd string) {
+	if s.Processor != nil && s.Processor.Output != nil {
+		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
+		stream.WriteTLV(s.Processor.Output, stream.TagPromptStart, "/"+cmd)
+		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
+		s.Processor.Output.Flush()
+	}
+}
+
+// handleCommandSync runs the command synchronously within the async loop
+func (s *Session) handleCommandSync(ctx context.Context, cmd string) error {
+	switch cmd {
+	case "summarize":
+		return s.Summarize(ctx)
+	case "cancel":
+		return s.Cancel()
+	default:
+		err := fmt.Errorf("unknown cmd <%s>", cmd)
+		s.writeError(err.Error())
+		return err
 	}
 }
 
@@ -234,22 +268,22 @@ func (s *Session) writeError(msg string) {
 	}
 }
 
-// queuePrompt adds a prompt to the queue (non-blocking)
-func (s *Session) queuePrompt(prompt string) bool {
+// queueTask adds a task to the queue (non-blocking)
+func (s *Session) queueTask(task Task) bool {
 	select {
-	case s.promptQueue <- prompt:
+	case s.taskQueue <- task:
 		return true
 	default:
 		return false
 	}
 }
 
-// getQueuedPrompt tries to get a queued prompt (non-blocking)
-func (s *Session) getQueuedPrompt() (string, bool) {
+// getQueuedTask tries to get a queued task (non-blocking)
+func (s *Session) getQueuedTask() (Task, bool) {
 	select {
-	case prompt, ok := <-s.promptQueue:
-		return prompt, ok
+	case task, ok := <-s.taskQueue:
+		return task, ok
 	default:
-		return "", false
+		return nil, false
 	}
 }

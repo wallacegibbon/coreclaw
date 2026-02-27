@@ -355,7 +355,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if command == "quit" {
 				m.confirmDialog = true
 			} else {
-				go m.session.HandleCommand(command)
+				m.session.SubmitCommand(command)
 				m.input.SetValue("")
 				// Start ticking to check for updates during command processing
 				return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
@@ -385,7 +385,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Terminal) updateStatus() {
 	if m.session != nil && m.session.IsInProgress() {
-		m.status = "Processing..."
+		m.status = fmt.Sprintf("Processing... | Context: %d | Total: %d", m.session.ContextTokens, m.session.TotalSpent.TotalTokens)
 	} else if m.session != nil {
 		m.status = fmt.Sprintf("Ready | Context: %d | Total: %d", m.session.ContextTokens, m.session.TotalSpent.TotalTokens)
 	} else {
