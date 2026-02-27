@@ -18,16 +18,12 @@
         }
         #status {
             padding: 3px 8px;
-            margin-bottom: 5px;
+            margin-top: 5px;
             border-radius: 3px;
             font-size: 12px;
             background: #45475a;
             color: #cdd6f4;
-            text-align: center;
         }
-        .connected { background: #a6e3a1 !important; color: #1e1e2e !important; }
-        .disconnected { background: #f38ba8 !important; color: #1e1e2e !important; }
-        .connecting { background: #f9e2af !important; color: #1e1e2e !important; }
         #messages {
             flex: 1;
             overflow-y: auto;
@@ -85,12 +81,12 @@
     </style>
 </head>
 <body>
-    <div id="status" class="disconnected">Disconnected</div>
     <div id="messages"></div>
     <div id="input-area">
         <input type="text" id="prompt" placeholder="Enter your prompt..." autocomplete="off">
         <button id="send">Send</button>
     </div>
+    <div id="status">Ready</div>
 
     <script>
         const messages = document.getElementById('messages');
@@ -109,25 +105,10 @@
         let currentReasoningElement = null;
 
         function connect() {
-            status.textContent = 'Connecting...';
-            status.className = 'connecting';
-
             ws = new WebSocket(wsUrl);
 
-            ws.onopen = () => {
-                status.textContent = 'Connected';
-                status.className = 'connected';
-            };
-
             ws.onclose = () => {
-                status.textContent = 'Disconnected';
-                status.className = 'disconnected';
                 setTimeout(connect, 3000);
-            };
-
-            ws.onerror = () => {
-                status.textContent = 'Error';
-                status.className = 'disconnected';
             };
 
             ws.onmessage = (event) => {
@@ -184,11 +165,12 @@
                 addMessage('error', value);
             } else if (tag === 'U') {
                 flushCurrentText();
-                addMessage('system', 'Tokens: ' + value);
+                status.textContent = 'Ready | ' + value;
             } else if (tag === 'S') {
                 flushCurrentText();
                 addMessage('system', value);
             } else if (tag === 'P') {
+                status.textContent = 'Processing...';
                 addMessage('user', value);
             } else if (tag === 'D') {
                 if (value && value.length > 0) {

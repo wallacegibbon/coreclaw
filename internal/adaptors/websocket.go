@@ -82,8 +82,6 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 		agent := factory()
 		session := NewSession(agent, baseURL, modelName, input, output)
 
-		conn.WriteMessage(websocket.TextMessage, []byte("Connected to CoreClaw"))
-
 		// Read loop - handles client input
 		go func() {
 			for {
