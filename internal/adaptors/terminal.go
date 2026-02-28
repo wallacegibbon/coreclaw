@@ -89,6 +89,7 @@ type terminalOutput struct {
 	updateChan chan struct{}
 
 	textStyle        lipgloss.Style
+	userInputStyle    lipgloss.Style
 	toolStyle        lipgloss.Style
 	toolContentStyle lipgloss.Style
 	reasoningStyle   lipgloss.Style
@@ -102,6 +103,7 @@ func newTerminalOutput() *terminalOutput {
 		display:          NewDisplayBuffer(),
 		updateChan:       make(chan struct{}, 1),
 		textStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Bold(true),
+		userInputStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")).Bold(true),
 		toolStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")),
 		toolContentStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")),
 		reasoningStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")).Italic(true),
@@ -166,7 +168,7 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 	case stream.TagSystem:
 		output = w.systemStyle.Render(value)
 	case stream.TagPromptStart:
-		output = w.promptStyle.Render("> ") + w.textStyle.Render(value)
+		output = w.promptStyle.Render("> ") + w.userInputStyle.Render(value)
 	case stream.TagStreamGap:
 		trimRight = false
 		output = "\n"
@@ -218,6 +220,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
 	input.Prompt = "> "
+	input.Cursor.Blink = true // Enable cursor blinking
 
 	inputStyle := lipgloss.NewStyle()
 	statusStyle := lipgloss.NewStyle().
