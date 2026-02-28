@@ -215,6 +215,7 @@ type Terminal struct {
 	userScrolledAway bool   // true after user manually scrolls up
 	windowWidth      int    // actual window width
 	editorContent    string // content from external editor with newlines preserved
+	showingWelcome   bool   // true while welcome text is still displayed
 
 	inputStyle  lipgloss.Style
 	statusStyle lipgloss.Style
@@ -244,6 +245,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 		inputStyle:     inputStyle,
 		statusStyle:    statusStyle,
 		focusedWindow:  "input",
+		showingWelcome: true,
 	}
 }
 
@@ -276,6 +278,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.windowWidth = msg.Width
 		m.display.Width = max(0, msg.Width-8)   // Leave room for padding (4 on each side)
 		m.display.Height = max(0, msg.Height-4) // Leave room for input box (3) and status bar (1)
+		m.centerWelcomeText()
 		return m, nil
 	case tickMsg:
 		m.updateDisplayContent()
@@ -322,6 +325,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "n", "N", "esc", "ctrl+c":
 			m.confirmDialog = false
+			m.input.SetValue("")
 			return m, nil
 		}
 		return m, nil
@@ -379,17 +383,9 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.Type {
-	case tea.KeyCtrlC, tea.KeyEsc:
-		m.confirmDialog = true
-		return m, nil
-	case tea.KeyCtrlG:
-		// Cancel the current request if one is in progress
-		if m.session.IsInProgress() {
-			if m.session.CancelCurrent() {
-				// Cancel initiated successfully - message will be shown via TLV
-			}
-		}
-		return m, nil
+	case tea.KeyCtrlC:
+		// Cancel the current request
+		return m, m.submitCommand("cancel", false)
 	case tea.KeyCtrlO:
 		// Open external editor for multi-line input
 		return m, m.openEditor()
@@ -412,19 +408,9 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if command, found := strings.CutPrefix(prompt, "/"); found {
 			if command == "quit" {
 				m.confirmDialog = true
-			} else {
-				if err := m.session.SubmitCommand(command); err != nil {
-					m.terminalOutput.display.Append(m.terminalOutput.errorStyle.Render(err.Error()))
-				}
-				m.input.SetValue("")
-				// Start ticking to check for updates during command processing
-				return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
-					return tickMsg{}
-				})
+				return m, nil
 			}
-
-			m.display.GotoBottom()
-			return m, nil
+			return m, m.submitCommand(command, true)
 		}
 
 		// Submit prompt - session handles queuing
@@ -457,6 +443,64 @@ func (m *Terminal) updateStatus() {
 	} else {
 		m.status = ""
 	}
+}
+
+func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
+	if err := m.session.SubmitCommand(command); err != nil {
+		m.terminalOutput.display.Append(m.terminalOutput.errorStyle.Render("\n"+err.Error() + "\n"))
+	}
+	if clearInput {
+		m.input.SetValue("")
+	}
+	// Start ticking to check for updates during command processing
+	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+		return tickMsg{}
+	})
+}
+
+func (m *Terminal) centerWelcomeText() {
+	width := m.display.Width
+	height := m.display.Height
+	if width == 0 || height == 0 {
+		return
+	}
+
+	// Only center if welcome text is still being shown
+	if !m.showingWelcome {
+		return
+	}
+
+	// Find the widest line in welcome text
+	lines := strings.Split(welcomeText, "\n")
+	maxWidth := 0
+	for _, line := range lines {
+		lineWidth := lipgloss.Width(line)
+		if lineWidth > maxWidth {
+			maxWidth = lineWidth
+		}
+	}
+
+	// Calculate vertical centering
+	lineCount := len(lines)
+	topPadding := max(0, (height-lineCount)/2)
+
+	// Calculate horizontal centering
+	centeredLines := make([]string, 0, len(lines)+topPadding)
+	if maxWidth < width {
+		padding := (width - maxWidth) / 2
+		for _, line := range lines {
+			centeredLines = append(centeredLines, strings.Repeat(" ", padding)+line)
+		}
+	} else {
+		centeredLines = append(centeredLines, lines...)
+	}
+
+	// Add vertical padding at the top
+	for range topPadding {
+		centeredLines = append([]string{""}, centeredLines...)
+	}
+
+	m.display.SetContent(strings.Join(centeredLines, "\n"))
 }
 
 func (m *Terminal) openEditor() tea.Cmd {
@@ -521,6 +565,11 @@ func (m *Terminal) getInputForEditor() string {
 func (m *Terminal) updateDisplayContent() {
 	newContent := m.terminalOutput.display.GetAll()
 
+	// Check if we've moved past the welcome message
+	if m.showingWelcome && newContent != welcomeText {
+		m.showingWelcome = false
+	}
+
 	// Wordwrap to viewport width for proper word boundary wrapping
 	width := m.display.Width
 
@@ -568,25 +617,28 @@ func (m *Terminal) View() string {
 
 	// Input area with border
 	sb.WriteString("\n")
+	// Set prompt color to match border color
+	m.input.PromptStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(inputBorderColor)).
+		Bold(true)
+
+	// Apply dimming to text content when unfocused
+	if m.focusedWindow == "input" {
+		m.input.TextStyle = lipgloss.NewStyle()
+	} else {
+		m.input.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
+	}
+
+	// Show confirm dialog instead of input when dialog is active
 	if m.confirmDialog {
+		confirmText := "Confirm exit? Press y/n"
 		confirmStyle := lipgloss.NewStyle().
 			Width(max(0, windowWidth-4)).
-			Foreground(lipgloss.Color("#f9e2af")).
+			Foreground(lipgloss.Color("#f38ba8")).
 			Bold(true)
-		sb.WriteString(inputBorderStyle.Render(confirmStyle.Render("Confirm exit? Press y/n")))
+		confirmInput := confirmStyle.Render(confirmText)
+		sb.WriteString(inputBorderStyle.Render(confirmInput))
 	} else {
-		// Set prompt color to match border color
-		m.input.PromptStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(inputBorderColor)).
-			Bold(true)
-
-		// Apply dimming to text content when unfocused
-		if m.focusedWindow == "input" {
-			m.input.TextStyle = lipgloss.NewStyle()
-		} else {
-			m.input.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
-		}
-
 		inputContent := inputStyle.Render(m.input.View())
 		sb.WriteString(inputBorderStyle.Render(inputContent))
 	}

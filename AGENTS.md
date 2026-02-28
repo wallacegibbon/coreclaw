@@ -114,8 +114,8 @@ When running the Terminal version:
 | `k` | Scroll up 1 line (when display focused) |
 | `Ctrl+D` | Scroll down half page (when display focused) |
 | `Ctrl+U` | Scroll up half page (when display focused) |
-| `Ctrl+G` | Cancel current request |
-| `Ctrl+C` / `Esc` | Exit |
+| `Ctrl+C` | Cancel current request |
+| `/quit` | Exit with confirmation (press y/n) |
 
 
 ## Skills System

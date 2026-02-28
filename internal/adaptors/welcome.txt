@@ -1,16 +1,15 @@
+ _________                        _________ .__                 
+ \_   ___ \  ___________   ____   \_   ___ \|  | _____ __  _  __
+ /    \  \/ /  _ \_  __ \_/ __ \  /    \  \/|  | \__  \\ \/ \/ /
+ \     \___(  <_> )  | \/\  ___/  \     \___|  |__/ __ \\     / 
+  \______  /\____/|__|    \___  >  \______  /____(____  /\/\_/  
+         \/                   \/          \/          \/        
 
-    _________                        _________ .__                 
-    \_   ___ \  ___________   ____   \_   ___ \|  | _____ __  _  __
-    /    \  \/ /  _ \_  __ \_/ __ \  /    \  \/|  | \__  \\ \/ \/ /
-    \     \___(  <_> )  | \/\  ___/  \     \___|  |__/ __ \\     / 
-     \______  /\____/|__|    \___  >  \______  /____(____  /\/\_/  
-            \/                   \/          \/          \/        
-
-   Controls:
-        Tab    - Switch focus between display and input
-        Ctrl+O - Open external editor for multi-line input
-        j/k    - Scroll up/down (when display focused)
-        Ctrl+D - Scroll down half page
-        Ctrl+U - Scroll up half page
-        Ctrl+G - Cancel current request
-        Ctrl+C - Exit
+Controls:
+     Tab    - Switch focus between display and input
+     Ctrl+O - Open external editor for multi-line input
+     j/k    - Scroll up/down (when display focused)
+     Ctrl+D - Scroll down half page
+     Ctrl+U - Scroll up half page
+     Ctrl+C - Cancel current request
+     /quit  - Exit with confirmation
