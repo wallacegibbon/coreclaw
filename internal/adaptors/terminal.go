@@ -514,17 +514,11 @@ func wordwrap(text string, width int) string {
 		for len(line) > 0 {
 			breakAt := 0
 			currentWidth := 0
-			inEscape := false
 
 			for breakAt < len(line) {
-				if line[breakAt] == '\x1b' {
-					inEscape = true
-				}
-				if inEscape {
-					breakAt++
-					if breakAt < len(line) && line[breakAt] == 'm' {
-						inEscape = false
-					}
+				skip := skipEscapeSequence(line[breakAt:])
+				if skip > 0 {
+					breakAt += skip
 					continue
 				}
 
@@ -562,4 +556,74 @@ func wordwrap(text string, width int) string {
 	}
 
 	return result.String()
+}
+
+// skipEscapeSequence returns the length of an ANSI escape sequence at the start of s,
+// or 0 if there is no escape sequence.
+func skipEscapeSequence(s string) int {
+	if len(s) == 0 || s[0] != '\x1b' {
+		return 0
+	}
+	if len(s) < 2 {
+		return 0
+	}
+
+	switch s[1] {
+	case '[':
+		return skipCSI(s)
+	case ']':
+		return skipOSC(s)
+	default:
+		return 2
+	}
+}
+
+// skipCSI skips a CSI (Control Sequence Introducer) sequence: ESC [ ... <final byte>
+// Final byte is in range 0x40-0x7E (@A-Z[\]^_`a-z{|}~)
+func skipCSI(s string) int {
+	if len(s) < 3 {
+		return len(s)
+	}
+
+	pos := 2
+	for pos < len(s) {
+		c := s[pos]
+
+		if c >= 0x40 && c <= 0x7E {
+			return pos + 1
+		}
+
+		if c >= 0x20 && c <= 0x3F {
+			pos++
+		} else {
+			break
+		}
+	}
+
+	return pos
+}
+
+// skipOSC skips an OSC (Operating System Command) sequence: ESC ] ... ST
+// ST (String Terminator) is either BEL (\x07) or ESC \ (\x1b\\)
+func skipOSC(s string) int {
+	if len(s) < 3 {
+		return len(s)
+	}
+
+	pos := 2
+	for pos < len(s) {
+		c := s[pos]
+
+		if c == '\x07' {
+			return pos + 1
+		}
+
+		if c == '\x1b' && pos+1 < len(s) && s[pos+1] == '\\' {
+			return pos + 2
+		}
+
+		pos++
+	}
+
+	return pos
 }
