@@ -152,6 +152,7 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 		}
 	}
 
+	trimRight := true
 	var output string
 	switch tag {
 	case stream.TagText:
@@ -167,10 +168,20 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 	case stream.TagPromptStart:
 		output = w.promptStyle.Render("> ") + w.textStyle.Render(value)
 	case stream.TagStreamGap:
+		trimRight = false
 		output = "\n"
 	default:
+		trimRight = false
 		output = value
 	}
+
+	// @WORKAROUND:
+	// The `xxStyle.Render` adds many extra spaces on the right (after escape sequences)
+	// Remove them to keep the display right.
+	if trimRight {
+		output = strings.TrimRight(output, " ")
+	}
+
 	w.display.Append(output)
 }
 
@@ -412,7 +423,10 @@ func (m *Terminal) updateStatus() {
 
 func (m *Terminal) updateDisplayContent() {
 	newContent := m.terminalOutput.display.GetAll()
-	width := m.display.Width - 5
+
+	// The `width` is designed for the current `wordwrap` function.
+	width := m.display.Width - 1
+
 	if width > 0 {
 		newContent = wordwrap(newContent, width)
 	}
@@ -485,9 +499,9 @@ var (
 	_ tea.Model = (*Terminal)(nil)
 )
 
-// wordwrap wraps text to fit the given width using display width
+// wordwrap breaks text to fit the given width
 func wordwrap(text string, width int) string {
-	if width <= 0 || strings.TrimSpace(text) == "" {
+	if width <= 0 || text == "" {
 		return text
 	}
 
@@ -500,26 +514,42 @@ func wordwrap(text string, width int) string {
 			continue
 		}
 
-		// Wrap the line
-		words := strings.Fields(line)
-		currentLen := 0
+		// Break line at width limit, handling ANSI escape sequences
+		for len(line) > 0 {
+			breakAt := 0
+			currentWidth := 0
+			inEscape := false
 
-		for _, word := range words {
-			wordLen := lipgloss.Width(word)
-			if currentLen == 0 {
-				result.WriteString(word)
-				currentLen = wordLen
-			} else if currentLen+1+wordLen <= width {
-				result.WriteString(" ")
-				result.WriteString(word)
-				currentLen += 1 + wordLen
-			} else {
-				result.WriteString("\n")
-				result.WriteString(word)
-				currentLen = wordLen
+			for breakAt < len(line) {
+				if line[breakAt] == '\x1b' {
+					inEscape = true
+				}
+				if inEscape {
+					breakAt++
+					if breakAt < len(line) && line[breakAt] == 'm' {
+						inEscape = false
+					}
+					continue
+				}
+
+				r := rune(line[breakAt])
+				charWidth := lipgloss.Width(string(r))
+
+				if currentWidth+charWidth > width {
+					break
+				}
+				currentWidth += charWidth
+				breakAt++
 			}
+
+			if breakAt == 0 {
+				breakAt = 1
+			}
+
+			result.WriteString(line[:breakAt])
+			result.WriteString("\n")
+			line = line[breakAt:]
 		}
-		result.WriteString("\n")
 	}
 
 	return result.String()
