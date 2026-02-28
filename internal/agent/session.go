@@ -43,8 +43,6 @@ type Session struct {
 
 	// inProgress tracks whether a prompt is currently being processed
 	inProgress bool
-	// cancelInProgress tracks whether a cancel operation is ongoing
-	cancelInProgress bool
 
 	// cancelCurrent is a function to cancel the current prompt
 	cancelCurrent func()
@@ -53,11 +51,7 @@ type Session struct {
 // CancelCurrent cancels the currently running prompt if any
 // Returns true if cancel was initiated, false if cancel is already in progress
 func (s *Session) CancelCurrent() bool {
-	if s.cancelInProgress {
-		return false // Ignore cancel if already cancelling
-	}
 	if s.cancelCurrent != nil {
-		s.cancelInProgress = true
 		s.cancelCurrent()
 		return true
 	}
@@ -73,7 +67,7 @@ func (s *Session) Cancel() error {
 	if s.CancelCurrent() {
 		return nil
 	}
-	return fmt.Errorf("cancel already in progress")
+	return fmt.Errorf("nothing to cancel")
 }
 
 // IsInProgress returns true if a prompt is currently being processed
@@ -184,7 +178,6 @@ func (s *Session) runAsync() {
 	s.inProgress = true
 	defer func() {
 		s.inProgress = false
-		s.cancelInProgress = false
 	}()
 
 	for {
@@ -207,12 +200,13 @@ func (s *Session) runAsync() {
 		}
 
 		// Check if cancelled
-		if taskCtx.Err() == context.Canceled && s.cancelInProgress {
-			s.cancelInProgress = false
-		}
-
-		// If context was cancelled, stop processing queued tasks
 		if taskCtx.Err() == context.Canceled {
+			// Add assistant message to close out the canceled prompt
+			// This prevents the next prompt from being concatenated into the canceled one
+			s.Messages = append(s.Messages, fantasy.Message{
+				Role:    fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "The user canceled."}},
+			})
 			s.cancelCurrent = nil
 			continue
 		}
