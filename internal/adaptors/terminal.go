@@ -220,7 +220,6 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
 	input.Prompt = "> "
-	input.Cursor.Blink = true // Enable cursor blinking
 
 	inputStyle := lipgloss.NewStyle()
 	statusStyle := lipgloss.NewStyle().
