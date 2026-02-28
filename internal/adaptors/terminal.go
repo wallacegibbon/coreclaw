@@ -492,9 +492,8 @@ func wordwrap(text string, width int) string {
 	}
 
 	var result strings.Builder
-	lines := strings.Split(text, "\n")
 
-	for _, line := range lines {
+	for line := range strings.SplitSeq(text, "\n") {
 		if lipgloss.Width(line) <= width {
 			result.WriteString(line)
 			result.WriteString("\n")
