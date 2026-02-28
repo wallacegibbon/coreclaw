@@ -206,12 +206,10 @@ type Terminal struct {
 	confirmDialog    bool
 	focusedWindow    string // "display" or "input"
 	userScrolledAway bool   // true after user manually scrolls up
+	windowWidth      int    // actual window width
 
-	inputStyle         lipgloss.Style
-	promptStyle        lipgloss.Style
-	statusStyle        lipgloss.Style
-	borderStyle        lipgloss.Style
-	displayBorderStyle lipgloss.Style
+	inputStyle  lipgloss.Style
+	statusStyle lipgloss.Style
 }
 
 // NewTerminal creates a new Terminal model
@@ -222,15 +220,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 	input.Prompt = "> "
 
 	inputStyle := lipgloss.NewStyle()
-	promptStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#a6e3a1")).
-		Bold(true)
-	statusStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#45475a")).
-		Foreground(lipgloss.Color("#cdd6f4"))
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#45475a"))
+	statusStyle := lipgloss.NewStyle()
 
 	var display = viewport.New(80, 20)
 	display.SetContent(welcomeText)
@@ -241,14 +231,10 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 		display:        display,
 		input:          input,
 		status:         "Context: 0 | Total: 0",
+		windowWidth:    80, // Will be updated on first WindowSizeMsg
 		inputStyle:     inputStyle,
-		promptStyle:    promptStyle,
 		statusStyle:    statusStyle,
-		borderStyle:    borderStyle,
-		displayBorderStyle: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#45475a")),
-		focusedWindow: "input",
+		focusedWindow:  "input",
 	}
 }
 
@@ -273,8 +259,9 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
 	case tea.WindowSizeMsg:
-		m.display.Width = msg.Width
-		m.display.Height = max(0, msg.Height-6) // Leave room for input, status, and display border
+		m.windowWidth = msg.Width
+		m.display.Width = max(0, msg.Width-8)   // Leave room for padding (4 on each side)
+		m.display.Height = max(0, msg.Height-4) // Leave room for input box (3) and status bar (1)
 		return m, nil
 	case tickMsg:
 		m.updateDisplayContent()
@@ -424,8 +411,8 @@ func (m *Terminal) updateStatus() {
 func (m *Terminal) updateDisplayContent() {
 	newContent := m.terminalOutput.display.GetAll()
 
-	// The `width` is designed for the current `wordwrap` function.
-	width := m.display.Width - 1
+	// Wordwrap to viewport width for proper word boundary wrapping
+	width := m.display.Width
 
 	if width > 0 {
 		newContent = wordwrap(newContent, width)
@@ -440,50 +427,56 @@ func (m *Terminal) updateDisplayContent() {
 // View renders the Terminal
 func (m *Terminal) View() string {
 	// Display content is already updated via updateDisplayContent()
-	// Just get the current width for styling
-	width := m.display.Width
+	// Use window width for input and status, viewport width for display
+	windowWidth := m.windowWidth
 
-	// Style input and status to match viewport width
-	inputStyle := m.inputStyle.Width(width - 6)
-	statusStyle := m.statusStyle.Width(width).Padding(0, 1)
+	// Style display, input, and status (accounting for padding)
+	displayStyle := lipgloss.NewStyle().Padding(0, 4)
+	inputStyle := m.inputStyle.Width(max(0, windowWidth-4))
+	statusStyle := m.statusStyle.Width(max(0, windowWidth-8)).Padding(0, 4)
 
-	// Determine border colors based on focus
-	var displayBorderColor string
+	// Input border color based on focus
 	var inputBorderColor string
-	if m.focusedWindow == "display" {
-		displayBorderColor = "#89d4fa" // Bright cyan for focused
-		inputBorderColor = "#45475a"   // Dimmed for unfocused
+	if m.focusedWindow == "input" {
+		inputBorderColor = "#89d4fa" // Bright cyan for focused
 	} else {
-		displayBorderColor = "#45475a" // Dimmed for unfocused
-		inputBorderColor = "#89d4fa"   // Bright cyan for focused
+		inputBorderColor = "#45475a" // Dimmed for unfocused
 	}
-
-	displayBorderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(displayBorderColor)).
-		Width(width-2).Padding(0, 1)
 
 	inputBorderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(inputBorderColor)).
-		Width(width-2).Padding(0, 1)
+		Padding(0, 1)
 
 	statusBar := statusStyle.Render(m.status)
 
 	// Build the view
 	var sb strings.Builder
 
-	// Display area with border
-	sb.WriteString(displayBorderStyle.Render(m.display.View()))
+	// Display area with padding but no border
+	sb.WriteString(displayStyle.Render(m.display.View()))
 
 	// Input area with border
 	sb.WriteString("\n")
 	if m.confirmDialog {
 		confirmStyle := lipgloss.NewStyle().
+			Width(max(0, windowWidth-4)).
 			Foreground(lipgloss.Color("#f9e2af")).
 			Bold(true)
 		sb.WriteString(inputBorderStyle.Render(confirmStyle.Render("Confirm exit? Press y/n")))
 	} else {
+		// Set prompt color to match border color
+		m.input.PromptStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(inputBorderColor)).
+			Bold(true)
+
+		// Apply dimming to text content when unfocused
+		if m.focusedWindow == "input" {
+			m.input.TextStyle = lipgloss.NewStyle()
+		} else {
+			m.input.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
+		}
+
 		inputContent := inputStyle.Render(m.input.View())
 		sb.WriteString(inputBorderStyle.Render(inputContent))
 	}
