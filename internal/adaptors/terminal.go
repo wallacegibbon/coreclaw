@@ -19,6 +19,10 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
+const (
+	tempFilePrefix = "coreclaw-input-*.txt"
+)
+
 //go:embed welcome.txt
 var welcomeText string
 
@@ -90,7 +94,7 @@ type terminalOutput struct {
 	updateChan chan struct{}
 
 	textStyle        lipgloss.Style
-	userInputStyle    lipgloss.Style
+	userInputStyle   lipgloss.Style
 	toolStyle        lipgloss.Style
 	toolContentStyle lipgloss.Style
 	reasoningStyle   lipgloss.Style
@@ -104,7 +108,7 @@ func newTerminalOutput() *terminalOutput {
 		display:          NewDisplayBuffer(),
 		updateChan:       make(chan struct{}, 1),
 		textStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Bold(true),
-		userInputStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")).Bold(true),
+		userInputStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")).Bold(true),
 		toolStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")),
 		toolContentStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")),
 		reasoningStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")).Italic(true),
@@ -210,6 +214,7 @@ type Terminal struct {
 	focusedWindow    string // "display" or "input"
 	userScrolledAway bool   // true after user manually scrolls up
 	windowWidth      int    // actual window width
+	editorContent    string // content from external editor with newlines preserved
 
 	inputStyle  lipgloss.Style
 	statusStyle lipgloss.Style
@@ -285,7 +290,18 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.terminalOutput.display.Append(m.terminalOutput.errorStyle.Render(fmt.Sprintf("Editor error: %v", msg.err)))
 		} else if msg.content != "" {
-			m.input.SetValue(msg.content)
+			m.editorContent = msg.content
+			lineCount := strings.Count(msg.content, "\n") + 1
+			preview := strings.Fields(msg.content)
+			var previewText string
+			if len(preview) > 0 && len(preview[0]) > 20 {
+				previewText = preview[0][:20] + "..."
+			} else if len(preview) > 0 {
+				previewText = preview[0]
+			} else {
+				previewText = "(empty)"
+			}
+			m.input.SetValue(fmt.Sprintf("[%d lines] %s (press Enter to send)", lineCount, previewText))
 			m.input.CursorEnd()
 			m.input.Focus()
 		}
@@ -296,8 +312,6 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.input, _ = m.input.Update(msg)
 	return m, nil
 }
-
-type updateMsg struct{}
 
 func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle confirm dialog
@@ -380,14 +394,22 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Open external editor for multi-line input
 		return m, m.openEditor()
 	case tea.KeyEnter:
-		prompt := m.input.Value()
+		var prompt string
+
+		// Check if we have editor content to submit
+		if m.editorContent != "" {
+			prompt = m.editorContent
+			m.editorContent = ""
+		} else {
+			prompt = m.input.Value()
+		}
+
 		if prompt == "" {
 			return m, nil
 		}
 
 		// Handle commands
-		if strings.HasPrefix(prompt, "/") {
-			command := strings.TrimPrefix(prompt, "/")
+		if command, found := strings.CutPrefix(prompt, "/"); found {
 			if command == "quit" {
 				m.confirmDialog = true
 			} else {
@@ -417,7 +439,15 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		})
 	}
 
+	oldValue := m.input.Value()
 	m.input, _ = m.input.Update(msg)
+	newValue := m.input.Value()
+
+	// If user modified input and we have editorContent, clear it
+	if m.editorContent != "" && oldValue != newValue && !strings.HasPrefix(oldValue, "[") {
+		m.editorContent = ""
+	}
+
 	return m, nil
 }
 
@@ -438,7 +468,7 @@ func (m *Terminal) openEditor() tea.Cmd {
 		}
 	}
 
-	tmpFile, err := os.CreateTemp("", "coreclaw-input-*.txt")
+	tmpFile, err := os.CreateTemp("", tempFilePrefix)
 	if err != nil {
 		return func() tea.Msg {
 			return editorFinishedMsg{content: "", err: err}
@@ -447,10 +477,12 @@ func (m *Terminal) openEditor() tea.Cmd {
 
 	tmpFileName := tmpFile.Name()
 
-	existingContent := m.input.Value()
+	existingContent := m.getInputForEditor()
+
 	if existingContent != "" {
 		if _, err := tmpFile.WriteString(existingContent); err != nil {
 			tmpFile.Close()
+			os.Remove(tmpFileName)
 			return func() tea.Msg {
 				return editorFinishedMsg{content: "", err: err}
 			}
@@ -472,9 +504,18 @@ func (m *Terminal) openEditor() tea.Cmd {
 			return editorFinishedMsg{content: "", err: readErr}
 		}
 
-		text := strings.TrimSpace(string(content))
-		return editorFinishedMsg{content: text, err: nil}
+		return editorFinishedMsg{content: string(content), err: nil}
 	})
+}
+
+// getInputForEditor returns the content to pre-populate in the editor
+// If editorContent is set (from a previous Ctrl+O), use that.
+// Otherwise, use the current input value.
+func (m *Terminal) getInputForEditor() string {
+	if m.editorContent != "" {
+		return m.editorContent
+	}
+	return m.input.Value()
 }
 
 func (m *Terminal) updateDisplayContent() {
