@@ -535,6 +535,19 @@ func wordwrap(text string, width int) string {
 				breakAt++
 			}
 
+			// Try to break at last space for word boundary
+			lastSpace := -1
+			for i := breakAt - 1; i >= 0; i-- {
+				if line[i] == ' ' {
+					lastSpace = i
+					break
+				}
+			}
+
+			if lastSpace > 0 {
+				breakAt = lastSpace + 1
+			}
+
 			if breakAt == 0 {
 				breakAt = 1
 			}
