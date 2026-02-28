@@ -220,7 +220,8 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 	input.Prompt = "> "
 
 	inputStyle := lipgloss.NewStyle()
-	statusStyle := lipgloss.NewStyle()
+	statusStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#45475a")) // Dimmed for status bar
 
 	var display = viewport.New(80, 20)
 	display.SetContent(welcomeText)
