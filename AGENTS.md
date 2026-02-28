@@ -109,6 +109,7 @@ When running the Terminal version:
 |-----|--------|
 | `Tab` | Switch focus between display and input window |
 | `Enter` | Submit prompt (when input focused) |
+| `Ctrl+O` | Open external editor for multi-line input |
 | `j` | Scroll down 1 line (when display focused) |
 | `k` | Scroll up 1 line (when display focused) |
 | `Ctrl+D` | Scroll down half page (when display focused) |

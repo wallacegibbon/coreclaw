@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -248,6 +249,11 @@ func (m *Terminal) Init() tea.Cmd {
 
 type tickMsg struct{}
 
+type editorFinishedMsg struct {
+	content string
+	err     error
+}
+
 // Update handles messages
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Non-blocking check for display updates
@@ -273,6 +279,15 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
 				return tickMsg{}
 			})
+		}
+		return m, nil
+	case editorFinishedMsg:
+		if msg.err != nil {
+			m.terminalOutput.display.Append(m.terminalOutput.errorStyle.Render(fmt.Sprintf("Editor error: %v", msg.err)))
+		} else if msg.content != "" {
+			m.input.SetValue(msg.content)
+			m.input.CursorEnd()
+			m.input.Focus()
 		}
 		return m, nil
 	}
@@ -361,6 +376,9 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case tea.KeyCtrlO:
+		// Open external editor for multi-line input
+		return m, m.openEditor()
 	case tea.KeyEnter:
 		prompt := m.input.Value()
 		if prompt == "" {
@@ -409,6 +427,54 @@ func (m *Terminal) updateStatus() {
 	} else {
 		m.status = ""
 	}
+}
+
+func (m *Terminal) openEditor() tea.Cmd {
+	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
+
+	if editorCmd == "" {
+		return func() tea.Msg {
+			return editorFinishedMsg{content: "", err: fmt.Errorf("no editor found (tried: vim, vi, nano)")}
+		}
+	}
+
+	tmpFile, err := os.CreateTemp("", "coreclaw-input-*.txt")
+	if err != nil {
+		return func() tea.Msg {
+			return editorFinishedMsg{content: "", err: err}
+		}
+	}
+
+	tmpFileName := tmpFile.Name()
+
+	existingContent := m.input.Value()
+	if existingContent != "" {
+		if _, err := tmpFile.WriteString(existingContent); err != nil {
+			tmpFile.Close()
+			return func() tea.Msg {
+				return editorFinishedMsg{content: "", err: err}
+			}
+		}
+	}
+	tmpFile.Close()
+
+	cmd := exec.Command(editorCmd, tmpFileName)
+
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		defer os.Remove(tmpFileName)
+
+		if err != nil {
+			return editorFinishedMsg{content: "", err: err}
+		}
+
+		content, readErr := os.ReadFile(tmpFileName)
+		if readErr != nil {
+			return editorFinishedMsg{content: "", err: readErr}
+		}
+
+		text := strings.TrimSpace(string(content))
+		return editorFinishedMsg{content: text, err: nil}
+	})
 }
 
 func (m *Terminal) updateDisplayContent() {
@@ -556,6 +622,23 @@ func wordwrap(text string, width int) string {
 	}
 
 	return result.String()
+}
+
+// getEditorCommand returns the editor command to use
+// First checks EDITOR env var, then tries vim, vi, nano in order
+func getEditorCommand(editorCmd string) string {
+	if editorCmd != "" {
+		return editorCmd
+	}
+
+	for _, editor := range []string{"vim", "vi", "nano"} {
+		path, err := exec.LookPath(editor)
+		if err == nil {
+			return path
+		}
+	}
+
+	return ""
 }
 
 // skipEscapeSequence returns the length of an ANSI escape sequence at the start of s,
