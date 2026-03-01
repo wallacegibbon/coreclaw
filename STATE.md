@@ -130,8 +130,8 @@ For this project, simplicity is more important than efficiency.
   - Added TagUserText='A' for user text input from client to session
   - Session reads TLV messages from input stream and unwraps TagUserText
   - Session validates tags and emits TagError for invalid ones
-  - Session detects commands (starts with "/") and calls SubmitCommand()
-  - Session checks SubmitCommand errors and emits TagError to user
+  - Session detects commands (starts with "/") and routes to handler
+  - Session checks command errors and emits TagError to user
   - ChanInput helper in stream.go with configurable buffer size
   - Terminal uses 10-buffer for human-paced input
   - WebSocket uses 100-buffer for network-paced input

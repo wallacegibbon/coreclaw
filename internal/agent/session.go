@@ -171,14 +171,13 @@ func (s *Session) SubmitTask(task Task) {
 	}
 }
 
-// SubmitPrompt submits a prompt for processing, queueing if necessary
-// This is the main entry point for adaptors - handles all queue logic internally
-func (s *Session) SubmitPrompt(prompt string) {
+// submitPrompt submits a prompt for processing, queueing if necessary
+func (s *Session) submitPrompt(prompt string) {
 	s.SubmitTask(UserPrompt(prompt))
 }
 
-// SubmitCommand submits a command for async processing via the task queue
-func (s *Session) SubmitCommand(cmd string) error {
+// submitCommand submits a command for async processing via the task queue
+func (s *Session) submitCommand(cmd string) error {
 	switch cmd {
 	case "summarize":
 		s.SubmitTask(CommandPrompt{Command: cmd})
@@ -237,9 +236,7 @@ func (s *Session) handleCommandSync(ctx context.Context, cmd string) error {
 	case "cancel":
 		return s.Cancel()
 	default:
-		err := fmt.Errorf("unknown cmd <%s>", cmd)
-		s.writeError(err.Error())
-		return err
+		return fmt.Errorf("unknown cmd <%s>", cmd)
 	}
 }
 
@@ -259,10 +256,6 @@ func (s *Session) signalPromptStart(prompt string) {
 
 func (s *Session) signalCommandStart(cmd string) {
 	s.writeGapped(stream.TagPromptStart, "/"+cmd)
-}
-
-func (s *Session) writeError(msg string) {
-	s.writeGapped(stream.TagError, msg)
 }
 
 func (s *Session) writeNotify(msg string) {
@@ -316,7 +309,7 @@ func (s *Session) readFromInput() {
 			// Check if it's a command (starts with "/")
 			if len(value) > 0 && value[0] == '/' {
 				command := value[1:]
-				if err := s.SubmitCommand(command); err != nil {
+				if err := s.submitCommand(command); err != nil {
 					// Emit error for failed command
 					if s.Processor != nil && s.Processor.Output != nil {
 						stream.WriteTLV(s.Processor.Output, stream.TagError, err.Error())
@@ -326,7 +319,7 @@ func (s *Session) readFromInput() {
 				}
 			} else {
 				// Regular prompt
-				s.SubmitPrompt(value)
+				s.submitPrompt(value)
 			}
 		} else {
 			// Emit error for invalid tag
