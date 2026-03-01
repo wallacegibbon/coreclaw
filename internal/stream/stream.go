@@ -31,8 +31,8 @@ func NewChanInput(bufferSize int) *ChanInput {
 	}
 }
 
-// EmitData writes a TLV-encoded message to the input
-func (i *ChanInput) EmitData(tag byte, value string) error {
+// EmitTLVData writes a TLV-encoded message to the input
+func (i *ChanInput) EmitTLVData(tag byte, value string) error {
 	data := []byte(value)
 	length := int32(len(data))
 
@@ -42,6 +42,13 @@ func (i *ChanInput) EmitData(tag byte, value string) error {
 	copy(msg[5:], data)
 
 	i.Ch <- msg
+	return nil
+}
+
+// EmitRawData writes raw bytes to the input channel
+// Useful when the data is already TLV-encoded (e.g., from WebSocket client)
+func (i *ChanInput) EmitRawData(data []byte) error {
+	i.Ch <- data
 	return nil
 }
 

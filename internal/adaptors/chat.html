@@ -251,8 +251,22 @@
             const text = prompt.value.trim();
             if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
 
-            // Send plain text - adaptor will encode as TLV
-            ws.send(text);
+            // Encode as TLV with TagUserText ('A')
+            const tag = 'A'.charCodeAt(0);
+            const encoder = new TextEncoder();
+            const valueBytes = encoder.encode(text);
+            const length = valueBytes.length;
+
+            // Build TLV message: tag (1) + length (4 big-endian) + value
+            const message = new Uint8Array(5 + length);
+            message[0] = tag;
+            message[1] = (length >> 24) & 0xff;
+            message[2] = (length >> 16) & 0xff;
+            message[3] = (length >> 8) & 0xff;
+            message[4] = length & 0xff;
+            message.set(valueBytes, 5);
+
+            ws.send(message);
             prompt.value = '';
         }
 

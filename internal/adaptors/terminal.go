@@ -419,7 +419,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		// Submit prompt as TLV to input stream - session handles queuing
-		m.streamInput.EmitData(stream.TagUserText, prompt)
+		m.streamInput.EmitTLVData(stream.TagUserText, prompt)
 
 		m.input.SetValue("")
 		m.updateStatus()
@@ -452,7 +452,7 @@ func (m *Terminal) updateStatus() {
 
 func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
 	// Send command as TLV to session
-	m.streamInput.EmitData(stream.TagUserText, "/"+command)
+	m.streamInput.EmitTLVData(stream.TagUserText, "/"+command)
 	if clearInput {
 		m.input.SetValue("")
 	}

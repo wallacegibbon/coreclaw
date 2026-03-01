@@ -91,29 +91,18 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 		output.session = session
 		go output.startStatusUpdater()
 
-		// Read loop - handles client input
-		go func() {
-			for {
-				_, message, err := conn.ReadMessage()
-				if err != nil {
-					return
-				}
-
-				if len(message) == 0 {
-					continue
-				}
-				// Encode as TLV message (same as terminal adaptor)
-				input.EmitData(stream.TagUserText, string(message))
-			}
-		}()
-
-		// Session's readFromInput() goroutine will handle reading TLV and processing
-		// Just wait for connection to close
+		// Read loop - handles client input and blocks until connection closes
 		for {
-			_, _, err := conn.ReadMessage()
+			_, message, err := conn.ReadMessage()
 			if err != nil {
 				return
 			}
+
+			if len(message) == 0 {
+				continue
+			}
+			// Client already encoded as TLV, pass through raw data
+			input.EmitRawData(message)
 		}
 	}
 }
