@@ -55,26 +55,16 @@ type Session struct {
 	cancelCurrent func()
 }
 
-// CancelCurrent cancels the currently running prompt if any
-// Returns true if cancel was initiated, false if cancel is already in progress
-func (s *Session) CancelCurrent() bool {
-	if s.cancelCurrent != nil {
-		s.cancelCurrent()
-		return true
-	}
-	return false
-}
-
-// Cancel handles the /cancel command
+// cancelTask handles the /cancel command
 // Returns error if nothing to cancel
-func (s *Session) Cancel() error {
-	if !s.inProgress {
-		return fmt.Errorf("nothing to cancel")
+func (s *Session) cancelTask() {
+	if s.inProgress {
+		if s.cancelCurrent != nil {
+			s.cancelCurrent()
+			return
+		}
 	}
-	if s.CancelCurrent() {
-		return nil
-	}
-	return fmt.Errorf("nothing to cancel")
+	s.writeError("nothing to cancel")
 }
 
 // IsInProgress returns true if a prompt is currently being processed
@@ -97,13 +87,14 @@ func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Proce
 	return session
 }
 
-// Summarize summarizes the conversation history
-func (s *Session) Summarize(ctx context.Context) error {
+// summarize summarizes the conversation history
+func (s *Session) summarize(ctx context.Context) {
 	summarizePrompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
 
 	assistantMsg, usage, err := s.Processor.ProcessPrompt(ctx, summarizePrompt, s.Messages)
 	if err != nil {
-		return err
+		s.writeError(err.Error())
+		return
 	}
 	// Replace messages with summary
 	s.Messages = []fantasy.Message{assistantMsg}
@@ -115,12 +106,11 @@ func (s *Session) Summarize(ctx context.Context) error {
 	s.ContextTokens = usage.OutputTokens
 	// Send system info with updated token usage
 	s.sendSystemInfo()
-	return nil
 }
 
-// ProcessPrompt processes a user prompt and updates message history
+// processPrompt processes a user prompt and updates message history
 // It handles adding user message, calling API, and storing assistant response
-func (s *Session) ProcessPrompt(ctx context.Context, prompt string) (fantasy.Message, fantasy.Usage, error) {
+func (s *Session) processPrompt(ctx context.Context, prompt string) {
 	// Add user message to history
 	s.Messages = append(s.Messages, fantasy.NewUserMessage(prompt))
 
@@ -131,6 +121,10 @@ func (s *Session) ProcessPrompt(ctx context.Context, prompt string) (fantasy.Mes
 
 	// Process the prompt
 	assistantMsg, usage, err := s.Processor.ProcessPrompt(ctx, prompt, messagesForAPI)
+	if err != nil {
+		s.writeError(err.Error())
+		return
+	}
 
 	// Track usage
 	s.TotalSpent.InputTokens += usage.InputTokens
@@ -144,21 +138,15 @@ func (s *Session) ProcessPrompt(ctx context.Context, prompt string) (fantasy.Mes
 	// Send system info with updated token usage
 	s.sendSystemInfo()
 
-	if err != nil {
-		return fantasy.Message{}, fantasy.Usage{}, err
-	}
-
 	// If there is an assistant message, store it.
 	if assistantMsg.Role != "" {
 		s.Messages = append(s.Messages, assistantMsg)
 	}
-
-	return assistantMsg, usage, nil
 }
 
-// SubmitTask submits a task for async processing via the task queue
+// submitTask submits a task for async processing via the task queue
 // Processing runs asynchronously so adaptors can continue receiving input
-func (s *Session) SubmitTask(task Task) {
+func (s *Session) submitTask(task Task) {
 	if s.queueTask(task) {
 		if s.inProgress {
 			s.writeNotify("[Queued] Previous task in progress. Will run after completion.")
@@ -173,17 +161,16 @@ func (s *Session) SubmitTask(task Task) {
 
 // submitPrompt submits a prompt for processing, queueing if necessary
 func (s *Session) submitPrompt(prompt string) {
-	s.SubmitTask(UserPrompt(prompt))
+	s.submitTask(UserPrompt(prompt))
 }
 
 // submitCommand submits a command for async processing via the task queue
-func (s *Session) submitCommand(cmd string) error {
+func (s *Session) submitCommand(cmd string) {
 	switch cmd {
 	case "summarize":
-		s.SubmitTask(CommandPrompt{Command: cmd})
-		return nil
+		s.submitTask(CommandPrompt{Command: cmd})
 	default:
-		return s.handleCommandSync(context.Background(), cmd)
+		s.handleCommandSync(context.Background(), cmd)
 	}
 }
 
@@ -207,7 +194,7 @@ func (s *Session) runAsync() {
 		switch task := queuedTask.(type) {
 		case UserPrompt:
 			s.signalPromptStart(string(task))
-			s.ProcessPrompt(taskCtx, string(task))
+			s.processPrompt(taskCtx, string(task))
 		case CommandPrompt:
 			s.signalCommandStart(task.Command)
 			s.handleCommandSync(taskCtx, task.Command)
@@ -229,17 +216,16 @@ func (s *Session) runAsync() {
 }
 
 // handleCommandSync runs the command synchronously within the async loop
-func (s *Session) handleCommandSync(ctx context.Context, cmd string) error {
+func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
 	switch cmd {
 	case "summarize":
-		return s.Summarize(ctx)
+		s.summarize(ctx)
 	case "cancel":
-		return s.Cancel()
+		s.cancelTask()
 	default:
-		return fmt.Errorf("unknown cmd <%s>", cmd)
+		s.writeError(fmt.Sprintf("unknown cmd <%s>", cmd))
 	}
 }
-
 
 func (s *Session) writeGapped(tag byte, msg string) {
 	if s.Processor != nil && s.Processor.Output != nil {
@@ -313,25 +299,13 @@ func (s *Session) readFromInput() {
 			// Check if it's a command (starts with "/")
 			if len(value) > 0 && value[0] == '/' {
 				command := value[1:]
-				if err := s.submitCommand(command); err != nil {
-					// Emit error for failed command
-					if s.Processor != nil && s.Processor.Output != nil {
-						stream.WriteTLV(s.Processor.Output, stream.TagError, err.Error())
-						stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-						s.Processor.Output.Flush()
-					}
-				}
+				s.submitCommand(command)
 			} else {
 				// Regular prompt
 				s.submitPrompt(value)
 			}
 		} else {
-			// Emit error for invalid tag
-			if s.Processor != nil && s.Processor.Output != nil {
-				stream.WriteTLV(s.Processor.Output, stream.TagError, fmt.Sprintf("Invalid input tag: %c (only %c is allowed)", tag, stream.TagUserText))
-				stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-				s.Processor.Output.Flush()
-			}
+			s.writeError(fmt.Sprintf("Invalid input tag: %c (only %c is allowed)", tag, stream.TagUserText))
 		}
 	}
 }

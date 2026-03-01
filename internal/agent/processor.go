@@ -88,10 +88,6 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 
 	agentResult, err := p.Agent.Stream(ctx, streamCall)
 	if err != nil {
-		stream.WriteTLV(p.Output, stream.TagStreamGap, "")
-		stream.WriteTLV(p.Output, stream.TagError, fmt.Sprintf("Error: %v", err))
-		stream.WriteTLV(p.Output, stream.TagStreamGap, "")
-		p.Output.Flush()
 		return fantasy.Message{}, fantasy.Usage{}, err
 	}
 
