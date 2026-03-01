@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"charm.land/fantasy"
@@ -20,6 +21,12 @@ type CommandPrompt struct {
 }
 
 func (CommandPrompt) isTask() {}
+
+// SystemInfo contains session system information
+type SystemInfo struct {
+	ContextTokens int64 `json:"context"`
+	TotalTokens   int64 `json:"total"`
+}
 
 // Session manages message history and processes prompts
 type Session struct {
@@ -106,6 +113,8 @@ func (s *Session) Summarize(ctx context.Context) error {
 	s.TotalSpent.ReasoningTokens += usage.ReasoningTokens
 	// After summarize, context shrinks to the summary
 	s.ContextTokens = usage.OutputTokens
+	// Send system info with updated token usage
+	s.sendSystemInfo()
 	return nil
 }
 
@@ -131,6 +140,9 @@ func (s *Session) ProcessPrompt(ctx context.Context, prompt string) (fantasy.Mes
 
 	// Context grows with each request
 	s.ContextTokens += usage.TotalTokens
+
+	// Send system info with updated token usage
+	s.sendSystemInfo()
 
 	if err != nil {
 		return fantasy.Message{}, fantasy.Usage{}, err
@@ -252,12 +264,22 @@ func (s *Session) signalCommandStart(cmd string) {
 func (s *Session) writeError(msg string) {
 	s.writeGapped(stream.TagError, msg)
 }
-func (s *Session) writeSystem(msg string) {
-	s.writeGapped(stream.TagSystem, msg)
-}
 
 func (s *Session) writeNotify(msg string) {
 	s.writeGapped(stream.TagNotify, msg)
+}
+
+func (s *Session) sendSystemInfo() {
+	info := SystemInfo{
+		ContextTokens: s.ContextTokens,
+		TotalTokens:   s.TotalSpent.TotalTokens,
+	}
+	data, err := json.Marshal(info)
+	if err != nil {
+		return
+	}
+	stream.WriteTLV(s.Processor.Output, stream.TagSystem, string(data))
+	s.Processor.Output.Flush()
 }
 
 // queueTask adds a task to the queue (non-blocking)

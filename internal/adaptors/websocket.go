@@ -1,10 +1,8 @@
 package adaptors
 
 import (
-	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -86,10 +84,7 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 		agent := factory()
 		processor := agentpkg.NewProcessorWithIO(agent, input, output)
 		session := agentpkg.NewSession(agent, baseURL, modelName, processor)
-
-		// Set session on output and start status updater
 		output.session = session
-		go output.startStatusUpdater()
 
 		// Read loop - handles client input and blocks until connection closes
 		for {
@@ -109,11 +104,10 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 
 // clientOutput implements stream.Output for a single WebSocket client
 type clientOutput struct {
-	conn       *websocket.Conn
-	session    *agentpkg.Session
-	mu         sync.Mutex
-	closeCh    chan struct{}
-	lastStatus string
+	conn    *websocket.Conn
+	session *agentpkg.Session
+	mu      sync.Mutex
+	closeCh chan struct{}
 }
 
 // Write implements stream.Output
@@ -135,41 +129,6 @@ func (o *clientOutput) WriteString(s string) (int, error) {
 // Flush implements stream.Output
 func (o *clientOutput) Flush() error {
 	return nil
-}
-
-// startStatusUpdater periodically sends status updates to the client
-// NOTE: Just a quick and dirty workaround since websocket client can not get session data directly like terminal client.
-func (o *clientOutput) startStatusUpdater() {
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			o.mu.Lock()
-			var status string
-			var shouldSend bool
-			if o.session != nil {
-				status = fmt.Sprintf("context=%d|total=%d", o.session.ContextTokens, o.session.TotalSpent.TotalTokens)
-				shouldSend = (status != o.lastStatus)
-				if shouldSend {
-					o.lastStatus = status
-				}
-			}
-			o.mu.Unlock()
-
-			if shouldSend {
-				// Encode and send TLV message (tag 'U')
-				// Must encode manually and write to conn directly to avoid deadlock
-				// (lock is already held by startStatusUpdater loop)
-				msg := stream.EncodeTLV('U', status)
-				o.mu.Lock()
-				o.conn.WriteMessage(websocket.BinaryMessage, msg)
-				o.mu.Unlock()
-			}
-		case <-o.closeCh:
-			return
-		}
-	}
 }
 
 //go:embed chat.html

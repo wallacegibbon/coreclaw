@@ -247,22 +247,26 @@
                 addMessage('system', value);
             } else if (tag === 'S') {
                 flushCurrentText();
-                addMessage('system', value);
+                try {
+                    const systemInfo = JSON.parse(value);
+                    if (systemInfo.context !== undefined || systemInfo.total !== undefined) {
+                        let statusText = '';
+                        if (systemInfo.context !== undefined) {
+                            statusText += ' | Context: ' + systemInfo.context;
+                        }
+                        if (systemInfo.total !== undefined) {
+                            statusText += ' | Total: ' + systemInfo.total;
+                        }
+                        if (statusText) {
+                            status.textContent = statusText.substring(3);
+                        }
+                    }
+                } catch (e) {
+                    // Not JSON, display as plain system message
+                    addMessage('system', value);
+                }
             } else if (tag === 'P') {
                 addMessage('user', value);
-            } else if (tag === 'U') {
-                const parts = value.split('|');
-                let statusText = '';
-                for (const part of parts) {
-                    if (part.startsWith('context=')) {
-                        statusText += ' | ' + part.replace('context=', 'Context: ');
-                    } else if (part.startsWith('total=')) {
-                        statusText += ' | ' + part.replace('total=', 'Total: ');
-                    }
-                }
-                if (statusText) {
-                    status.textContent = statusText.substring(3);
-                }
             } else if (tag === 'G') {
                 flushCurrentText();
                 currentTextValue += '\n';

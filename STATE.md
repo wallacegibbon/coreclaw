@@ -144,9 +144,10 @@ For this project, simplicity is more important than efficiency.
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 - **Stream Protocol**: TLV (Tag-Length-Value) for structured output
-  - Session-to-user: TagAssistantText, TagTool, TagReasoning, TagError, TagSystem, TagStreamGap, TagPromptStart
+  - Session-to-user: TagAssistantText, TagTool, TagReasoning, TagError, TagSystem (JSON), TagNotify, TagStreamGap, TagPromptStart
   - User-to-session: TagUserText
   - Session validates and unwraps user TLV messages
+  - TagSystem contains JSON-encoded SystemInfo struct with token usage: `{"context":1234,"total":5678}`
 
 ### Code Structure
 ```

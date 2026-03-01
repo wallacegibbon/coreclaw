@@ -3,6 +3,7 @@ package adaptors
 import (
 	_ "embed"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -93,6 +94,7 @@ type terminalOutput struct {
 	display    *DisplayBuffer
 	buffer     []byte
 	updateChan chan struct{}
+	status     string // Status bar content from TagSystem
 
 	textStyle        lipgloss.Style
 	userInputStyle   lipgloss.Style
@@ -174,7 +176,13 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 	case stream.TagNotify:
 		output = w.systemStyle.Render(value)
 	case stream.TagSystem:
-		output = w.systemStyle.Render(value)
+		// Parse JSON to update status bar
+		var info agentpkg.SystemInfo
+		if err := json.Unmarshal([]byte(value), &info); err == nil {
+			w.status = fmt.Sprintf("Context: %d | Total: %d", info.ContextTokens, info.TotalTokens)
+		}
+		// Don't append to display for TagSystem - it updates status bar only
+		return
 	case stream.TagPromptStart:
 		output = w.promptStyle.Render("> ") + w.userInputStyle.Render(value)
 	case stream.TagStreamGap:
@@ -245,7 +253,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 		streamInput:    inputStream,
 		display:        display,
 		input:          input,
-		status:         "Context: 0 | Total: 0",
+		status:         terminalOutput.status,
 		windowWidth:    80, // Will be updated on first WindowSizeMsg
 		inputStyle:     inputStyle,
 		statusStyle:    statusStyle,
@@ -445,11 +453,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Terminal) updateStatus() {
-	if m.session != nil {
-		m.status = fmt.Sprintf("Context: %d | Total: %d", m.session.ContextTokens, m.session.TotalSpent.TotalTokens)
-	} else {
-		m.status = ""
-	}
+	m.status = m.terminalOutput.status
 }
 
 func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
