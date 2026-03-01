@@ -31,8 +31,8 @@ func NewChanInput(bufferSize int) *ChanInput {
 	}
 }
 
-// WriteTLV writes a TLV-encoded message to the input
-func (i *ChanInput) WriteTLV(tag byte, value string) error {
+// EmitData writes a TLV-encoded message to the input
+func (i *ChanInput) EmitData(tag byte, value string) error {
 	data := []byte(value)
 	length := int32(len(data))
 

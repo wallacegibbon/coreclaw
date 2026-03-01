@@ -207,7 +207,7 @@ func (w *terminalOutput) colorizeTool(value string) string {
 type Terminal struct {
 	session          *agentpkg.Session
 	terminalOutput   *terminalOutput
-	inputStream      *stream.ChanInput
+	streamInput      *stream.ChanInput
 	display          viewport.Model
 	input            textinput.Model
 	status           string
@@ -240,7 +240,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	return &Terminal{
 		session:        session,
 		terminalOutput: terminalOutput,
-		inputStream:    inputStream,
+		streamInput:    inputStream,
 		display:        display,
 		input:          input,
 		status:         "Context: 0 | Total: 0",
@@ -326,7 +326,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "y", "Y":
 			m.quitting = true
 			// Close input channel to stop session's readFromInput
-			close(m.inputStream.Ch)
+			close(m.streamInput.Ch)
 			return m, tea.Quit
 		case "n", "N", "esc", "ctrl+c":
 			m.confirmDialog = false
@@ -419,7 +419,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		// Submit prompt as TLV to input stream - session handles queuing
-		m.inputStream.WriteTLV(stream.TagUserText, prompt)
+		m.streamInput.EmitData(stream.TagUserText, prompt)
 
 		m.input.SetValue("")
 		m.updateStatus()
@@ -452,7 +452,7 @@ func (m *Terminal) updateStatus() {
 
 func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
 	// Send command as TLV to session
-	m.inputStream.WriteTLV(stream.TagUserText, "/"+command)
+	m.streamInput.EmitData(stream.TagUserText, "/"+command)
 	if clearInput {
 		m.input.SetValue("")
 	}

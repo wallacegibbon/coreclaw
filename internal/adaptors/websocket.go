@@ -102,8 +102,8 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 				if len(message) == 0 {
 					continue
 				}
-				// Pass through binary data transparently to input stream
-				input.Ch <- message
+				// Encode as TLV message (same as terminal adaptor)
+				input.EmitData(stream.TagUserText, string(message))
 			}
 		}()
 
