@@ -3,7 +3,6 @@ package adaptors
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -76,9 +75,7 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 		defer conn.Close()
 
 		// Create per-client streams
-		input := &clientInput{
-			clientCh: make(chan []byte, 10),
-		}
+		input := stream.NewChanInput(100)
 		output := &clientOutput{
 			conn:    conn,
 			closeCh: make(chan struct{}),
@@ -87,7 +84,8 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 
 		// Create a new agent, processor, and session for this client
 		agent := factory()
-		session := NewSession(agent, baseURL, modelName, input, output)
+		processor := agentpkg.NewProcessorWithIO(agent, input, output)
+		session := agentpkg.NewSession(agent, baseURL, modelName, processor)
 
 		// Set session on output and start status updater
 		output.session = session
@@ -101,91 +99,23 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 					return
 				}
 
-				msgStr := strings.TrimSpace(string(message))
-				if msgStr == "" {
+				if len(message) == 0 {
 					continue
 				}
-				input.clientCh <- message
+				// Pass through binary data transparently to input stream
+				input.Ch <- message
 			}
 		}()
 
-		// Interactive loop - synchronous like terminal
+		// Session's readFromInput() goroutine will handle reading TLV and processing
+		// Just wait for connection to close
 		for {
-			line, err := input.readLine()
+			_, _, err := conn.ReadMessage()
 			if err != nil {
 				return
 			}
-			userPrompt := strings.TrimSpace(line)
-			if userPrompt == "" {
-				continue
-			}
-
-			// Handle commands like /summarize
-			if strings.HasPrefix(userPrompt, "/") {
-				command := strings.TrimPrefix(userPrompt, "/")
-				if err := session.SubmitCommand(command); err != nil {
-					stream.WriteTLV(session.Processor.Output, stream.TagError, err.Error())
-				}
-				continue
-			}
-
-			// Submit prompt - Session handles queue internally
-			session.SubmitPrompt(userPrompt)
 		}
 	}
-}
-
-// clientInput implements stream.Input for a single WebSocket client
-type clientInput struct {
-	clientCh chan []byte
-	buf      []byte
-}
-
-// readLine reads a newline-terminated line from the client
-func (i *clientInput) readLine() (string, error) {
-	var line []byte
-
-	for {
-		// If we have buffered data, check for newline
-		if len(i.buf) > 0 {
-			for idx, b := range i.buf {
-				if b == '\n' {
-					line = append(line, i.buf[:idx]...)
-					i.buf = i.buf[idx+1:]
-					return string(line), nil
-				}
-			}
-			// No newline found, append all buffer and continue
-			line = append(line, i.buf...)
-			i.buf = nil
-		}
-
-		// Wait for more data
-		msg, ok := <-i.clientCh
-		if !ok {
-			return string(line), nil
-		}
-		i.buf = msg
-	}
-}
-
-// Read implements stream.Input interface (used by processor)
-func (i *clientInput) Read(p []byte) (n int, err error) {
-	if len(i.buf) > 0 {
-		n = copy(p, i.buf)
-		i.buf = i.buf[n:]
-		return n, nil
-	}
-
-	msg, ok := <-i.clientCh
-	if !ok {
-		return 0, nil
-	}
-
-	i.buf = msg
-	n = copy(p, i.buf)
-	i.buf = i.buf[n:]
-	return n, nil
 }
 
 // clientOutput implements stream.Output for a single WebSocket client

@@ -77,7 +77,7 @@ func (s *Session) IsInProgress() bool {
 
 // NewSession creates a new session with the given processor
 func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor) *Session {
-	return &Session{
+	session := &Session{
 		Processor: processor,
 		Messages:  nil,
 		Agent:     agent,
@@ -85,6 +85,9 @@ func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Proce
 		ModelName: modelName,
 		taskQueue: make(chan Task, 10),
 	}
+	// Start input reader goroutine that reads TLV from input stream
+	go session.readFromInput()
+	return session
 }
 
 // Summarize summarizes the conversation history
@@ -285,5 +288,42 @@ func (s *Session) getQueuedTask() (Task, bool) {
 		return task, ok
 	default:
 		return nil, false
+	}
+}
+
+// readFromInput reads TLV messages from the input stream and processes them
+func (s *Session) readFromInput() {
+	for {
+		tag, value, err := stream.ReadTLV(s.Processor.Input)
+		if err != nil {
+			// Input stream closed or error, stop reading
+			return
+		}
+
+		// Only accept TagUserText messages, emit error for other tags
+		if tag == stream.TagUserText {
+			// Check if it's a command (starts with "/")
+			if len(value) > 0 && value[0] == '/' {
+				command := value[1:]
+				if err := s.SubmitCommand(command); err != nil {
+					// Emit error for failed command
+					if s.Processor != nil && s.Processor.Output != nil {
+						stream.WriteTLV(s.Processor.Output, stream.TagError, err.Error())
+						stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
+						s.Processor.Output.Flush()
+					}
+				}
+			} else {
+				// Regular prompt
+				s.SubmitPrompt(value)
+			}
+		} else {
+			// Emit error for invalid tag
+			if s.Processor != nil && s.Processor.Output != nil {
+				stream.WriteTLV(s.Processor.Output, stream.TagError, fmt.Sprintf("Invalid input tag: %c (only %c is allowed)", tag, stream.TagUserText))
+				stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
+				s.Processor.Output.Flush()
+			}
+		}
 	}
 }

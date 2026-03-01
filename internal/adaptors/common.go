@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"charm.land/fantasy"
-	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
-	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
 // AgentFactory creates a new agent for each client session
@@ -14,18 +12,6 @@ type AgentFactory func() fantasy.Agent
 // Adaptor is the interface for terminal adaptors
 type Adaptor interface {
 	Start()
-}
-
-// NewSession creates a processor and session with common setup
-func NewSession(
-	agent fantasy.Agent,
-	baseURL, modelName string,
-	input stream.Input,
-	output stream.Output,
-) *agentpkg.Session {
-	processor := agentpkg.NewProcessorWithIO(agent, input, output)
-	session := agentpkg.NewSession(agent, baseURL, modelName, processor)
-	return session
 }
 
 // Dim returns text in dim gray color

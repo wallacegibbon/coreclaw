@@ -14,7 +14,55 @@ const (
 	TagSystem      = 'S' // System messages (queue status, etc.)
 	TagStreamGap   = 'G' // Stream gap to separate data
 	TagPromptStart = 'P' // Prompt started processing (show user message + context/total)
+	TagUserText    = 'A' // User text input from client to session
 )
+
+// ChanInput implements Input using a channel for writing
+// Useful for adaptors that need to queue data from a separate goroutine
+type ChanInput struct {
+	Ch   chan []byte
+	buf  []byte
+}
+
+// NewChanInput creates a new ChanInput with specified buffer size
+func NewChanInput(bufferSize int) *ChanInput {
+	return &ChanInput{
+		Ch: make(chan []byte, bufferSize),
+	}
+}
+
+// WriteTLV writes a TLV-encoded message to the input
+func (i *ChanInput) WriteTLV(tag byte, value string) error {
+	data := []byte(value)
+	length := int32(len(data))
+
+	msg := make([]byte, 5+length)
+	msg[0] = tag
+	binary.BigEndian.PutUint32(msg[1:], uint32(length))
+	copy(msg[5:], data)
+
+	i.Ch <- msg
+	return nil
+}
+
+// Read implements Input interface (used by processor)
+func (i *ChanInput) Read(p []byte) (n int, err error) {
+	if len(i.buf) > 0 {
+		n = copy(p, i.buf)
+		i.buf = i.buf[n:]
+		return n, nil
+	}
+
+	msg, ok := <-i.Ch
+	if !ok {
+		return 0, nil
+	}
+
+	i.buf = msg
+	n = copy(p, i.buf)
+	i.buf = i.buf[n:]
+	return n, nil
+}
 
 // WriteTLV writes a TLV message to the output
 func WriteTLV(output Output, tag byte, value string) error {

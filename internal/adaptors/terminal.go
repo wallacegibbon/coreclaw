@@ -75,13 +75,14 @@ func NewTerminalAdaptor(agentFactory AgentFactory, baseURL, modelName string) *T
 func (a *TerminalAdaptor) Start() {
 	agent := a.AgentFactory()
 
-	// Create first (callback set after Terminal is created)
+	// Create input and output streams
+	inputStream := stream.NewChanInput(10)
 	terminalOutput := newTerminalOutput()
-	processor := agentpkg.NewProcessorWithIO(agent, &stream.NopInput{}, terminalOutput)
+	processor := agentpkg.NewProcessorWithIO(agent, inputStream, terminalOutput)
 	a.processor = processor
 	a.session = agentpkg.NewSession(agent, a.BaseURL, a.ModelName, processor)
 
-	t := NewTerminal(a.session, terminalOutput)
+	t := NewTerminal(a.session, terminalOutput, inputStream)
 
 	p := tea.NewProgram(t, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
@@ -206,6 +207,7 @@ func (w *terminalOutput) colorizeTool(value string) string {
 type Terminal struct {
 	session          *agentpkg.Session
 	terminalOutput   *terminalOutput
+	inputStream      *stream.ChanInput
 	display          viewport.Model
 	input            textinput.Model
 	status           string
@@ -222,7 +224,7 @@ type Terminal struct {
 }
 
 // NewTerminal creates a new Terminal model
-func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Terminal {
+func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inputStream *stream.ChanInput) *Terminal {
 	input := textinput.New()
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
@@ -238,6 +240,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput) *Ter
 	return &Terminal{
 		session:        session,
 		terminalOutput: terminalOutput,
+		inputStream:    inputStream,
 		display:        display,
 		input:          input,
 		status:         "Context: 0 | Total: 0",
@@ -322,6 +325,8 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "y", "Y":
 			m.quitting = true
+			// Close input channel to stop session's readFromInput
+			close(m.inputStream.Ch)
 			return m, tea.Quit
 		case "n", "N", "esc", "ctrl+c":
 			m.confirmDialog = false
@@ -413,8 +418,8 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.submitCommand(command, true)
 		}
 
-		// Submit prompt - session handles queuing
-		m.session.SubmitPrompt(prompt)
+		// Submit prompt as TLV to input stream - session handles queuing
+		m.inputStream.WriteTLV(stream.TagUserText, prompt)
 
 		m.input.SetValue("")
 		m.updateStatus()
@@ -446,9 +451,8 @@ func (m *Terminal) updateStatus() {
 }
 
 func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
-	if err := m.session.SubmitCommand(command); err != nil {
-		m.terminalOutput.display.Append(m.terminalOutput.errorStyle.Render("\n"+err.Error() + "\n"))
-	}
+	// Send command as TLV to session
+	m.inputStream.WriteTLV(stream.TagUserText, "/"+command)
 	if clearInput {
 		m.input.SetValue("")
 	}
