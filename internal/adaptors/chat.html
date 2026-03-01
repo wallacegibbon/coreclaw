@@ -180,6 +180,7 @@
 
             ws.onopen = () => {
                 setConnectionState('connected');
+                prompt.focus();
             };
 
             ws.onclose = () => {

@@ -96,6 +96,20 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 			if len(message) == 0 {
 				continue
 			}
+
+			// Decode TLV to check for /quit command
+			if len(message) >= 5 {
+				tag := message[0]
+				length := uint32(message[1])<<24 | uint32(message[2])<<16 | uint32(message[3])<<8 | uint32(message[4])
+				if len(message) >= 5+int(length) {
+					value := string(message[5 : 5+length])
+					// Ignore /quit commands from web client
+					if tag == 'A' && value == "/quit" {
+						continue
+					}
+				}
+			}
+
 			// Client already encoded as TLV, pass through raw data
 			input.EmitRawData(message)
 		}
