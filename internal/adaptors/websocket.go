@@ -103,8 +103,8 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 				length := uint32(message[1])<<24 | uint32(message[2])<<16 | uint32(message[3])<<8 | uint32(message[4])
 				if len(message) >= 5+int(length) {
 					value := string(message[5 : 5+length])
-					// Ignore /quit commands from web client
-					if tag == 'A' && value == "/quit" {
+					// Ignore /quit and /exit commands from web client
+					if tag == 'A' && (value == "/quit" || value == "/exit") {
 						continue
 					}
 				}

@@ -4,12 +4,3 @@
  \     \___(  <_> )  | \/\  ___/  \     \___|  |__/ __ \\     / 
   \______  /\____/|__|    \___  >  \______  /____(____  /\/\_/  
          \/                   \/          \/          \/        
-
-Controls:
-     Tab    - Switch focus between display and input
-     Ctrl+O - Open external editor for multi-line input
-     j/k    - Scroll up/down (when display focused)
-     Ctrl+D - Scroll down half page
-     Ctrl+U - Scroll up half page
-     Ctrl+C - Cancel current request
-     /quit  - Exit with confirmation

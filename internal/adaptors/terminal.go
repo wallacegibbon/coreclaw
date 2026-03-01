@@ -203,6 +203,33 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 	w.display.Append(output)
 }
 
+// colorizeWelcomeText applies gradient coloring to the ASCII art
+func colorizeWelcomeText(text string) string {
+	lines := strings.Split(text, "\n")
+	colors := []string{
+		"#cba6f7", // Purple
+		"#f38ba8", // Red/pink
+		"#f9e2af", // Yellow
+		"#a6e3a1", // Green
+		"#89d4fa", // Cyan
+		"#cba6f7", // Purple
+	}
+
+	var result strings.Builder
+	for i, line := range lines {
+		if i < len(colors) && line != "" {
+			style := lipgloss.NewStyle().Foreground(lipgloss.Color(colors[i]))
+			result.WriteString(style.Render(line))
+		} else {
+			result.WriteString(line)
+		}
+		if i < len(lines)-1 {
+			result.WriteString("\n")
+		}
+	}
+	return result.String()
+}
+
 func (w *terminalOutput) colorizeTool(value string) string {
 	colonIdx := strings.Index(value, ":")
 	if colonIdx > 0 {
@@ -228,6 +255,7 @@ type Terminal struct {
 	windowWidth      int    // actual window width
 	editorContent    string // content from external editor with newlines preserved
 	showingWelcome   bool   // true while welcome text is still displayed
+	welcomeText      string // colored welcome text for comparison
 
 	inputStyle  lipgloss.Style
 	statusStyle lipgloss.Style
@@ -244,8 +272,10 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	statusStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#45475a")) // Dimmed for status bar
 
+	// Colorize welcome text with gradient effect
+	coloredWelcome := colorizeWelcomeText(welcomeText)
 	var display = viewport.New(80, 20)
-	display.SetContent(welcomeText)
+	display.SetContent(coloredWelcome)
 
 	return &Terminal{
 		session:        session,
@@ -259,6 +289,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 		statusStyle:    statusStyle,
 		focusedWindow:  "input",
 		showingWelcome: true,
+		welcomeText:    coloredWelcome,
 	}
 }
 
@@ -421,7 +452,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		// Handle commands
 		if command, found := strings.CutPrefix(prompt, "/"); found {
-			if command == "quit" {
+			if command == "quit" || command == "exit" {
 				m.confirmDialog = true
 				return m, nil
 			}
@@ -481,7 +512,7 @@ func (m *Terminal) centerWelcomeText() {
 	}
 
 	// Find the widest line in welcome text
-	lines := strings.Split(welcomeText, "\n")
+	lines := strings.Split(m.welcomeText, "\n")
 	maxWidth := 0
 	for _, line := range lines {
 		lineWidth := lipgloss.Width(line)
@@ -576,7 +607,7 @@ func (m *Terminal) updateDisplayContent() {
 	newContent := m.terminalOutput.display.GetAll()
 
 	// Check if we've moved past the welcome message
-	if m.showingWelcome && newContent != welcomeText {
+	if m.showingWelcome && newContent != m.welcomeText {
 		m.showingWelcome = false
 	}
 
