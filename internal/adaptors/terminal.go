@@ -93,6 +93,7 @@ func (a *TerminalAdaptor) Start() {
 type terminalOutput struct {
 	display    *DisplayBuffer
 	buffer     []byte
+	mu         sync.Mutex
 	updateChan chan struct{}
 	status     string // Status bar content from TagSystem
 
@@ -122,8 +123,10 @@ func newTerminalOutput() *terminalOutput {
 }
 
 func (w *terminalOutput) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
 	w.buffer = append(w.buffer, p...)
 	w.processBuffer()
+	w.mu.Unlock()
 	return len(p), nil
 }
 
@@ -179,7 +182,12 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 		// Parse JSON to update status bar
 		var info agentpkg.SystemInfo
 		if err := json.Unmarshal([]byte(value), &info); err == nil {
-			w.status = fmt.Sprintf("Context: %d | Total: %d", info.ContextTokens, info.TotalTokens)
+			if info.QueueCount > 0 {
+				queueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")).Bold(true)
+				w.status = fmt.Sprintf("Queue: %s | Context: %d | Total: %d", queueStyle.Render(fmt.Sprintf("%d", info.QueueCount)), info.ContextTokens, info.TotalTokens)
+			} else {
+				w.status = fmt.Sprintf("Context: %d | Total: %d", info.ContextTokens, info.TotalTokens)
+			}
 		}
 		// Don't append to display for TagSystem - it updates status bar only
 		return

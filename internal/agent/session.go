@@ -26,6 +26,7 @@ func (CommandPrompt) isTask() {}
 type SystemInfo struct {
 	ContextTokens int64 `json:"context"`
 	TotalTokens   int64 `json:"total"`
+	QueueCount    int   `json:"queue"`
 }
 
 // Session manages message history and processes prompts
@@ -150,6 +151,7 @@ func (s *Session) submitTask(task Task) {
 	if s.queueTask(task) {
 		if s.inProgress {
 			s.writeNotify("[Queued] Previous task in progress. Will run after completion.")
+			s.sendSystemInfo()
 		}
 		if !s.inProgress {
 			go s.runAsync()
@@ -186,6 +188,7 @@ func (s *Session) runAsync() {
 		if !ok {
 			break
 		}
+		s.sendSystemInfo()
 		// Create a fresh context for each queued task
 		taskCtx, taskCancel := context.WithCancel(context.Background())
 		s.cancelCurrent = taskCancel
@@ -256,6 +259,7 @@ func (s *Session) sendSystemInfo() {
 	info := SystemInfo{
 		ContextTokens: s.ContextTokens,
 		TotalTokens:   s.TotalSpent.TotalTokens,
+		QueueCount:    len(s.taskQueue),
 	}
 	data, err := json.Marshal(info)
 	if err != nil {

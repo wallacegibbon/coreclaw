@@ -250,17 +250,20 @@
                 flushCurrentText();
                 try {
                     const systemInfo = JSON.parse(value);
-                    if (systemInfo.context !== undefined || systemInfo.total !== undefined) {
-                        let statusText = '';
-                        if (systemInfo.context !== undefined) {
-                            statusText += ' | Context: ' + systemInfo.context;
-                        }
-                        if (systemInfo.total !== undefined) {
-                            statusText += ' | Total: ' + systemInfo.total;
-                        }
-                        if (statusText) {
-                            status.textContent = statusText.substring(3);
-                        }
+                    let statusText = '';
+                    if (systemInfo.queue !== undefined && systemInfo.queue > 0) {
+                        statusText += 'Queue: <span style="color: #f38ba8; font-weight: bold;">' + systemInfo.queue + '</span> | ';
+                    }
+                    if (systemInfo.context !== undefined) {
+                        statusText += 'Context: ' + systemInfo.context + ' | ';
+                    }
+                    if (systemInfo.total !== undefined) {
+                        statusText += 'Total: ' + systemInfo.total;
+                    }
+                    if (statusText) {
+                        // Remove trailing " | " if present
+                        statusText = statusText.replace(/ \s*\|\s*$/, '');
+                        status.innerHTML = statusText;
                     }
                 } catch (e) {
                     // Not JSON, display as plain system message

@@ -147,7 +147,7 @@ For this project, simplicity is more important than efficiency.
   - Session-to-user: TagAssistantText, TagTool, TagReasoning, TagError, TagSystem (JSON), TagNotify, TagStreamGap, TagPromptStart
   - User-to-session: TagUserText
   - Session validates and unwraps user TLV messages
-  - TagSystem contains JSON-encoded SystemInfo struct with token usage: `{"context":1234,"total":5678}`
+  - TagSystem contains JSON-encoded SystemInfo struct with token usage and queue: `{"context":1234,"total":5678,"queue":2}`
 
 ### Code Structure
 ```
