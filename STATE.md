@@ -104,13 +104,16 @@ For this project, simplicity is more important than efficiency.
   - Test coverage for parsing, discovery, and activation
 - ✅ IOStream abstraction layer
   - Input/Output interfaces in internal/stream/stream.go
-  - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E', TagSystem='S')
+  - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E', TagSystem='S', TagPromptStart='P', TagUserText='A')
   - Buffered reads/writes with Flush() method
+  - ChanInput helper for channel-based input with configurable buffer
+  - WriteTLV/ReadTLV functions for encoding/decoding
 - ✅ Adaptors in internal/adaptors/
   - terminal.go - Terminal adaptor with Terminal (lipgloss/bubbletea)
   - websocket.go - WebSocket server with per-client sessions
-  - colors.go - ANSI color styling
+  - colors.go - ANSI color styling (now in common.go)
   - chat.html - Embedded chat UI
+  - Removed NewSession function - create processor/session directly
 - ✅ coreclaw-web command
   - cmd/coreclaw-web/main.go entry point
   - Per-client independent agent sessions
@@ -123,6 +126,17 @@ For this project, simplicity is more important than efficiency.
 - ✅ Tab key to switch focus between display and input windows
   - Focused window has bright border (#89d4fa), unfocused has dimmed border (#45475a)
   - When display window is focused, j/k scrolls content like vim
+- ✅ TLV protocol for user-to-session communication
+  - Added TagUserText='A' for user text input from client to session
+  - Session reads TLV messages from input stream and unwraps TagUserText
+  - Session validates tags and emits TagError for invalid ones
+  - Session detects commands (starts with "/") and calls SubmitCommand()
+  - Session checks SubmitCommand errors and emits TagError to user
+  - ChanInput helper in stream.go with configurable buffer size
+  - Terminal uses 10-buffer for human-paced input
+  - WebSocket uses 100-buffer for network-paced input
+  - HTML client encodes user input as TagUserText TLV
+  - Removed adaptors.NewSession - adaptors create processor/session directly
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
@@ -130,6 +144,9 @@ For this project, simplicity is more important than efficiency.
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 - **Stream Protocol**: TLV (Tag-Length-Value) for structured output
+  - Session-to-user: TagText, TagTool, TagReasoning, TagError, TagSystem, TagStreamGap, TagPromptStart
+  - User-to-session: TagUserText
+  - Session validates and unwraps user TLV messages
 
 ### Code Structure
 ```

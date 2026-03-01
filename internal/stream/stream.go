@@ -20,8 +20,8 @@ const (
 // ChanInput implements Input using a channel for writing
 // Useful for adaptors that need to queue data from a separate goroutine
 type ChanInput struct {
-	Ch   chan []byte
-	buf  []byte
+	Ch  chan []byte
+	buf []byte
 }
 
 // NewChanInput creates a new ChanInput with specified buffer size
