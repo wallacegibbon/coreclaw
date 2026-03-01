@@ -31,8 +31,8 @@ func NewChanInput(bufferSize int) *ChanInput {
 	}
 }
 
-// EmitTLVData writes a TLV-encoded message to the input
-func (i *ChanInput) EmitTLVData(tag byte, value string) error {
+// EncodeTLV creates a TLV-encoded byte slice
+func EncodeTLV(tag byte, value string) []byte {
 	data := []byte(value)
 	length := int32(len(data))
 
@@ -41,7 +41,12 @@ func (i *ChanInput) EmitTLVData(tag byte, value string) error {
 	binary.BigEndian.PutUint32(msg[1:], uint32(length))
 	copy(msg[5:], data)
 
-	i.Ch <- msg
+	return msg
+}
+
+// EmitTLVData writes a TLV-encoded message to the input
+func (i *ChanInput) EmitTLVData(tag byte, value string) error {
+	i.Ch <- EncodeTLV(tag, value)
 	return nil
 }
 
@@ -73,17 +78,7 @@ func (i *ChanInput) Read(p []byte) (n int, err error) {
 
 // WriteTLV writes a TLV message to the output
 func WriteTLV(output Output, tag byte, value string) error {
-	data := []byte(value)
-	length := int32(len(data))
-
-	// Build complete message: tag (1) + length (4) + value
-	msg := make([]byte, 5+length)
-	msg[0] = tag
-	binary.BigEndian.PutUint32(msg[1:], uint32(length))
-	copy(msg[5:], data)
-
-	// Write complete message in one call
-	_, err := output.Write(msg)
+	_, err := output.Write(EncodeTLV(tag, value))
 	return err
 }
 

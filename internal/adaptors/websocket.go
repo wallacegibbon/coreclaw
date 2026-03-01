@@ -146,17 +146,26 @@ func (o *clientOutput) startStatusUpdater() {
 		select {
 		case <-ticker.C:
 			o.mu.Lock()
+			var status string
+			var shouldSend bool
 			if o.session != nil {
-				status := fmt.Sprintf("context=%d|total=%d", o.session.ContextTokens, o.session.TotalSpent.TotalTokens)
-				if status != o.lastStatus {
+				status = fmt.Sprintf("context=%d|total=%d", o.session.ContextTokens, o.session.TotalSpent.TotalTokens)
+				shouldSend = (status != o.lastStatus)
+				if shouldSend {
 					o.lastStatus = status
-					// Send as binary TLV message (tag 'U' + length + value)
-					msg := []byte{'U', byte(len(status) >> 24), byte(len(status) >> 16), byte(len(status) >> 8), byte(len(status))}
-					msg = append(msg, status...)
-					o.conn.WriteMessage(websocket.BinaryMessage, msg)
 				}
 			}
 			o.mu.Unlock()
+
+			if shouldSend {
+				// Encode and send TLV message (tag 'U')
+				// Must encode manually and write to conn directly to avoid deadlock
+				// (lock is already held by startStatusUpdater loop)
+				msg := stream.EncodeTLV('U', status)
+				o.mu.Lock()
+				o.conn.WriteMessage(websocket.BinaryMessage, msg)
+				o.mu.Unlock()
+			}
 		case <-o.closeCh:
 			return
 		}
