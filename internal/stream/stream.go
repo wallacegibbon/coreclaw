@@ -7,14 +7,15 @@ import (
 
 // Message tags for TLV protocol
 const (
-	TagText        = 'T' // Regular text output
-	TagTool        = 't' // Tool call output
-	TagReasoning   = 'R' // Reasoning/thinking content
-	TagError       = 'E' // Error messages
-	TagSystem      = 'S' // System messages (queue status, etc.)
-	TagStreamGap   = 'G' // Stream gap to separate data
-	TagPromptStart = 'P' // Prompt started processing (show user message + context/total)
-	TagUserText    = 'A' // User text input from client to session
+	TagUserText      = 'A' // User text input from client to session
+	TagAssistantText = 'B' // Assistant text output
+	TagReasoning     = 'C' // Reasoning/thinking content
+	TagTool          = 'D' // Tool call output
+	TagError         = 'E' // Error messages
+	TagNotify        = 'N' // Notification messages
+	TagSystem        = 'S' // System messages (queue status, etc.)
+	TagStreamGap     = 'G' // Stream gap to separate data
+	TagPromptStart   = 'P' // Prompt started processing (show user message + context/total)
 )
 
 // ChanInput implements Input using a channel for writing

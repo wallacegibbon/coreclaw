@@ -49,7 +49,7 @@ func (p *Processor) ProcessPrompt(ctx context.Context, prompt string, messages [
 	}
 
 	streamCall.OnTextDelta = func(id, text string) error {
-		stream.WriteTLV(p.Output, stream.TagText, text)
+		stream.WriteTLV(p.Output, stream.TagAssistantText, text)
 		p.Output.Flush()
 		return nil
 	}

@@ -104,7 +104,7 @@ For this project, simplicity is more important than efficiency.
   - Test coverage for parsing, discovery, and activation
 - ✅ IOStream abstraction layer
   - Input/Output interfaces in internal/stream/stream.go
-  - TLV protocol (TagText='T', TagTool='t', TagReasoning='R', TagError='E', TagSystem='S', TagPromptStart='P', TagUserText='A')
+  - TLV protocol (TagAssistantText='B', TagTool='D', TagReasoning='C', TagError='E', TagNotify='N', TagSystem='S', TagPromptStart='P', TagUserText='A')
   - Buffered reads/writes with Flush() method
   - ChanInput helper for channel-based input with configurable buffer
   - WriteTLV/ReadTLV functions for encoding/decoding
@@ -144,7 +144,7 @@ For this project, simplicity is more important than efficiency.
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 - **Stream Protocol**: TLV (Tag-Length-Value) for structured output
-  - Session-to-user: TagText, TagTool, TagReasoning, TagError, TagSystem, TagStreamGap, TagPromptStart
+  - Session-to-user: TagAssistantText, TagTool, TagReasoning, TagError, TagSystem, TagStreamGap, TagPromptStart
   - User-to-session: TagUserText
   - Session validates and unwraps user TLV messages
 

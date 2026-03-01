@@ -152,7 +152,7 @@ func (w *terminalOutput) processBuffer() {
 
 func (w *terminalOutput) writeColored(tag byte, value string) {
 	switch tag {
-	case stream.TagText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap:
+	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagNotify, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap:
 		// Notify that content changed (non-blocking)
 		select {
 		case w.updateChan <- struct{}{}:
@@ -163,7 +163,7 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 	trimRight := true
 	var output string
 	switch tag {
-	case stream.TagText:
+	case stream.TagAssistantText:
 		output = w.textStyle.Render(value)
 	case stream.TagTool:
 		output = w.colorizeTool(value)
@@ -171,6 +171,8 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 		output = w.reasoningStyle.Render(value)
 	case stream.TagError:
 		output = w.errorStyle.Render(value)
+	case stream.TagNotify:
+		output = w.systemStyle.Render(value)
 	case stream.TagSystem:
 		output = w.systemStyle.Render(value)
 	case stream.TagPromptStart:

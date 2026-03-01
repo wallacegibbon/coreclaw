@@ -149,13 +149,13 @@ func (s *Session) ProcessPrompt(ctx context.Context, prompt string) (fantasy.Mes
 func (s *Session) SubmitTask(task Task) {
 	if s.queueTask(task) {
 		if s.inProgress {
-			s.writeStatus("[Queued] Previous task in progress. Will run after completion.")
+			s.writeNotify("[Queued] Previous task in progress. Will run after completion.")
 		}
 		if !s.inProgress {
 			go s.runAsync()
 		}
 	} else {
-		s.writeStatus("[Busy] Cannot queue, try again shortly.")
+		s.writeNotify("[Busy] Cannot queue, try again shortly.")
 	}
 }
 
@@ -217,26 +217,6 @@ func (s *Session) runAsync() {
 	}
 }
 
-// signalPromptStart signals that a prompt has started processing
-func (s *Session) signalPromptStart(prompt string) {
-	if s.Processor != nil && s.Processor.Output != nil {
-		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-		stream.WriteTLV(s.Processor.Output, stream.TagPromptStart, prompt)
-		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-		s.Processor.Output.Flush()
-	}
-}
-
-// signalCommandStart signals that a command has started processing
-func (s *Session) signalCommandStart(cmd string) {
-	if s.Processor != nil && s.Processor.Output != nil {
-		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-		stream.WriteTLV(s.Processor.Output, stream.TagPromptStart, "/"+cmd)
-		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-		s.Processor.Output.Flush()
-	}
-}
-
 // handleCommandSync runs the command synchronously within the async loop
 func (s *Session) handleCommandSync(ctx context.Context, cmd string) error {
 	switch cmd {
@@ -251,24 +231,33 @@ func (s *Session) handleCommandSync(ctx context.Context, cmd string) error {
 	}
 }
 
-// writeStatus writes a system status message to the output
-func (s *Session) writeStatus(msg string) {
+
+func (s *Session) writeGapped(tag byte, msg string) {
 	if s.Processor != nil && s.Processor.Output != nil {
 		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-		stream.WriteTLV(s.Processor.Output, stream.TagSystem, msg)
+		stream.WriteTLV(s.Processor.Output, tag, msg)
 		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 		s.Processor.Output.Flush()
 	}
 }
 
-// writeError writes an error message to the output
+func (s *Session) signalPromptStart(prompt string) {
+	s.writeGapped(stream.TagPromptStart, prompt)
+}
+
+func (s *Session) signalCommandStart(cmd string) {
+	s.writeGapped(stream.TagPromptStart, "/"+cmd)
+}
+
 func (s *Session) writeError(msg string) {
-	if s.Processor != nil && s.Processor.Output != nil {
-		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-		stream.WriteTLV(s.Processor.Output, stream.TagError, msg)
-		stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
-		s.Processor.Output.Flush()
-	}
+	s.writeGapped(stream.TagError, msg)
+}
+func (s *Session) writeSystem(msg string) {
+	s.writeGapped(stream.TagSystem, msg)
+}
+
+func (s *Session) writeNotify(msg string) {
+	s.writeGapped(stream.TagNotify, msg)
 }
 
 // queueTask adds a task to the queue (non-blocking)

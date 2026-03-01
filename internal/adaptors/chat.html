@@ -222,26 +222,29 @@
         }
 
         function handleTLV(tag, value) {
-            if (tag === 'T') {
+            if (tag === 'B') {
                 currentTextValue += value;
                 if (currentTextElement) {
                     updateMessageContent(currentTextElement, 'assistant', currentTextValue);
                 } else {
                     currentTextElement = addMessageElement('assistant', currentTextValue);
                 }
-            } else if (tag === 'R') {
+            } else if (tag === 'C') {
                 currentReasoningValue += value;
                 if (currentReasoningElement) {
                     updateMessageContent(currentReasoningElement, 'reasoning', currentReasoningValue);
                 } else {
                     currentReasoningElement = addMessageElement('reasoning', currentReasoningValue);
                 }
-            } else if (tag === 't') {
+            } else if (tag === 'D') {
                 flushCurrentText();
                 addMessage('tool', value);
             } else if (tag === 'E') {
                 flushCurrentText();
                 addMessage('error', value);
+            } else if (tag === 'N') {
+                flushCurrentText();
+                addMessage('system', value);
             } else if (tag === 'S') {
                 flushCurrentText();
                 addMessage('system', value);
