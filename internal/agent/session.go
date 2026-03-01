@@ -258,6 +258,10 @@ func (s *Session) signalCommandStart(cmd string) {
 	s.writeGapped(stream.TagPromptStart, "/"+cmd)
 }
 
+func (s *Session) writeError(msg string) {
+	s.writeGapped(stream.TagError, msg)
+}
+
 func (s *Session) writeNotify(msg string) {
 	s.writeGapped(stream.TagNotify, msg)
 }
