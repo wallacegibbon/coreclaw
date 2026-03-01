@@ -71,6 +71,43 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 - `-debug-api` - Write raw API requests and responses to log file
 - `-system string` - Override system prompt
 - `-skill string` - Skills directory path (can be specified multiple times)
+- `-session string` - Session file path (default: creates new file in ~/.coreclaw/sessions/)
+
+
+## Session Persistence
+
+CoreClaw automatically saves session state, allowing you to manually restore conversations by specifying a session file.
+
+### Behavior
+
+- **Auto-create**: New session files are created immediately on startup in `~/.coreclaw/sessions/`
+- **Auto-save**: Sessions are automatically saved when you quit via `/quit` or `/exit`
+- **Manual-load**: On startup, CoreClaw creates a new session unless you specify `--session` to load an existing one
+- **Location**: Sessions are stored in `~/.coreclaw/sessions/`
+- **Format**: Session files use JSON format with timestamps in the filename (e.g., `2026-03-01-022632-1.json`)
+
+### What's Saved
+
+- Message history (user prompts and assistant responses)
+- Token usage statistics (total and context)
+- Provider configuration (BaseURL, ModelName)
+
+### What's Not Saved
+
+- Reasoning/thinking content (streamed output not stored)
+- Tool call details (only message history is preserved)
+
+### Custom Session Files
+
+You can specify a custom session file using the `--session` flag:
+
+```sh
+# Load a specific session file
+coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/.coreclaw/sessions/custom-session.json
+
+# Start fresh with a new session (default behavior)
+coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+```
 
 
 ## Web Server

@@ -10,7 +10,7 @@ import (
 )
 
 func TestCtrlOOpensEditor(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10))
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
 
 	msg := tea.KeyMsg{
 		Type: tea.KeyCtrlO,
@@ -28,7 +28,7 @@ func TestCtrlOOpensEditor(t *testing.T) {
 }
 
 func TestCtrlOWithExistingContent(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10))
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.input.SetValue("existing input text")
 
 	msg := tea.KeyMsg{
@@ -51,7 +51,7 @@ func TestCtrlOWithExistingContent(t *testing.T) {
 }
 
 func TestEditorFinishedMsg(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10))
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
 
 	msg := editorFinishedMsg{
 		content: "test content from editor",
@@ -77,7 +77,7 @@ func TestEditorFinishedMsg(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10))
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
 
 	msg := editorFinishedMsg{
 		content: "  content with leading and trailing spaces  \n",
@@ -97,7 +97,7 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 }
 
 func TestEditorContentSubmittedOnEnter(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10))
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.editorContent = "line1\nline2\nline3"
 
 	// editorContent is cleared before submission when Enter is pressed
@@ -108,7 +108,7 @@ func TestEditorContentSubmittedOnEnter(t *testing.T) {
 }
 
 func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10))
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.editorContent = "editor content"
 	terminal.input.SetValue("input value")
 
@@ -120,7 +120,7 @@ func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithError(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10))
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.input.SetValue("original content")
 
 	msg := editorFinishedMsg{

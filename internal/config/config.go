@@ -20,6 +20,7 @@ type Settings struct {
 	ProviderType string
 	Skills       []string
 	Addr         string
+	Session      string
 }
 
 // Parse parses CLI flags and returns settings
@@ -34,6 +35,7 @@ func Parse() *Settings {
 	providerType := flag.String("type", "", "Provider type: anthropic, openai (overrides auto-detection)")
 	skill := flag.String("skill", "", "Skill path (can be specified multiple times)")
 	addr := flag.String("addr", ":8080", "Server address to listen on (for web server)")
+	session := flag.String("session", "", "Session file path (default: creates new file in ~/.coreclaw/sessions/)")
 	flag.Parse()
 
 	// Collect skill paths
@@ -53,6 +55,7 @@ func Parse() *Settings {
 		ProviderType: *providerType,
 		Skills:       skillPaths,
 		Addr:         *addr,
+		Session:      *session,
 	}
 
 	return s

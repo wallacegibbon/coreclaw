@@ -61,6 +61,7 @@ type TerminalAdaptor struct {
 	ModelName    string
 	processor    *agentpkg.Processor
 	session      *agentpkg.Session
+	sessionFile  string
 }
 
 // NewTerminalAdaptor creates a new Terminal adaptor
@@ -69,7 +70,13 @@ func NewTerminalAdaptor(agentFactory AgentFactory, baseURL, modelName string) *T
 		AgentFactory: agentFactory,
 		BaseURL:      baseURL,
 		ModelName:    modelName,
+		sessionFile:  "",
 	}
+}
+
+// SetSessionFile sets the session file path
+func (a *TerminalAdaptor) SetSessionFile(sessionFile string) {
+	a.sessionFile = sessionFile
 }
 
 // Start runs the Terminal
@@ -81,9 +88,16 @@ func (a *TerminalAdaptor) Start() {
 	terminalOutput := newTerminalOutput()
 	processor := agentpkg.NewProcessorWithIO(agent, inputStream, terminalOutput)
 	a.processor = processor
-	a.session = agentpkg.NewSession(agent, a.BaseURL, a.ModelName, processor)
 
-	t := NewTerminal(a.session, terminalOutput, inputStream)
+	// Load or create session
+	a.session, a.sessionFile = agentpkg.LoadOrNewSession(agent, a.BaseURL, a.ModelName, processor, a.sessionFile)
+
+	// Display loaded messages if session has any
+	if len(a.session.Messages) > 0 {
+		a.session.DisplayMessages()
+	}
+
+	t := NewTerminal(a.session, terminalOutput, inputStream, a.sessionFile)
 
 	p := tea.NewProgram(t, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
@@ -267,13 +281,14 @@ type Terminal struct {
 	editorContent    string // content from external editor with newlines preserved
 	showingWelcome   bool   // true while welcome text is still displayed
 	welcomeText      string // colored welcome text for comparison
+	sessionFile      string // session file path for saving on quit
 
 	inputStyle  lipgloss.Style
 	statusStyle lipgloss.Style
 }
 
 // NewTerminal creates a new Terminal model
-func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inputStream *stream.ChanInput) *Terminal {
+func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inputStream *stream.ChanInput, sessionFile string) *Terminal {
 	input := textinput.New()
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
@@ -301,6 +316,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 		focusedWindow:  "input",
 		showingWelcome: true,
 		welcomeText:    coloredWelcome,
+		sessionFile:    sessionFile,
 	}
 }
 
@@ -377,6 +393,12 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "y", "Y":
 			m.quitting = true
+			// Save session before quitting
+			if m.sessionFile != "" && m.session != nil {
+				if err := m.session.SaveSession(m.sessionFile); err != nil {
+					m.terminalOutput.WriteString(fmt.Sprintf("Failed to save session: %v\n", err))
+				}
+			}
 			// Close input channel to stop session's readFromInput
 			close(m.streamInput.Ch)
 			return m, tea.Quit

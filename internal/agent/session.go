@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"sync"
+	"time"
 
 	"charm.land/fantasy"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
@@ -54,6 +59,9 @@ type Session struct {
 
 	// cancelCurrent is a function to cancel the current prompt
 	cancelCurrent func()
+
+	// mu protects concurrent access to session state
+	mu sync.Mutex
 }
 
 // cancelTask handles the /cancel command
@@ -312,4 +320,247 @@ func (s *Session) readFromInput() {
 			s.writeError(fmt.Sprintf("Invalid input tag: %c (only %c is allowed)", tag, stream.TagUserText))
 		}
 	}
+}
+
+// SessionData represents the persistent data saved for a session
+type SessionData struct {
+	BaseURL       string            `json:"base_url"`
+	ModelName     string            `json:"model_name"`
+	Messages      []fantasy.Message `json:"messages"`
+	TotalSpent    fantasy.Usage     `json:"total_spent"`
+	ContextTokens int64             `json:"context_tokens"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+}
+
+// GetSessionsDir returns the sessions directory path
+func GetSessionsDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	sessionsDir := filepath.Join(homeDir, ".coreclaw", "sessions")
+	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
+		return "", err
+	}
+	return sessionsDir, nil
+}
+
+// GenerateSessionFilename generates a session filename based on current time
+func GenerateSessionFilename() string {
+	now := time.Now()
+	return now.Format("2006-01-02-150405-1.json")
+}
+
+// LoadLatestSession finds and loads the most recent session file
+func LoadLatestSession() (*SessionData, string, error) {
+	sessionsDir, err := GetSessionsDir()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get sessions directory: %w", err)
+	}
+
+	entries, err := os.ReadDir(sessionsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, "", nil // No sessions yet
+		}
+		return nil, "", fmt.Errorf("failed to read sessions directory: %w", err)
+	}
+
+	if len(entries) == 0 {
+		return nil, "", nil // No sessions yet
+	}
+
+	var sessionFiles []os.FileInfo
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".json" {
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			sessionFiles = append(sessionFiles, info)
+		}
+	}
+
+	if len(sessionFiles) == 0 {
+		return nil, "", nil // No session files
+	}
+
+	// Sort by modification time, most recent first
+	sort.Slice(sessionFiles, func(i, j int) bool {
+		return sessionFiles[i].ModTime().After(sessionFiles[j].ModTime())
+	})
+
+	latestFile := sessionFiles[0]
+	latestPath := filepath.Join(sessionsDir, latestFile.Name())
+
+	data, err := os.ReadFile(latestPath)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read session file: %w", err)
+	}
+
+	var sessionData SessionData
+	if err := json.Unmarshal(data, &sessionData); err != nil {
+		return nil, "", fmt.Errorf("failed to parse session data: %w", err)
+	}
+
+	return &sessionData, latestPath, nil
+}
+
+// LoadSession loads a session from a specific file path
+func LoadSession(path string) (*SessionData, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read session file: %w", err)
+	}
+
+	var sessionData SessionData
+	if err := json.Unmarshal(data, &sessionData); err != nil {
+		return nil, fmt.Errorf("failed to parse session data: %w", err)
+	}
+
+	return &sessionData, nil
+}
+
+// SaveSession saves session data to a file
+func (s *Session) SaveSession(path string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sessionData := SessionData{
+		BaseURL:       s.BaseURL,
+		ModelName:     s.ModelName,
+		Messages:      s.Messages,
+		TotalSpent:    s.TotalSpent,
+		ContextTokens: s.ContextTokens,
+		UpdatedAt:     time.Now(),
+	}
+
+	data, err := json.MarshalIndent(sessionData, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal session data: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write session file: %w", err)
+	}
+
+	return nil
+}
+
+// RestoreFromSession restores a session from saved session data
+func RestoreFromSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor, sessionData *SessionData) *Session {
+	session := &Session{
+		Processor:     processor,
+		Messages:      sessionData.Messages,
+		Agent:         agent,
+		BaseURL:       baseURL,
+		ModelName:     modelName,
+		TotalSpent:    sessionData.TotalSpent,
+		ContextTokens: sessionData.ContextTokens,
+		taskQueue:     make(chan Task, 10),
+	}
+	// Start input reader goroutine
+	go session.readFromInput()
+	return session
+}
+
+// DisplayMessages outputs all session messages to the output stream
+// This is used to display conversation history when loading a session
+func (s *Session) DisplayMessages() {
+	if s.Processor == nil || s.Processor.Output == nil {
+		return
+	}
+
+	for _, msg := range s.Messages {
+		switch msg.Role {
+		case fantasy.MessageRoleUser:
+			// Find the text content from user message
+			var userText string
+			for _, part := range msg.Content {
+				if textPart, ok := part.(fantasy.TextPart); ok {
+					userText += textPart.Text
+				}
+			}
+			if userText != "" {
+				s.signalPromptStart(userText)
+			}
+
+		case fantasy.MessageRoleAssistant:
+			// Output all parts from assistant message
+			for _, part := range msg.Content {
+				if textPart, ok := part.(fantasy.TextPart); ok {
+					stream.WriteTLV(s.Processor.Output, stream.TagAssistantText, textPart.Text)
+					s.Processor.Output.Flush()
+				} else if reasoningPart, ok := part.(fantasy.ReasoningPart); ok {
+					stream.WriteTLV(s.Processor.Output, stream.TagReasoning, reasoningPart.Text)
+					stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
+					s.Processor.Output.Flush()
+				}
+			}
+
+		case fantasy.MessageRoleTool:
+			// Output tool call information
+			for _, part := range msg.Content {
+				if toolCall, ok := part.(fantasy.ToolCallPart); ok {
+					// Format tool call similar to how processor does it
+					var toolInfo string
+					switch toolCall.ToolName {
+					case "posix_shell":
+						toolInfo = fmt.Sprintf("%s: %s", toolCall.ToolName, toolCall.Input)
+					case "activate_skill":
+						toolInfo = fmt.Sprintf("%s: %s", toolCall.ToolName, toolCall.Input)
+					case "read_file":
+						toolInfo = fmt.Sprintf("%s: %s", toolCall.ToolName, toolCall.Input)
+					case "write_file":
+						toolInfo = fmt.Sprintf("%s: %s", toolCall.ToolName, toolCall.Input)
+					}
+					if toolInfo != "" {
+						stream.WriteTLV(s.Processor.Output, stream.TagTool, toolInfo)
+						s.Processor.Output.Flush()
+					}
+				}
+			}
+		}
+	}
+}
+
+// LoadOrNewSession loads an existing session or creates a new one
+// If sessionFile is specified, it loads that specific session
+// Otherwise, it always creates a new session
+// Returns the session and the session file path
+func LoadOrNewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor, sessionFile string) (*Session, string) {
+	var sessionData *SessionData
+
+	if sessionFile != "" {
+		// Load specific session
+		data, err := LoadSession(sessionFile)
+		if err != nil {
+			// Failed to load specific session, will create new
+			sessionData = nil
+		} else {
+			sessionData = data
+		}
+	}
+
+	// Create or restore session
+	if sessionData != nil {
+		return RestoreFromSession(agent, baseURL, modelName, processor, sessionData), sessionFile
+	}
+
+	// Create new session
+	session := NewSession(agent, baseURL, modelName, processor)
+
+	// Generate new session filename if not specified
+	if sessionFile == "" {
+		sessionsDir, _ := GetSessionsDir()
+		sessionFile = filepath.Join(sessionsDir, GenerateSessionFilename())
+	}
+
+	// Save new session file immediately
+	if err := session.SaveSession(sessionFile); err != nil {
+		// Log but continue - session will be saved again on quit
+	}
+
+	return session, sessionFile
 }
