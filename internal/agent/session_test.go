@@ -158,20 +158,26 @@ func TestLoadOrNewSession(t *testing.T) {
 	agent := fantasy.NewAgent(nil)
 	processor := NewProcessor(nil)
 
-	// Test creating a new session
+	// Test creating a new session without specifying session file
 	session, sessionFile := LoadOrNewSession(agent, "https://api.test.com", "test-model", processor, "")
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 	}
-	if sessionFile == "" {
-		t.Fatal("LoadOrNewSession returned empty session file")
+	if sessionFile != "" {
+		t.Fatalf("LoadOrNewSession should return empty session file when not specified, got: %s", sessionFile)
 	}
 
-	// Verify session file was created immediately
-	if _, err := os.Stat(sessionFile); os.IsNotExist(err) {
-		t.Errorf("Session file was not created: %s", sessionFile)
+	// Verify SessionFile is empty in the session object
+	if session.SessionFile != "" {
+		t.Errorf("Session SessionFile should be empty when not specified, got: %s", session.SessionFile)
 	}
-	defer os.Remove(sessionFile) // Clean up test file
+
+	// Test manual save to a specific file
+	testFile := "/tmp/test-session.json"
+	if err := session.SaveSession(testFile); err != nil {
+		t.Errorf("Failed to save session: %v", err)
+	}
+	defer os.Remove(testFile) // Clean up test file
 
 	// Verify session is properly initialized
 	if session.Agent != agent {

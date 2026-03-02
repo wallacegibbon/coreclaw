@@ -341,6 +341,10 @@
             sendTLV('A', '/cancel');
         }
 
+        function sendSaveCommand() {
+            sendTLV('A', '/save');
+        }
+
         send.addEventListener('click', sendMessage);
         prompt.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
@@ -349,6 +353,9 @@
             if (e.ctrlKey && e.key === 'c') {
                 e.preventDefault();
                 sendCancelCommand();
+            } else if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                sendSaveCommand();
             }
         });
 

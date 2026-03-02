@@ -46,7 +46,7 @@ Flags:
   -model string       Model name to use
   -system string      Override system prompt
   -skill string       Skills directory path (can be specified multiple times)
-  -session string     Session file path (default: creates new file in ~/.coreclaw/sessions/)
+  -session string     Session file path to load/save conversations
   -debug-api          Write raw API requests and responses to log file
   -version            Show version information
   -help               Show help information
@@ -55,7 +55,7 @@ Examples:
   coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
   coreclaw --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514
   coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3
-  coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --session ~/.coreclaw/sessions/custom-session.json
+  coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --session ~/mysession.json
 
 `)
 }

@@ -35,7 +35,7 @@ func Parse() *Settings {
 	providerType := flag.String("type", "", "Provider type: anthropic, openai (overrides auto-detection)")
 	skill := flag.String("skill", "", "Skill path (can be specified multiple times)")
 	addr := flag.String("addr", ":8080", "Server address to listen on (for web server)")
-	session := flag.String("session", "", "Session file path (default: creates new file in ~/.coreclaw/sessions/)")
+	session := flag.String("session", "", "Session file path to load/save conversations")
 	flag.Parse()
 
 	// Collect skill paths

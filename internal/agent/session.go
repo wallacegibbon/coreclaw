@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -46,6 +48,9 @@ type Session struct {
 	BaseURL   string
 	ModelName string
 
+	// SessionFile is the file path for saving/loading the session
+	SessionFile string
+
 	// TotalSpent tracks total tokens used across all requests
 	TotalSpent fantasy.Usage
 	// ContextTokens tracks context tokens used (grows with each request, shrinks after summarize)
@@ -76,20 +81,64 @@ func (s *Session) cancelTask() {
 	s.writeError("nothing to cancel")
 }
 
+// expandPath expands ~ to the user's home directory
+func expandPath(path string) string {
+	if !strings.HasPrefix(path, "~") {
+		return path
+	}
+
+	usr, err := user.Current()
+	if err != nil {
+		return path
+	}
+
+	if path == "~" {
+		return usr.HomeDir
+	}
+
+	return filepath.Join(usr.HomeDir, path[1:])
+}
+
+// saveSession handles the /save command
+// If args is empty, saves to s.SessionFile
+// If args has one element, saves to that file path
+func (s *Session) saveSession(args []string) {
+	var filepath string
+	if len(args) == 0 {
+		if s.SessionFile == "" {
+			s.writeError("no session file set and no filename provided")
+			return
+		}
+		filepath = s.SessionFile
+	} else if len(args) == 1 {
+		filepath = expandPath(args[0])
+	} else {
+		s.writeError("usage: /save [filename]")
+		return
+	}
+
+	if err := s.SaveSession(filepath); err != nil {
+		s.writeError(fmt.Sprintf("failed to save session: %v", err))
+	} else {
+		s.writeGapped(stream.TagNotify, fmt.Sprintf("Session saved to %s", filepath))
+	}
+}
+
 // IsInProgress returns true if a prompt is currently being processed
 func (s *Session) IsInProgress() bool {
 	return s.inProgress
 }
 
 // NewSession creates a new session with the given processor
-func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor) *Session {
+func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor, sessionFile string) *Session {
 	session := &Session{
-		Processor: processor,
-		Messages:  nil,
-		Agent:     agent,
-		BaseURL:   baseURL,
-		ModelName: modelName,
-		taskQueue: make(chan Task, 10),
+		Processor:   processor,
+		Messages:    nil,
+		Agent:       agent,
+		BaseURL:     baseURL,
+		ModelName:   modelName,
+		SessionFile: sessionFile,
+		taskQueue:   make(chan Task, 10),
 	}
 	// Start input reader goroutine that reads TLV from input stream
 	go session.readFromInput()
@@ -228,11 +277,20 @@ func (s *Session) runAsync() {
 
 // handleCommandSync runs the command synchronously within the async loop
 func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
-	switch cmd {
+	// Parse command parts
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		s.writeError("empty command")
+		return
+	}
+
+	switch parts[0] {
 	case "summarize":
 		s.summarize(ctx)
 	case "cancel":
 		s.cancelTask()
+	case "save":
+		s.saveSession(parts[1:])
 	default:
 		s.writeError(fmt.Sprintf("unknown cmd <%s>", cmd))
 	}
@@ -478,13 +536,14 @@ func (s *Session) SaveSession(path string) error {
 }
 
 // RestoreFromSession restores a session from saved session data
-func RestoreFromSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor, sessionData *SessionData) *Session {
+func RestoreFromSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor, sessionData *SessionData, sessionFile string) *Session {
 	session := &Session{
 		Processor:     processor,
 		Messages:      sessionData.Messages,
 		Agent:         agent,
 		BaseURL:       baseURL,
 		ModelName:     modelName,
+		SessionFile:   sessionFile,
 		TotalSpent:    sessionData.TotalSpent,
 		ContextTokens: sessionData.ContextTokens,
 		taskQueue:     make(chan Task, 10),
@@ -553,6 +612,9 @@ func (s *Session) DisplayMessages() {
 func LoadOrNewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor, sessionFile string) (*Session, string) {
 	var sessionData *SessionData
 
+	// Expand ~ to home directory if present
+	sessionFile = expandPath(sessionFile)
+
 	if sessionFile != "" {
 		// Load specific session
 		data, err := LoadSession(sessionFile)
@@ -566,22 +628,11 @@ func LoadOrNewSession(agent fantasy.Agent, baseURL, modelName string, processor 
 
 	// Create or restore session
 	if sessionData != nil {
-		return RestoreFromSession(agent, baseURL, modelName, processor, sessionData), sessionFile
+		return RestoreFromSession(agent, baseURL, modelName, processor, sessionData, sessionFile), sessionFile
 	}
 
-	// Create new session
-	session := NewSession(agent, baseURL, modelName, processor)
-
-	// Generate new session filename if not specified
-	if sessionFile == "" {
-		sessionsDir, _ := GetSessionsDir()
-		sessionFile = filepath.Join(sessionsDir, GenerateSessionFilename())
-	}
-
-	// Save new session file immediately
-	if err := session.SaveSession(sessionFile); err != nil {
-		// Log but continue - session will be saved again on quit
-	}
+	// Create new session (without auto-saving)
+	session := NewSession(agent, baseURL, modelName, processor, sessionFile)
 
 	return session, sessionFile
 }

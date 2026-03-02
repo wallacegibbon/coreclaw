@@ -71,20 +71,18 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 - `-debug-api` - Write raw API requests and responses to log file
 - `-system string` - Override system prompt
 - `-skill string` - Skills directory path (can be specified multiple times)
-- `-session string` - Session file path (default: creates new file in ~/.coreclaw/sessions/)
+- `-session string` - Session file path to load/save conversations
 
 
 ## Session Persistence
 
-CoreClaw automatically saves session state, allowing you to manually restore conversations by specifying a session file.
+CoreClaw allows you to save and restore conversations manually using session files.
 
 ### Behavior
 
-- **Auto-create**: New session files are created immediately on startup in `~/.coreclaw/sessions/`
-- **Auto-save**: Sessions are automatically saved when you quit via `/quit` or `/exit`
-- **Manual-load**: On startup, CoreClaw creates a new session unless you specify `--session` to load an existing one
-- **Location**: Sessions are stored in `~/.coreclaw/sessions/`
-- **Format**: Session files use JSON format with timestamps in the filename (e.g., `2026-03-01-022632-1.json`)
+- **Manual-save**: Sessions are saved only when you use `/save [filename]` or press `Ctrl+S`
+- **Load**: On startup, CoreClaw creates a new empty session unless you specify `--session` to load an existing one
+- **Path expansion**: Paths like `~/mysession.json` are expanded to your home directory
 
 ### What's Saved
 
@@ -97,13 +95,20 @@ CoreClaw automatically saves session state, allowing you to manually restore con
 - Reasoning/thinking content (streamed output not stored)
 - Tool call details (only message history is preserved)
 
-### Custom Session Files
+### Session Commands
 
-You can specify a custom session file using the `--session` flag:
+```sh
+/save                    # Save to current session file (if set with --session)
+/save ~/mysession.json    # Save to specific file
+```
+
+### Loading Sessions
+
+You can load an existing session using the `--session` flag:
 
 ```sh
 # Load a specific session file
-coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/.coreclaw/sessions/custom-session.json
+coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/mysession.json
 
 # Start fresh with a new session (default behavior)
 coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
@@ -146,6 +151,7 @@ When running the Terminal version:
 |-----|--------|
 | `Tab` | Switch focus between display and input window |
 | `Enter` | Submit prompt (when input focused) |
+| `Ctrl+S` | Save session to file |
 | `Ctrl+O` | Open external editor for multi-line input |
 | `j` | Scroll down 1 line (when display focused) |
 | `k` | Scroll up 1 line (when display focused) |

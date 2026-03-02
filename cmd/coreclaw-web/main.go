@@ -55,7 +55,7 @@ Flags:
   -system string     Override system prompt
   -skill string      Skills directory path (can be specified multiple times)
   -addr string       Server address to listen on (default ":8080")
-  -session string    Session file path (default: creates new file in ~/.coreclaw/sessions/)
+  -session string    Session file path to load/save conversations
   -debug-api         Write raw API requests and responses to log file
   -version           Show version information
   -help              Show help information
@@ -64,6 +64,6 @@ Examples:
   coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
   coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514
   coreclaw-web --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --addr :9090
-  coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/.coreclaw/sessions/my-session.json
+  coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/my-session.json
 `)
 }

@@ -431,12 +431,6 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "y", "Y":
 			m.quitting = true
-			// Save session before quitting
-			if m.sessionFile != "" && m.session != nil {
-				if err := m.session.SaveSession(m.sessionFile); err != nil {
-					fmt.Fprintf(m.terminalOutput, "Failed to save session: %v\n", err)
-				}
-			}
 			// Close input channel to stop session's readFromInput
 			close(m.streamInput.Ch)
 			return m, tea.Quit
@@ -503,6 +497,9 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyCtrlC:
 		// Cancel the current request
 		return m, m.submitCommand("cancel", false)
+	case tea.KeyCtrlS:
+		// Save session
+		return m, m.submitCommand("save", false)
 	case tea.KeyCtrlO:
 		// Open external editor for multi-line input
 		return m, m.openEditor()
