@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
@@ -154,5 +156,100 @@ func TestEditorSelectionOrder(t *testing.T) {
 	// Or use EDITOR environment variable if set
 	if editor != "vim" && editor != "vi" && editor != "nano" {
 		t.Logf("Editor is: %s (may be set by EDITOR env var)", editor)
+	}
+}
+
+func TestRenderMultiline(t *testing.T) {
+	// Ensure we have color output in tests
+	lipgloss.SetColorProfile(termenv.TrueColor)
+
+	output := newTerminalOutput()
+	// Use existing reasoning style which should produce ANSI codes
+	style := output.reasoningStyle
+	// First test direct rendering
+	direct := style.Render("test")
+	t.Logf("Direct render: %q, bytes: %v", direct, []byte(direct))
+	hasANSI := strings.Contains(direct, "\x1b[")
+	if !hasANSI {
+		t.Log("Warning: style.Render produced no ANSI codes (maybe color disabled)")
+	}
+	text := "line1\nline2\nline3"
+	result := output.renderMultiline(style, text, true)
+	lines := strings.Split(result, "\n")
+	if len(lines) != 3 {
+		t.Errorf("Expected 3 lines, got %d", len(lines))
+	}
+	// Debug output
+	for i, line := range lines {
+		t.Logf("Line %d: %q", i, line)
+		t.Logf("  bytes: %v", []byte(line))
+	}
+	// Check each line contains ANSI escape sequence if the style produces them
+	if hasANSI {
+		for i, line := range lines {
+			if !strings.Contains(line, "\x1b[") {
+				t.Errorf("Line %d missing ANSI escape sequence: %q", i, line)
+			}
+		}
+	}
+}
+
+func TestColorizeToolMultiline(t *testing.T) {
+	// Ensure we have color output in tests
+	lipgloss.SetColorProfile(termenv.TrueColor)
+
+	output := newTerminalOutput()
+	// Test multiline tool output with colon on first line
+	value := "tool_name: first line\nsecond line\nthird line"
+	result := output.colorizeTool(value)
+	lines := strings.Split(result, "\n")
+	if len(lines) != 3 {
+		t.Errorf("Expected 3 lines, got %d", len(lines))
+	}
+	// First line should have toolStyle for tool_name and toolContentStyle for rest
+	// Check that each line contains ANSI codes
+	for i, line := range lines {
+		if !strings.Contains(line, "\x1b[") {
+			t.Errorf("Line %d missing ANSI escape sequence: %q", i, line)
+		}
+	}
+	// Additional checks: first line should contain toolStyle color
+	// We can check that the line includes the specific ANSI codes for toolStyle and toolContentStyle
+	// but for simplicity we just ensure styling per line.
+}
+
+func TestWordwrapPreservesANSI(t *testing.T) {
+	// Ensure we have color output in tests
+	lipgloss.SetColorProfile(termenv.TrueColor)
+
+	// Create a styled line with ANSI escape sequences (dimmed reasoning style)
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color("#585b70")).Italic(true)
+	styledText := style.Render("This is a long line of reasoning text that should wrap when width is limited.")
+
+	// Test wrapping at various widths
+	widths := []int{20, 40, 60}
+	for _, width := range widths {
+		t.Run(fmt.Sprintf("width-%d", width), func(t *testing.T) {
+			wrapped := wordwrap(styledText, width)
+			lines := strings.Split(strings.TrimSuffix(wrapped, "\n"), "\n")
+			if len(lines) == 0 {
+				t.Fatal("No lines after wrapping")
+			}
+			// Each line should contain ANSI escape sequence
+			for i, line := range lines {
+				t.Logf("Line %d: %q", i, line)
+				if !strings.Contains(line, "\x1b[") {
+					t.Errorf("Line %d missing ANSI escape sequence after wrapping at width %d: %q", i, width, line)
+				}
+				// Ensure each line starts with escape sequence (style prefix)
+				if !strings.HasPrefix(line, "\x1b[") {
+					t.Errorf("Line %d does not start with ANSI escape sequence: %q", i, line)
+				}
+				// Ensure each line ends with reset sequence (\x1b[0m)
+				if !strings.HasSuffix(line, "\x1b[0m") {
+					t.Errorf("Line %d does not end with reset sequence: %q", i, line)
+				}
+			}
+		})
 	}
 }

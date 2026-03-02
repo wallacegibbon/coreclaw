@@ -169,6 +169,18 @@ func (w *terminalOutput) processBuffer() {
 	}
 }
 
+func (w *terminalOutput) renderMultiline(style lipgloss.Style, value string, trimRight bool) string {
+	lines := strings.Split(value, "\n")
+	for i, line := range lines {
+		rendered := style.Render(line)
+		if trimRight {
+			rendered = strings.TrimRight(rendered, " ")
+		}
+		lines[i] = rendered
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (w *terminalOutput) writeColored(tag byte, value string) {
 	switch tag {
 	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagNotify, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap:
@@ -183,15 +195,15 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 	var output string
 	switch tag {
 	case stream.TagAssistantText:
-		output = w.textStyle.Render(value)
+		output = w.renderMultiline(w.textStyle, value, true)
 	case stream.TagTool:
 		output = w.colorizeTool(value)
 	case stream.TagReasoning:
-		output = w.reasoningStyle.Render(value)
+		output = w.renderMultiline(w.reasoningStyle, value, true)
 	case stream.TagError:
-		output = w.errorStyle.Render(value)
+		output = w.renderMultiline(w.errorStyle, value, true)
 	case stream.TagNotify:
-		output = w.systemStyle.Render(value)
+		output = w.renderMultiline(w.systemStyle, value, true)
 	case stream.TagSystem:
 		// Parse JSON to update status bar
 		var info agentpkg.SystemInfo
@@ -256,13 +268,37 @@ func colorizeWelcomeText(text string) string {
 }
 
 func (w *terminalOutput) colorizeTool(value string) string {
-	colonIdx := strings.Index(value, ":")
-	if colonIdx > 0 {
-		toolName := value[:colonIdx]
-		rest := value[colonIdx:]
-		return w.toolStyle.Render(toolName) + w.toolContentStyle.Render(rest)
+	lines := strings.Split(value, "\n")
+	if len(lines) == 1 {
+		// Single line: original logic
+		colonIdx := strings.Index(value, ":")
+		if colonIdx > 0 {
+			toolName := value[:colonIdx]
+			rest := value[colonIdx:]
+			return strings.TrimRight(w.toolStyle.Render(toolName), " ") + strings.TrimRight(w.toolContentStyle.Render(rest), " ")
+		}
+		return strings.TrimRight(w.toolStyle.Render(value), " ")
 	}
-	return w.toolStyle.Render(value)
+
+	// Multiline: first line may contain colon
+	firstLine := lines[0]
+	colonIdx := strings.Index(firstLine, ":")
+	var result strings.Builder
+	if colonIdx > 0 {
+		toolName := firstLine[:colonIdx]
+		restFirst := firstLine[colonIdx:]
+		result.WriteString(strings.TrimRight(w.toolStyle.Render(toolName), " "))
+		result.WriteString(strings.TrimRight(w.toolContentStyle.Render(restFirst), " "))
+	} else {
+		// No colon in first line, treat entire first line as tool name
+		result.WriteString(strings.TrimRight(w.toolStyle.Render(firstLine), " "))
+	}
+	// Remaining lines: apply toolContentStyle (continuation of tool output)
+	for _, line := range lines[1:] {
+		result.WriteString("\n")
+		result.WriteString(strings.TrimRight(w.toolContentStyle.Render(line), " "))
+	}
+	return result.String()
 }
 
 // Terminal is the main Terminal model
@@ -396,7 +432,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Save session before quitting
 			if m.sessionFile != "" && m.session != nil {
 				if err := m.session.SaveSession(m.sessionFile); err != nil {
-					m.terminalOutput.WriteString(fmt.Sprintf("Failed to save session: %v\n", err))
+					fmt.Fprintf(m.terminalOutput, "Failed to save session: %v\n", err)
 				}
 			}
 			// Close input channel to stop session's readFromInput
@@ -736,25 +772,32 @@ func wordwrap(text string, width int) string {
 	var result strings.Builder
 
 	for line := range strings.SplitSeq(text, "\n") {
+		// Extract escape sequences prefix (styling) at start of line
+		prefix := extractEscapePrefix(line)
+		remaining := line[len(prefix):]
+		suffix := extractEscapeSuffix(remaining)
+		middle := remaining[:len(remaining)-len(suffix)]
+
 		if lipgloss.Width(line) <= width {
 			result.WriteString(line)
 			result.WriteString("\n")
 			continue
 		}
 
-		// Break line at width limit, handling ANSI escape sequences
-		for len(line) > 0 {
+		// Break middle at width limit
+		for len(middle) > 0 {
 			breakAt := 0
 			currentWidth := 0
 
-			for breakAt < len(line) {
-				skip := skipEscapeSequence(line[breakAt:])
+			for breakAt < len(middle) {
+				// Note: middle should not contain escape sequences at start/end, but skip just in case
+				skip := skipEscapeSequence(middle[breakAt:])
 				if skip > 0 {
 					breakAt += skip
 					continue
 				}
 
-				r := rune(line[breakAt])
+				r := rune(middle[breakAt])
 				charWidth := lipgloss.Width(string(r))
 
 				if currentWidth+charWidth > width {
@@ -767,7 +810,7 @@ func wordwrap(text string, width int) string {
 			// Try to break at last space for word boundary
 			lastSpace := -1
 			for i := breakAt - 1; i >= 0; i-- {
-				if line[i] == ' ' {
+				if middle[i] == ' ' {
 					lastSpace = i
 					break
 				}
@@ -781,9 +824,12 @@ func wordwrap(text string, width int) string {
 				breakAt = 1
 			}
 
-			result.WriteString(line[:breakAt])
+			// Write prefix + this segment + suffix
+			result.WriteString(prefix)
+			result.WriteString(middle[:breakAt])
+			result.WriteString(suffix)
 			result.WriteString("\n")
-			line = line[breakAt:]
+			middle = middle[breakAt:]
 		}
 	}
 
@@ -875,4 +921,55 @@ func skipOSC(s string) int {
 	}
 
 	return pos
+}
+
+// extractEscapePrefix returns all consecutive ANSI escape sequences at the start of s.
+func extractEscapePrefix(s string) string {
+	var prefix strings.Builder
+	i := 0
+	for i < len(s) {
+		skip := skipEscapeSequence(s[i:])
+		if skip == 0 {
+			break
+		}
+		prefix.WriteString(s[i : i+skip])
+		i += skip
+	}
+	return prefix.String()
+}
+
+// extractEscapeSuffix returns all consecutive ANSI escape sequences at the end of s.
+func extractEscapeSuffix(s string) string {
+	var sequences []string
+	i := len(s)
+	for i > 0 {
+		// Look for escape sequence ending at i
+		found := false
+		// Escape sequences are at most 30 bytes
+		maxLookback := 30
+		if i < maxLookback {
+			maxLookback = i
+		}
+		for start := i - 1; start >= i-maxLookback; start-- {
+			if s[start] == '\x1b' {
+				skip := skipEscapeSequence(s[start:])
+				if skip > 0 && start+skip == i {
+					// Found escape sequence
+					sequences = append(sequences, s[start:i])
+					i = start
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			break
+		}
+	}
+	// Build suffix from first sequence to last (since we collected from end to start)
+	var suffix strings.Builder
+	for j := len(sequences) - 1; j >= 0; j-- {
+		suffix.WriteString(sequences[j])
+	}
+	return suffix.String()
 }

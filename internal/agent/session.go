@@ -333,6 +333,35 @@ type SessionData struct {
 	UpdatedAt     time.Time         `json:"updated_at"`
 }
 
+// formatToolCall formats a tool call for display, matching processor's formatting
+func formatToolCall(toolName, input string) string {
+	var value string
+	switch toolName {
+	case "posix_shell":
+		cmd := extractPosixShellCommand(input)
+		if cmd != "" {
+			displayCmd := formatCommon(cmd)
+			value = fmt.Sprintf("%s: %s", toolName, displayCmd)
+		}
+	case "activate_skill":
+		name := extractSkillName(input)
+		if name != "" {
+			value = fmt.Sprintf("%s: %s", toolName, name)
+		}
+	case "read_file":
+		path := extractReadFilePath(input)
+		if path != "" {
+			value = fmt.Sprintf("%s: %s", toolName, path)
+		}
+	case "write_file":
+		path := extractWriteFilePath(input)
+		if path != "" {
+			value = fmt.Sprintf("%s: %s", toolName, path)
+		}
+	}
+	return value
+}
+
 // GetSessionsDir returns the sessions directory path
 func GetSessionsDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
@@ -491,6 +520,7 @@ func (s *Session) DisplayMessages() {
 			for _, part := range msg.Content {
 				if textPart, ok := part.(fantasy.TextPart); ok {
 					stream.WriteTLV(s.Processor.Output, stream.TagAssistantText, textPart.Text)
+					stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 					s.Processor.Output.Flush()
 				} else if reasoningPart, ok := part.(fantasy.ReasoningPart); ok {
 					stream.WriteTLV(s.Processor.Output, stream.TagReasoning, reasoningPart.Text)
@@ -504,19 +534,10 @@ func (s *Session) DisplayMessages() {
 			for _, part := range msg.Content {
 				if toolCall, ok := part.(fantasy.ToolCallPart); ok {
 					// Format tool call similar to how processor does it
-					var toolInfo string
-					switch toolCall.ToolName {
-					case "posix_shell":
-						toolInfo = fmt.Sprintf("%s: %s", toolCall.ToolName, toolCall.Input)
-					case "activate_skill":
-						toolInfo = fmt.Sprintf("%s: %s", toolCall.ToolName, toolCall.Input)
-					case "read_file":
-						toolInfo = fmt.Sprintf("%s: %s", toolCall.ToolName, toolCall.Input)
-					case "write_file":
-						toolInfo = fmt.Sprintf("%s: %s", toolCall.ToolName, toolCall.Input)
-					}
+					toolInfo := formatToolCall(toolCall.ToolName, toolCall.Input)
 					if toolInfo != "" {
 						stream.WriteTLV(s.Processor.Output, stream.TagTool, toolInfo)
+						stream.WriteTLV(s.Processor.Output, stream.TagStreamGap, "")
 						s.Processor.Output.Flush()
 					}
 				}

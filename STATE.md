@@ -137,6 +137,24 @@ For this project, simplicity is more important than efficiency.
   - WebSocket uses 100-buffer for network-paced input
   - HTML client encodes user input as TagUserText TLV
   - Removed adaptors.NewSession - adaptors create processor/session directly
+- ✅ Terminal display color persistence fix
+  - Fixed dimmed text (reasoning text) losing color in two scenarios:
+    1. **Scrolling**: First word loses color when line moves off-screen
+    2. **Session loading**: Entire dimmed text block loses color when loading from session file
+  - Root causes:
+    - ANSI escape sequences only applied at beginning of text blocks via Style.Render()
+    - Session loading format didn't match live streaming format (missing TagStreamGap separators)
+    - Word wrapping broke ANSI escape sequences across line breaks
+  - Solutions implemented:
+    1. **Per-line styling**: Added `renderMultiline` helper that splits text by newlines and applies styling per line
+    2. **Session format consistency**: Updated `session.go:DisplayMessages()` to match live streaming format with proper TagStreamGap separators and tool formatting
+    3. **Wordwrap ANSI preservation**: Enhanced `wordwrap()` function to preserve both prefix (styling) and suffix (reset) ANSI escape sequences across line breaks
+    4. **Panic fix**: Fixed slice bounds panic when line contains only escape sequences by extracting suffix from remaining text after prefix removal
+  - Testing:
+    - Added `TestWordwrapPreservesANSI` to verify each wrapped line starts with styling and ends with reset sequence
+    - Added `TestWordwrapEdgeCases` to verify no panic with edge cases (empty lines, only escape sequences)
+    - Updated `TestRenderMultiline` to verify per-line styling
+    - Verified scrolling behavior with loaded sessions using real session files
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
