@@ -155,6 +155,17 @@ For this project, simplicity is more important than efficiency.
     - Added `TestWordwrapEdgeCases` to verify no panic with edge cases (empty lines, only escape sequences)
     - Updated `TestRenderMultiline` to verify per-line styling
     - Verified scrolling behavior with loaded sessions using real session files
+- ✅ **Terminal viewport initial position fix**
+  - Fixed incorrect initial display position when loading content from session files
+  - **Problem**: When loading session content, viewport stayed at welcome text offset (centered) instead of scrolling to bottom of actual content
+  - **Root cause**: Welcome text centering added empty lines; viewport YOffset didn't reset when session content replaced welcome
+  - **Solution**: Detect existing content in display buffer during Terminal initialization; show session content immediately instead of welcome
+  - **Implementation**:
+    1. Added check in `NewTerminal()`: if `terminalOutput.display.GetAll()` is non-empty, set viewport content to word-wrapped session content and `GotoBottom()`
+    2. Skip welcome text and centering when session content exists
+    3. Added `firstScrollDone` flag to track initial scroll state
+    4. Updated `updateDisplayContent()` to respect scroll state
+  - **Result**: Session content now displays at correct scroll position; scrolling works smoothly without large jumps
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)

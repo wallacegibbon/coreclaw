@@ -95,6 +95,8 @@ func (a *TerminalAdaptor) Start() {
 	// Display loaded messages if session has any
 	if len(a.session.Messages) > 0 {
 		a.session.DisplayMessages()
+		// Force flush to ensure all messages are written to display buffer
+		processor.Output.Flush()
 	}
 
 	t := NewTerminal(a.session, terminalOutput, inputStream, a.sessionFile)
@@ -337,6 +339,35 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	// Colorize welcome text with gradient effect
 	coloredWelcome := colorizeWelcomeText(welcomeText)
 	var display = viewport.New(80, 20)
+
+	// Check if there's already content in the display buffer (from session loading)
+	existingContent := terminalOutput.display.GetAll()
+	if existingContent != "" {
+		// Session content already loaded - show it immediately instead of welcome
+		wrapped := wordwrap(existingContent, display.Width)
+		newlineCount := strings.Count(wrapped, "\n")
+		display.SetContent(wrapped)
+		// Calculate correct YOffset manually (viewport's TotalLineCount is unreliable with some content)
+		correctYOffset := max(0, newlineCount-display.Height)
+		display.SetYOffset(correctYOffset)
+		return &Terminal{
+			session:        session,
+			terminalOutput: terminalOutput,
+			streamInput:    inputStream,
+			display:        display,
+			input:          input,
+			status:         terminalOutput.status,
+			windowWidth:    80, // Will be updated on first WindowSizeMsg
+			inputStyle:     inputStyle,
+			statusStyle:    statusStyle,
+			focusedWindow:  "input",
+			showingWelcome: false,
+			welcomeText:    coloredWelcome,
+			sessionFile:    sessionFile,
+		}
+	}
+
+	// No existing content - show welcome text
 	display.SetContent(coloredWelcome)
 
 	return &Terminal{
@@ -386,6 +417,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.display.Width = max(0, msg.Width-8)   // Leave room for padding (4 on each side)
 		m.display.Height = max(0, msg.Height-4) // Leave room for input box (3) and status bar (1)
 		m.centerWelcomeText()
+		m.updateDisplayContent()
 		return m, nil
 	case tickMsg:
 		m.updateDisplayContent()
