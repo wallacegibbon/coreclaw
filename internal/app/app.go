@@ -12,6 +12,7 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/config"
 	debugpkg "github.com/wallacegibbon/coreclaw/internal/debug"
 	"github.com/wallacegibbon/coreclaw/internal/skills"
+	"github.com/wallacegibbon/coreclaw/internal/todo"
 	"github.com/wallacegibbon/coreclaw/internal/tools"
 )
 
@@ -21,13 +22,28 @@ RULES:
 - Never assume - verify with tools
 - Check <available_skills> below; activate relevant ones using the activate_skill tool
 - When running skill scripts, cd to the skill's directory first (e.g., cd /path/to/skill && ./scripts/script.sh)
-- Do NOT use find to locate scripts - use the path from SKILL.md`
+- Do NOT use find to locate scripts - use the path from SKILL.md
+
+PLANNING RULES (STRICT):
+- For ANY non-trivial task (anything beyond a simple single action):
+  1. First, read the current todo list with todo_read
+  2. Create or update your plan using todo_write with content, active_form (present continuous), and status (pending/in_progress/completed)
+     - IMPORTANT: The "content" field must remain EXACTLY THE SAME when updating status. Only change the "status" field.
+     - Example: content="Install dependencies", active_form="Installing dependencies"
+     - When updating to in_progress: content="Install dependencies", status="in_progress" (content unchanged)
+     - When updating to completed: content="Install dependencies", status="completed" (content unchanged)
+  3. Present the plan to the user and STOP - DO NOT execute any tools yet
+  4. Wait for explicit user confirmation before proceeding
+  5. Only after confirmation, execute tasks while updating todo status as you go
+- For trivial tasks (single simple action like "what's in this file?"), you may proceed directly without planning
+- ALWAYS STOP and wait for confirmation before executing any multi-step plan`
 
 // Config holds the common app configuration
 type Config struct {
 	Cfg          *config.Settings
 	Model        fantasy.LanguageModel
 	SkillsMgr    *skills.Manager
+	TodoMgr      *todo.Manager
 	AgentTools   []fantasy.AgentTool
 	SystemPrompt string
 }
@@ -66,7 +82,12 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		systemPrompt = systemPrompt + "\n\n" + skillsFragment
 	}
 
+	// Create todo manager
+	todoManager := todo.NewManager()
+
 	readFileTool := tools.NewReadFileTool()
+	todoReadTool := tools.NewTodoReadTool(todoManager)
+	todoWriteTool := tools.NewTodoWriteTool(todoManager)
 	writeFileTool := tools.NewWriteFileTool()
 	activateSkillTool := tools.NewActivateSkillTool(skillsManager)
 	posixShellTool := tools.NewPosixShellTool()
@@ -75,7 +96,8 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		Cfg:          cfg,
 		Model:        model,
 		SkillsMgr:    skillsManager,
-		AgentTools:   []fantasy.AgentTool{readFileTool, writeFileTool, activateSkillTool, posixShellTool},
+		TodoMgr:      todoManager,
+		AgentTools:   []fantasy.AgentTool{readFileTool, todoReadTool, todoWriteTool, writeFileTool, activateSkillTool, posixShellTool},
 		SystemPrompt: systemPrompt,
 	}, nil
 }

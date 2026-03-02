@@ -19,7 +19,7 @@ func main() {
 
 	if cfg.ShowHelp {
 		printHelp()
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	appCfg, err := app.Setup(cfg)
@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// Create WebSocket adaptor
-	adaptor := adaptors.NewWebSocketAdaptor(port, appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName, appCfg.Cfg.Session)
+	adaptor := adaptors.NewWebSocketAdaptor(port, appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName, appCfg.Cfg.Session, appCfg.TodoMgr)
 	adaptor.Start()
 
 	// Wait for interrupt

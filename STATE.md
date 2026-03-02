@@ -1,7 +1,7 @@
 # CoreClaw Project Status
 
 ## Overview
-CoreClaw is a minimal AI Agent that can handle toolcalling. It provides four tools: `read_file`, `write_file`, `activate_skill`, and `posix_shell`.
+CoreClaw is a minimal AI Agent that can handle toolcalling. It provides six tools: `read_file`, `todo_read`, `todo_write`, `write_file`, `activate_skill`, and `posix_shell`.
 All skills are based on these tools.
 
 For this project, simplicity is more important than efficiency.
@@ -166,10 +166,23 @@ For this project, simplicity is more important than efficiency.
     3. Added `firstScrollDone` flag to track initial scroll state
     4. Updated `updateDisplayContent()` to respect scroll state
   - **Result**: Session content now displays at correct scroll position; scrolling works smoothly without large jumps
+- ✅ **Todo system with display and runtime management**
+  - Implemented todo_read and todo_write tools for task planning
+  - TodoManager provides thread-safe todo list management
+  - Todo items have Content (description) and ActiveForm (present continuous verb form)
+  - Terminal displays todos between display and input boxes
+  - Display updates automatically when todos change
+  - Dynamic height adjustment - viewport shrinks when todos appear
+  - Status-based coloring: white (pending), green/italic (in-progress), green (completed)
+  - Runtime-only - todos are cleared on /cancel, not persisted to session files
+  - Updated system prompt to enforce Content field preservation when updating status
+  - Content remains exactly the same when changing from pending→in_progress→completed
+  - Only status field changes; Content and ActiveForm stay constant
+  - **Width matching**: Todo box width now matches input box width (fixed width calculation)
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
-- **Tools**: read_file, write_file, activate_skill, posix_shell
+- **Tools**: read_file, todo_read, todo_write, write_file, activate_skill, posix_shell
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 - **Stream Protocol**: TLV (Tag-Length-Value) for structured output
@@ -188,7 +201,8 @@ internal/
   provider/    - Provider configuration (API keys, endpoints)
   skills/      - Skills system (discovery, parsing, activation)
   stream/      - IOStream interfaces and TLV protocol
-  tools/       - Tool implementations (posix_shell, read_file, write_file, activate_skill)
+  todo/        - Todo list management for task planning
+  tools/       - Tool implementations (posix_shell, read_file, write_file, activate_skill, todo_read, todo_write)
 cmd/coreclaw-web/       - coreclaw-web entry point
 main.go        - coreclaw entry point
 ```

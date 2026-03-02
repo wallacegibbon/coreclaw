@@ -17,6 +17,7 @@ import (
 
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
+	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
 
 const (
@@ -58,6 +59,7 @@ type TerminalAdaptor struct {
 	processor    *agentpkg.Processor
 	session      *agentpkg.Session
 	sessionFile  string
+	TodoMgr      *todo.Manager
 }
 
 // NewTerminalAdaptor creates a new Terminal adaptor
@@ -68,6 +70,11 @@ func NewTerminalAdaptor(agentFactory AgentFactory, baseURL, modelName string) *T
 		ModelName:    modelName,
 		sessionFile:  "",
 	}
+}
+
+// SetTodoMgr sets the todo manager
+func (a *TerminalAdaptor) SetTodoMgr(todoMgr *todo.Manager) {
+	a.TodoMgr = todoMgr
 }
 
 // SetSessionFile sets the session file path
@@ -88,6 +95,11 @@ func (a *TerminalAdaptor) Start() {
 	// Load or create session
 	a.session, a.sessionFile = agentpkg.LoadOrNewSession(agent, a.BaseURL, a.ModelName, processor, a.sessionFile)
 
+	// Set TodoMgr on session
+	if a.TodoMgr != nil {
+		a.session.SetTodoMgr(a.TodoMgr)
+	}
+
 	// Display loaded messages if session has any
 	if len(a.session.Messages) > 0 {
 		a.session.DisplayMessages()
@@ -96,6 +108,7 @@ func (a *TerminalAdaptor) Start() {
 	}
 
 	t := NewTerminal(a.session, terminalOutput, inputStream, a.sessionFile)
+	t.SetTodoMgr(a.TodoMgr)
 
 	p := tea.NewProgram(t, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
@@ -299,13 +312,16 @@ type Terminal struct {
 	input            textinput.Model
 	quitting         bool
 	confirmDialog    bool
-	focusedWindow    string // "display" or "input"
-	userScrolledAway bool   // true after user manually scrolls up
-	windowWidth      int    // actual window width
-	editorContent    string // content from external editor with newlines preserved
-	showingWelcome   bool   // true while welcome text is still displayed
-	welcomeText      string // colored welcome text for comparison
-	sessionFile      string // session file path for saving on quit
+	focusedWindow    string        // "display" or "input"
+	userScrolledAway bool          // true after user manually scrolls up
+	windowWidth      int           // actual window width
+	windowHeight     int           // actual window height
+	editorContent    string        // content from external editor with newlines preserved
+	showingWelcome   bool          // true while welcome text is still displayed
+	welcomeText      string        // colored welcome text for comparison
+	sessionFile      string        // session file path for saving on quit
+	todoMgr          *todo.Manager // todo manager
+	todos            todo.TodoList // cached todos for display
 
 	inputStyle  lipgloss.Style
 	statusStyle lipgloss.Style
@@ -354,6 +370,73 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	return m
 }
 
+// SetTodoMgr sets the todo manager
+func (m *Terminal) SetTodoMgr(todoMgr *todo.Manager) {
+	m.todoMgr = todoMgr
+	m.updateTodos()
+}
+
+// updateTodos updates the cached todos from the todo manager
+func (m *Terminal) updateTodos() {
+	if m.todoMgr != nil {
+		m.todos = m.todoMgr.GetTodos()
+	}
+	m.updateDisplayHeight()
+}
+
+// updateDisplayHeight updates the display viewport height based on window size and todo visibility
+func (m *Terminal) updateDisplayHeight() {
+	// Base height: total height minus input box (3 lines) and status bar (1 line)
+	height := m.windowHeight - 4
+
+	// Subtract todo box height if visible (header + todos + border)
+	if len(m.todos) > 0 {
+		// Header line + each todo item + border lines (2 for top/bottom)
+		height -= (1 + len(m.todos) + 2)
+	}
+
+	m.display.Height = max(0, height)
+	m.updateDisplayContent()
+}
+
+// renderTodos formats the todo list for display
+func (m *Terminal) renderTodos() string {
+	if len(m.todos) == 0 {
+		return ""
+	}
+
+	todoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af"))                  // Yellow
+	pendingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff"))               // White
+	inProgressStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true) // Green bold
+	completedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1"))             // Green
+
+	var sb strings.Builder
+	sb.WriteString(todoStyle.Render("TODO LIST"))
+	sb.WriteString("\n")
+
+	for i, item := range m.todos {
+		var statusStyle lipgloss.Style
+		var todoText string
+
+		switch item.Status {
+		case "pending":
+			statusStyle = pendingStyle
+			todoText = fmt.Sprintf("%d. %s", i+1, item.Content)
+		case "in_progress":
+			statusStyle = inProgressStyle
+			todoText = fmt.Sprintf("%d. %s", i+1, item.ActiveForm)
+		case "completed":
+			statusStyle = completedStyle
+			todoText = fmt.Sprintf("%d. %s", i+1, item.Content)
+		}
+
+		sb.WriteString(statusStyle.Render(todoText))
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
 // Init initializes the Terminal
 func (m *Terminal) Init() tea.Cmd {
 	return nil
@@ -373,6 +456,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case <-m.terminalOutput.updateChan:
 		m.updateDisplayContent()
 		m.updateStatus()
+		m.updateTodos()
 	default:
 	}
 
@@ -381,10 +465,11 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKeyMsg(msg)
 	case tea.WindowSizeMsg:
 		m.windowWidth = msg.Width
-		m.display.Width = max(0, msg.Width-8)   // Leave room for padding (4 on each side)
-		m.display.Height = max(0, msg.Height-4) // Leave room for input box (3) and status bar (1)
+		m.windowHeight = msg.Height
+		m.display.Width = max(0, msg.Width-8) // Leave room for padding (4 on each side)
+		m.updateDisplayHeight()
 		m.centerWelcomeText()
-		m.updateDisplayContent()
+		m.updateTodos()
 		return m, nil
 	case tickMsg:
 		m.updateDisplayContent()
@@ -718,6 +803,19 @@ func (m *Terminal) View() string {
 	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Padding(0, 4).Render(m.display.View()))
 	sb.WriteString("\n")
+
+	// Add todo list between display and input
+	todos := m.renderTodos()
+	if todos != "" {
+		todoInnerStyle := lipgloss.NewStyle().
+			Width(max(0, windowWidth-4))
+		todoBorderStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#6c7086")).
+			Padding(0, 1)
+		sb.WriteString(todoBorderStyle.Render(todoInnerStyle.Render(todos)))
+		sb.WriteString("\n")
+	}
 
 	if m.confirmDialog {
 		confirmText := lipgloss.NewStyle().

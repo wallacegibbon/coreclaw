@@ -138,6 +138,8 @@ CoreClaw provides the following tools (ordered from safest to most dangerous):
 | Tool | Description |
 |------|-------------|
 | `read_file` | Read the contents of a file |
+| `todo_read` | Read the current todo list |
+| `todo_write` | Write or update the todo list |
 | `write_file` | Create a new file or replace entire file content |
 | `activate_skill` | Load and execute a skill |
 | `posix_shell` | Execute shell commands |
@@ -237,6 +239,8 @@ Skills metadata is injected into the system prompt using XML format:
 Tools must be ordered from safest to most dangerous:
 
 1. `read_file` - Read file contents
-2. `write_file` - Create or replace files (full overwrite)
-3. `activate_skill` - Load and execute skills
-4. `posix_shell` - Execute shell commands (most dangerous)
+2. `todo_read` - Read todo list
+3. `todo_write` - Write/update todo list
+4. `write_file` - Create or replace files (full overwrite)
+5. `activate_skill` - Load and execute skills
+6. `posix_shell` - Execute shell commands (most dangerous)

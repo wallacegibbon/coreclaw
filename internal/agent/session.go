@@ -14,6 +14,7 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
+	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
 
 // Task represents a unit of work in the task queue
@@ -56,6 +57,12 @@ type Session struct {
 	// ContextTokens tracks context tokens used (grows with each request, shrinks after summarize)
 	ContextTokens int64
 
+	// Todos is the todo list (runtime-only, not persisted)
+	Todos todo.TodoList
+
+	// TodoMgr is the todo manager (runtime-only, for clearing todos on cancel)
+	TodoMgr *todo.Manager
+
 	// taskQueue buffers tasks submitted while agent is processing
 	taskQueue chan Task
 
@@ -70,11 +77,16 @@ type Session struct {
 }
 
 // cancelTask handles the /cancel command
+// cancelTask handles the /cancel command
 // Returns error if nothing to cancel
 func (s *Session) cancelTask() {
 	if s.inProgress {
 		if s.cancelCurrent != nil {
 			s.cancelCurrent()
+			// Clear todos when cancelling
+			if s.TodoMgr != nil {
+				s.TodoMgr.SetTodos(todo.TodoList{})
+			}
 			return
 		}
 	}
@@ -97,6 +109,13 @@ func expandPath(path string) string {
 	}
 
 	return filepath.Join(usr.HomeDir, path[1:])
+}
+
+// SetTodoMgr sets the todo manager on the session (for clearing todos on cancel)
+func (s *Session) SetTodoMgr(todoMgr *todo.Manager) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.TodoMgr = todoMgr
 }
 
 // saveSession handles the /save command
@@ -416,6 +435,10 @@ func formatToolCall(toolName, input string) string {
 		if path != "" {
 			value = fmt.Sprintf("%s: %s", toolName, path)
 		}
+	case "todo_read":
+		value = "todo_read: Reading todo list"
+	case "todo_write":
+		value = "todo_write: Updating todo list"
 	}
 	return value
 }
@@ -613,6 +636,23 @@ func (s *Session) DisplayMessages() {
 			}
 		}
 	}
+}
+
+// GetTodos returns the current todo list
+func (s *Session) GetTodos() todo.TodoList {
+	return s.Todos
+}
+
+// SetTodos sets the todo list
+func (s *Session) SetTodos(todos todo.TodoList) {
+	s.Todos = todos
+}
+
+// GetSetTodos applies a function to the current todo list and returns the result
+func (s *Session) GetSetTodos(fn func(todo.TodoList) todo.TodoList) todo.TodoList {
+	result := fn(s.Todos)
+	s.Todos = result
+	return result
 }
 
 // LoadOrNewSession loads an existing session or creates a new one

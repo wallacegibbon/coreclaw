@@ -78,7 +78,7 @@ coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $AN
 
 ## Features
 
-- Tools: read_file, write_file, activate_skill, posix_shell
+- Tools: read_file, todo_read, todo_write, write_file, activate_skill, posix_shell
 - Multi-step conversations with tool calls
 - Token usage tracking
 - Error handling for command execution
@@ -91,6 +91,7 @@ coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $AN
 - API debug mode for HTTP requests and responses
 - Skills system (agentskills.io compatible)
 - Web server with WebSocket support and chat UI
+- Todo list management for task tracking
 
 ## Project Status
 

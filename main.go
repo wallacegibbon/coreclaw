@@ -29,6 +29,7 @@ func main() {
 	}
 
 	adaptor := adaptors.NewTerminalAdaptor(appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName)
+	adaptor.SetTodoMgr(appCfg.TodoMgr)
 	adaptor.SetSessionFile(appCfg.Cfg.Session)
 	adaptor.Start()
 }

@@ -11,6 +11,7 @@ import (
 
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
+	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
 
 var upgrader = websocket.Upgrader{
@@ -26,15 +27,16 @@ type WebSocketAdaptor struct {
 	ModelName    string
 	SessionFile  string
 	Server       *http.Server
+	TodoMgr      *todo.Manager
 }
 
 // NewWebSocketAdaptor creates a new WebSocket adaptor that listens on the given port
 // Each client gets its own agent session
-func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName, sessionFile string) *WebSocketAdaptor {
+func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName, sessionFile string, todoMgr *todo.Manager) *WebSocketAdaptor {
 	mux := http.NewServeMux()
 
 	// Handle WebSocket
-	mux.HandleFunc("/ws", handleWebSocket(factory, baseURL, modelName, sessionFile))
+	mux.HandleFunc("/ws", handleWebSocket(factory, baseURL, modelName, sessionFile, todoMgr))
 
 	// Serve embedded index.html
 	mux.HandleFunc("/", serveIndex)
@@ -50,6 +52,7 @@ func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName, 
 		ModelName:    modelName,
 		SessionFile:  sessionFile,
 		Server:       server,
+		TodoMgr:      todoMgr,
 	}
 }
 
@@ -68,7 +71,7 @@ func (a *WebSocketAdaptor) Start() {
 }
 
 // handleWebSocket handles WebSocket connections with per-client sessions
-func handleWebSocket(factory AgentFactory, baseURL, modelName, sessionFile string) func(http.ResponseWriter, *http.Request) {
+func handleWebSocket(factory AgentFactory, baseURL, modelName, sessionFile string, todoMgr *todo.Manager) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -91,6 +94,11 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName, sessionFile strin
 		// Load or create session
 		session, _ := agentpkg.LoadOrNewSession(agent, baseURL, modelName, processor, sessionFile)
 		output.session = session
+
+		// Set TodoMgr on session
+		if todoMgr != nil {
+			session.SetTodoMgr(todoMgr)
+		}
 
 		// Display loaded messages if session has any
 		if len(session.Messages) > 0 {

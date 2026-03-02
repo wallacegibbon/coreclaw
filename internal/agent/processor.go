@@ -189,6 +189,10 @@ func (p *Processor) handleToolCall(tc fantasy.ToolCallContent) {
 		if path != "" {
 			value = fmt.Sprintf("%s: %s", tc.ToolName, path)
 		}
+	case "todo_read":
+		value = "todo_read: Reading todo list"
+	case "todo_write":
+		value = "todo_write: Updating todo list"
 	}
 
 	if value != "" {
