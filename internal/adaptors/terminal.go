@@ -184,35 +184,38 @@ func (w *terminalOutput) renderMultiline(style lipgloss.Style, value string, tri
 }
 
 func (w *terminalOutput) writeColored(tag byte, value string) {
-	switch tag {
-	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagNotify, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap:
-		// Notify that content changed (non-blocking)
+	triggerUpdate := func() {
 		select {
 		case w.updateChan <- struct{}{}:
 		default:
 		}
 	}
 
-	trimRight := true
-	var output string
+	switch tag {
+	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagNotify, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap:
+		triggerUpdate()
+	}
+
+	output := func(style lipgloss.Style, text string) string {
+		return strings.TrimRight(w.renderMultiline(style, text, true), " ")
+	}
+
 	switch tag {
 	case stream.TagAssistantText:
-		output = w.renderMultiline(w.textStyle, value, true)
+		w.display.Append(output(w.textStyle, value))
 	case stream.TagTool:
-		output = w.colorizeTool(value)
+		w.display.Append(strings.TrimRight(w.colorizeTool(value), " "))
 	case stream.TagReasoning:
-		output = w.renderMultiline(w.reasoningStyle, value, true)
+		w.display.Append(output(w.reasoningStyle, value))
 	case stream.TagError:
-		output = w.renderMultiline(w.errorStyle, value, true)
+		w.display.Append(output(w.errorStyle, value))
 	case stream.TagNotify:
-		output = w.renderMultiline(w.systemStyle, value, true)
+		w.display.Append(output(w.systemStyle, value))
 	case stream.TagSystem:
-		// Parse JSON to update status bar
 		var info agentpkg.SystemInfo
 		if err := json.Unmarshal([]byte(value), &info); err == nil {
 			baseStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
 			queueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")).Bold(true)
-
 			if info.QueueCount > 0 {
 				queueNum := queueStyle.Render(fmt.Sprintf("%d", info.QueueCount))
 				w.status = baseStyle.Render("Queue: ") + queueNum + baseStyle.Render(fmt.Sprintf(" | Context: %d | Total: %d", info.ContextTokens, info.TotalTokens))
@@ -220,26 +223,14 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 				w.status = baseStyle.Render(fmt.Sprintf("Context: %d | Total: %d", info.ContextTokens, info.TotalTokens))
 			}
 		}
-		// Don't append to display for TagSystem - it updates status bar only
 		return
 	case stream.TagPromptStart:
-		output = w.promptStyle.Render("> ") + w.userInputStyle.Render(value)
+		w.display.Append(strings.TrimRight(w.promptStyle.Render("> ")+w.userInputStyle.Render(value), " "))
 	case stream.TagStreamGap:
-		trimRight = false
-		output = "\n"
+		w.display.Append("\n")
 	default:
-		trimRight = false
-		output = value
+		w.display.Append(value)
 	}
-
-	// @WORKAROUND:
-	// The `xxStyle.Render` adds many extra spaces on the right (after escape sequences)
-	// Remove them to keep the display right.
-	if trimRight {
-		output = strings.TrimRight(output, " ")
-	}
-
-	w.display.Append(output)
 }
 
 // colorizeWelcomeText applies gradient coloring to the ASCII art
@@ -310,7 +301,6 @@ type Terminal struct {
 	streamInput      *stream.ChanInput
 	display          viewport.Model
 	input            textinput.Model
-	status           string
 	quitting         bool
 	confirmDialog    bool
 	focusedWindow    string // "display" or "input"
@@ -333,58 +323,38 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	input.Prompt = "> "
 
 	inputStyle := lipgloss.NewStyle()
-	statusStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#45475a")) // Dimmed for status bar
+	statusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
 
-	// Colorize welcome text with gradient effect
 	coloredWelcome := colorizeWelcomeText(welcomeText)
-	var display = viewport.New(80, 20)
+	display := viewport.New(80, 20)
 
-	// Check if there's already content in the display buffer (from session loading)
-	existingContent := terminalOutput.display.GetAll()
-	if existingContent != "" {
-		// Session content already loaded - show it immediately instead of welcome
-		wrapped := wordwrap(existingContent, display.Width)
-		newlineCount := strings.Count(wrapped, "\n")
-		display.SetContent(wrapped)
-		// Calculate correct YOffset manually (viewport's TotalLineCount is unreliable with some content)
-		correctYOffset := max(0, newlineCount-display.Height)
-		display.SetYOffset(correctYOffset)
-		return &Terminal{
-			session:        session,
-			terminalOutput: terminalOutput,
-			streamInput:    inputStream,
-			display:        display,
-			input:          input,
-			status:         terminalOutput.status,
-			windowWidth:    80, // Will be updated on first WindowSizeMsg
-			inputStyle:     inputStyle,
-			statusStyle:    statusStyle,
-			focusedWindow:  "input",
-			showingWelcome: false,
-			welcomeText:    coloredWelcome,
-			sessionFile:    sessionFile,
-		}
-	}
-
-	// No existing content - show welcome text
-	display.SetContent(coloredWelcome)
-
-	return &Terminal{
+	m := &Terminal{
 		session:        session,
 		terminalOutput: terminalOutput,
 		streamInput:    inputStream,
 		display:        display,
 		input:          input,
-		status:         terminalOutput.status,
-		windowWidth:    80, // Will be updated on first WindowSizeMsg
+		windowWidth:    80,
 		inputStyle:     inputStyle,
 		statusStyle:    statusStyle,
 		focusedWindow:  "input",
-		showingWelcome: true,
 		welcomeText:    coloredWelcome,
 		sessionFile:    sessionFile,
 	}
+
+	existingContent := terminalOutput.display.GetAll()
+	if existingContent != "" {
+		wrapped := wordwrap(existingContent, display.Width)
+		newlineCount := strings.Count(wrapped, "\n")
+		display.SetContent(wrapped)
+		display.SetYOffset(max(0, newlineCount-display.Height))
+		m.showingWelcome = false
+	} else {
+		display.SetContent(coloredWelcome)
+		m.showingWelcome = true
+	}
+
+	return m
 }
 
 // Init initializes the Terminal
@@ -584,9 +554,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Terminal) updateStatus() {
-	m.status = m.terminalOutput.status
-}
+func (m *Terminal) updateStatus() {}
 
 func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
 	// Send command as TLV to session
@@ -727,66 +695,38 @@ func (m *Terminal) updateDisplayContent() {
 
 // View renders the Terminal
 func (m *Terminal) View() string {
-	// Display content is already updated via updateDisplayContent()
-	// Use window width for input and status, viewport width for display
 	windowWidth := m.windowWidth
+	focused := m.focusedWindow == "input"
+	borderColor := map[bool]string{true: "#89d4fa", false: "#45475a"}[focused]
 
-	// Style display, input, and status (accounting for padding)
-	displayStyle := lipgloss.NewStyle().Padding(0, 4)
-	inputStyle := m.inputStyle.Width(max(0, windowWidth-4))
-
-	// Input border color based on focus
-	var inputBorderColor string
-	if m.focusedWindow == "input" {
-		inputBorderColor = "#89d4fa" // Bright cyan for focused
-	} else {
-		inputBorderColor = "#45475a" // Dimmed for unfocused
-	}
-
-	inputBorderStyle := lipgloss.NewStyle().
+	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(inputBorderColor)).
+		BorderForeground(lipgloss.Color(borderColor)).
 		Padding(0, 1)
 
-	statusBar := lipgloss.NewStyle().Width(max(0, windowWidth-8)).Padding(0, 4).Render(m.status)
-
-	// Build the view
-	var sb strings.Builder
-
-	// Display area with padding but no border
-	sb.WriteString(displayStyle.Render(m.display.View()))
-
-	// Input area with border
-	sb.WriteString("\n")
-	// Set prompt color to match border color
-	m.input.PromptStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(inputBorderColor)).
-		Bold(true)
-
-	// Apply dimming to text content when unfocused
-	if m.focusedWindow == "input" {
+	m.input.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(borderColor)).Bold(true)
+	if focused {
 		m.input.TextStyle = lipgloss.NewStyle()
 	} else {
 		m.input.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
 	}
 
-	// Show confirm dialog instead of input when dialog is active
+	var sb strings.Builder
+	sb.WriteString(lipgloss.NewStyle().Padding(0, 4).Render(m.display.View()))
+	sb.WriteString("\n")
+
 	if m.confirmDialog {
-		confirmText := "Confirm exit? Press y/n"
-		confirmStyle := lipgloss.NewStyle().
+		confirmText := lipgloss.NewStyle().
 			Width(max(0, windowWidth-4)).
 			Foreground(lipgloss.Color("#f38ba8")).
-			Bold(true)
-		confirmInput := confirmStyle.Render(confirmText)
-		sb.WriteString(inputBorderStyle.Render(confirmInput))
+			Bold(true).Render("Confirm exit? Press y/n")
+		sb.WriteString(borderStyle.Render(confirmText))
 	} else {
-		inputContent := inputStyle.Render(m.input.View())
-		sb.WriteString(inputBorderStyle.Render(inputContent))
+		sb.WriteString(borderStyle.Render(m.inputStyle.Width(max(0, windowWidth-4)).Render(m.input.View())))
 	}
 
-	// Status bar
 	sb.WriteString("\n")
-	sb.WriteString(statusBar)
+	sb.WriteString(lipgloss.NewStyle().Width(max(0, windowWidth-8)).Padding(0, 4).Render(m.terminalOutput.status))
 
 	return sb.String()
 }
@@ -794,79 +734,6 @@ func (m *Terminal) View() string {
 var (
 	_ tea.Model = (*Terminal)(nil)
 )
-
-// wordwrap breaks text to fit the given width
-func wordwrap(text string, width int) string {
-	if width <= 0 || text == "" {
-		return text
-	}
-
-	var result strings.Builder
-
-	for line := range strings.SplitSeq(text, "\n") {
-		// Extract escape sequences prefix (styling) at start of line
-		prefix := extractEscapePrefix(line)
-		remaining := line[len(prefix):]
-		suffix := extractEscapeSuffix(remaining)
-		middle := remaining[:len(remaining)-len(suffix)]
-
-		if lipgloss.Width(line) <= width {
-			result.WriteString(line)
-			result.WriteString("\n")
-			continue
-		}
-
-		// Break middle at width limit
-		for len(middle) > 0 {
-			breakAt := 0
-			currentWidth := 0
-
-			for breakAt < len(middle) {
-				// Note: middle should not contain escape sequences at start/end, but skip just in case
-				skip := skipEscapeSequence(middle[breakAt:])
-				if skip > 0 {
-					breakAt += skip
-					continue
-				}
-
-				r := rune(middle[breakAt])
-				charWidth := lipgloss.Width(string(r))
-
-				if currentWidth+charWidth > width {
-					break
-				}
-				currentWidth += charWidth
-				breakAt++
-			}
-
-			// Try to break at last space for word boundary
-			lastSpace := -1
-			for i := breakAt - 1; i >= 0; i-- {
-				if middle[i] == ' ' {
-					lastSpace = i
-					break
-				}
-			}
-
-			if lastSpace > 0 {
-				breakAt = lastSpace + 1
-			}
-
-			if breakAt == 0 {
-				breakAt = 1
-			}
-
-			// Write prefix + this segment + suffix
-			result.WriteString(prefix)
-			result.WriteString(middle[:breakAt])
-			result.WriteString(suffix)
-			result.WriteString("\n")
-			middle = middle[breakAt:]
-		}
-	}
-
-	return result.String()
-}
 
 // getEditorCommand returns the editor command to use
 // First checks EDITOR env var, then tries vim, vi, nano in order
@@ -883,125 +750,4 @@ func getEditorCommand(editorCmd string) string {
 	}
 
 	return ""
-}
-
-// skipEscapeSequence returns the length of an ANSI escape sequence at the start of s,
-// or 0 if there is no escape sequence.
-func skipEscapeSequence(s string) int {
-	if len(s) == 0 || s[0] != '\x1b' {
-		return 0
-	}
-	if len(s) < 2 {
-		return 0
-	}
-
-	switch s[1] {
-	case '[':
-		return skipCSI(s)
-	case ']':
-		return skipOSC(s)
-	default:
-		return 2
-	}
-}
-
-// skipCSI skips a CSI (Control Sequence Introducer) sequence: ESC [ ... <final byte>
-// Final byte is in range 0x40-0x7E (@A-Z[\]^_`a-z{|}~)
-func skipCSI(s string) int {
-	if len(s) < 3 {
-		return len(s)
-	}
-
-	pos := 2
-	for pos < len(s) {
-		c := s[pos]
-
-		if c >= 0x40 && c <= 0x7E {
-			return pos + 1
-		}
-
-		if c >= 0x20 && c <= 0x3F {
-			pos++
-		} else {
-			break
-		}
-	}
-
-	return pos
-}
-
-// skipOSC skips an OSC (Operating System Command) sequence: ESC ] ... ST
-// ST (String Terminator) is either BEL (\x07) or ESC \ (\x1b\\)
-func skipOSC(s string) int {
-	if len(s) < 3 {
-		return len(s)
-	}
-
-	pos := 2
-	for pos < len(s) {
-		c := s[pos]
-
-		if c == '\x07' {
-			return pos + 1
-		}
-
-		if c == '\x1b' && pos+1 < len(s) && s[pos+1] == '\\' {
-			return pos + 2
-		}
-
-		pos++
-	}
-
-	return pos
-}
-
-// extractEscapePrefix returns all consecutive ANSI escape sequences at the start of s.
-func extractEscapePrefix(s string) string {
-	var prefix strings.Builder
-	i := 0
-	for i < len(s) {
-		skip := skipEscapeSequence(s[i:])
-		if skip == 0 {
-			break
-		}
-		prefix.WriteString(s[i : i+skip])
-		i += skip
-	}
-	return prefix.String()
-}
-
-// extractEscapeSuffix returns all consecutive ANSI escape sequences at the end of s.
-func extractEscapeSuffix(s string) string {
-	var sequences []string
-	i := len(s)
-	for i > 0 {
-		// Look for escape sequence ending at i
-		found := false
-		// Escape sequences are at most 30 bytes
-		maxLookback := 30
-		if i < maxLookback {
-			maxLookback = i
-		}
-		for start := i - 1; start >= i-maxLookback; start-- {
-			if s[start] == '\x1b' {
-				skip := skipEscapeSequence(s[start:])
-				if skip > 0 && start+skip == i {
-					// Found escape sequence
-					sequences = append(sequences, s[start:i])
-					i = start
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
-			break
-		}
-	}
-	// Build suffix from first sequence to last (since we collected from end to start)
-	var suffix strings.Builder
-	for j := len(sequences) - 1; j >= 0; j-- {
-		suffix.WriteString(sequences[j])
-	}
-	return suffix.String()
 }
