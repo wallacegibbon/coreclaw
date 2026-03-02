@@ -514,10 +514,20 @@ func (s *Session) SaveSession(path string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Check if last message is a user message (unfinished prompt)
+	messagesToSave := s.Messages
+	if len(s.Messages) > 0 {
+		lastMsg := s.Messages[len(s.Messages)-1]
+		if lastMsg.Role == fantasy.MessageRoleUser {
+			// Skip the last user message when saving
+			messagesToSave = s.Messages[:len(s.Messages)-1]
+		}
+	}
+
 	sessionData := SessionData{
 		BaseURL:       s.BaseURL,
 		ModelName:     s.ModelName,
-		Messages:      s.Messages,
+		Messages:      messagesToSave,
 		TotalSpent:    s.TotalSpent,
 		ContextTokens: s.ContextTokens,
 		UpdatedAt:     time.Now(),
