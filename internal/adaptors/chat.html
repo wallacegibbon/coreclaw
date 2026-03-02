@@ -57,6 +57,12 @@
         .message.assistant pre { background: #313244; padding: 10px; border-radius: 5px; overflow-x: auto; }
         .message.assistant pre code { background: none; padding: 0; }
         .message.assistant ul, .message.assistant ol { margin: 0 0 8px 0; padding-left: 20px; }
+        #welcome {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100%;
+        }
         #input-area {
             display: flex;
             gap: 10px;
@@ -97,7 +103,13 @@
 </head>
 <body>
     <div id="connection">Connecting...</div>
-    <div id="messages"></div>
+    <div id="messages">
+        <div id="welcome" class="message assistant" style="text-align: center; padding: 20px;">
+            <pre style="font-family: monospace; color: #89b4fa; font-size: 14px; line-height: 1.2;">
+{{welcome}}
+            </pre>
+        </div>
+    </div>
     <div id="input-area" class="disabled">
         <input type="text" id="prompt" placeholder="Enter your prompt..." autocomplete="off" disabled>
         <button id="send" disabled>Send</button>
@@ -294,6 +306,12 @@
         }
 
         function addMessageElement(type, text) {
+            // Remove welcome message when first message is added
+            const welcome = document.getElementById('welcome');
+            if (welcome) {
+                welcome.remove();
+            }
+
             const div = document.createElement('div');
             div.className = 'message ' + type;
             if (type === 'tool') {

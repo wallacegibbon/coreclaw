@@ -1,7 +1,6 @@
 package adaptors
 
 import (
-	_ "embed"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -23,9 +22,6 @@ import (
 const (
 	tempFilePrefix = "coreclaw-input-*.txt"
 )
-
-//go:embed welcome.txt
-var welcomeText string
 
 // DisplayBuffer holds text to display in Terminal
 type DisplayBuffer struct {
@@ -325,7 +321,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	inputStyle := lipgloss.NewStyle()
 	statusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
 
-	coloredWelcome := colorizeWelcomeText(welcomeText)
+	coloredWelcome := colorizeWelcomeText(WelcomeText)
 	display := viewport.New(80, 20)
 
 	m := &Terminal{

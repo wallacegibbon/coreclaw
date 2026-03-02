@@ -2,6 +2,7 @@ package adaptors
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -55,7 +56,8 @@ func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName, 
 // serveIndex serves the embedded index.html
 func serveIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(indexHTML)
+	html := strings.Replace(string(indexHTML), "{{welcome}}", WelcomeText, 1)
+	w.Write([]byte(html))
 }
 
 // Start starts the WebSocket server in a goroutine
