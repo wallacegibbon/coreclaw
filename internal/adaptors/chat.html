@@ -377,6 +377,15 @@
             }
         });
 
+        // Handle "/" key to focus input and insert it
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '/' && document.activeElement !== prompt) {
+                e.preventDefault();
+                prompt.focus();
+                prompt.value = '/';
+            }
+        });
+
         prompt.focus();
         connect();
     </script>

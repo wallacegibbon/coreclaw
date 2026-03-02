@@ -487,6 +487,12 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.display.ScrollUp(m.display.Height / 2)
 			m.userScrolledAway = true
 			return m, nil
+		case "/":
+			m.focusedWindow = "input"
+			m.input.Focus()
+			m.input.SetValue("/")
+			m.input.CursorEnd()
+			return m, nil
 		}
 	}
 
