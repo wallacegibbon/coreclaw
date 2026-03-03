@@ -155,11 +155,14 @@ func TestLoadLatestSession_WithFiles(t *testing.T) {
 }
 
 func TestLoadOrNewSession(t *testing.T) {
-	agent := fantasy.NewAgent(nil)
+	// Use nil for model since we're just testing session creation
+	var model fantasy.LanguageModel = nil
 	processor := NewProcessor(nil)
+	baseTools := []fantasy.AgentTool{}
+	systemPrompt := "test system prompt"
 
 	// Test creating a new session without specifying session file
-	session, sessionFile := LoadOrNewSession(agent, "https://api.test.com", "test-model", processor, "")
+	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, "https://api.test.com", "test-model", processor, "")
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 	}
@@ -180,7 +183,7 @@ func TestLoadOrNewSession(t *testing.T) {
 	defer os.Remove(testFile) // Clean up test file
 
 	// Verify session is properly initialized
-	if session.Agent != agent {
+	if session.Agent == nil {
 		t.Error("Session agent not set correctly")
 	}
 	if session.BaseURL != "https://api.test.com" {

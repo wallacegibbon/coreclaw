@@ -10,8 +10,8 @@ import (
 	_ "embed"
 
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
+	"github.com/wallacegibbon/coreclaw/internal/app"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
-	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
 
 var upgrader = websocket.Upgrader{
@@ -22,21 +22,17 @@ var upgrader = websocket.Upgrader{
 
 // WebSocketAdaptor connects WebSocket to the agent processor
 type WebSocketAdaptor struct {
-	AgentFactory AgentFactory
-	BaseURL      string
-	ModelName    string
-	SessionFile  string
-	Server       *http.Server
-	TodoMgr      *todo.Manager
+	Config *app.Config
+	Server *http.Server
 }
 
 // NewWebSocketAdaptor creates a new WebSocket adaptor that listens on the given port
 // Each client gets its own agent session
-func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName, sessionFile string, todoMgr *todo.Manager) *WebSocketAdaptor {
+func NewWebSocketAdaptor(port string, cfg *app.Config) *WebSocketAdaptor {
 	mux := http.NewServeMux()
 
 	// Handle WebSocket
-	mux.HandleFunc("/ws", handleWebSocket(factory, baseURL, modelName, sessionFile, todoMgr))
+	mux.HandleFunc("/ws", handleWebSocket(cfg))
 
 	// Serve embedded index.html
 	mux.HandleFunc("/", serveIndex)
@@ -47,12 +43,8 @@ func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName, 
 	}
 
 	return &WebSocketAdaptor{
-		AgentFactory: factory,
-		BaseURL:      baseURL,
-		ModelName:    modelName,
-		SessionFile:  sessionFile,
-		Server:       server,
-		TodoMgr:      todoMgr,
+		Config: cfg,
+		Server: server,
 	}
 }
 
@@ -71,7 +63,7 @@ func (a *WebSocketAdaptor) Start() {
 }
 
 // handleWebSocket handles WebSocket connections with per-client sessions
-func handleWebSocket(factory AgentFactory, baseURL, modelName, sessionFile string, todoMgr *todo.Manager) func(http.ResponseWriter, *http.Request) {
+func handleWebSocket(cfg *app.Config) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -87,18 +79,20 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName, sessionFile strin
 		}
 		defer close(output.closeCh)
 
-		// Create a new agent and processor for this client
-		agent := factory()
-		processor := agentpkg.NewProcessorWithIO(agent, input, output)
+		// Create processor for this client
+		processor := agentpkg.NewProcessorWithIO(nil, input, output)
 
 		// Load or create session
-		session, _ := agentpkg.LoadOrNewSession(agent, baseURL, modelName, processor, sessionFile)
+		session, _ := agentpkg.LoadOrNewSession(
+			cfg.Model,
+			cfg.AgentTools,
+			cfg.SystemPrompt,
+			cfg.Cfg.BaseURL,
+			cfg.Cfg.ModelName,
+			processor,
+			cfg.Cfg.Session,
+		)
 		output.session = session
-
-		// Set TodoMgr on session
-		if todoMgr != nil {
-			session.SetTodoMgr(todoMgr)
-		}
 
 		// Display loaded messages if session has any
 		if len(session.Messages) > 0 {

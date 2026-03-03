@@ -15,6 +15,7 @@ import (
 	"charm.land/fantasy"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 	"github.com/wallacegibbon/coreclaw/internal/todo"
+	"github.com/wallacegibbon/coreclaw/internal/tools"
 )
 
 // Task represents a unit of work in the task queue
@@ -57,11 +58,8 @@ type Session struct {
 	// ContextTokens tracks context tokens used (grows with each request, shrinks after summarize)
 	ContextTokens int64
 
-	// Todos is the todo list (runtime-only, not persisted)
+	// Todos is the todo list (persisted in session)
 	Todos todo.TodoList
-
-	// TodoMgr is the todo manager (runtime-only, for clearing todos on cancel)
-	TodoMgr *todo.Manager
 
 	// taskQueue buffers tasks submitted while agent is processing
 	taskQueue chan Task
@@ -84,9 +82,7 @@ func (s *Session) cancelTask() {
 		if s.cancelCurrent != nil {
 			s.cancelCurrent()
 			// Clear todos when cancelling
-			if s.TodoMgr != nil {
-				s.TodoMgr.SetTodos(todo.TodoList{})
-			}
+			s.SetTodos(todo.TodoList{})
 			return
 		}
 	}
@@ -109,13 +105,6 @@ func expandPath(path string) string {
 	}
 
 	return filepath.Join(usr.HomeDir, path[1:])
-}
-
-// SetTodoMgr sets the todo manager on the session (for clearing todos on cancel)
-func (s *Session) SetTodoMgr(todoMgr *todo.Manager) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.TodoMgr = todoMgr
 }
 
 // saveSession handles the /save command
@@ -148,17 +137,33 @@ func (s *Session) IsInProgress() bool {
 	return s.inProgress
 }
 
-// NewSession creates a new session with the given processor
-func NewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor, sessionFile string) *Session {
+// NewSession creates a new session with the given model, tools, and processor
+func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, processor *Processor, sessionFile string) *Session {
+	// Create session without agent first
 	session := &Session{
 		Processor:   processor,
 		Messages:    nil,
-		Agent:       agent,
 		BaseURL:     baseURL,
 		ModelName:   modelName,
 		SessionFile: sessionFile,
 		taskQueue:   make(chan Task, 10),
 	}
+
+	// Create todo tools with session reference
+	todoReadTool := tools.NewTodoReadTool(session)
+	todoWriteTool := tools.NewTodoWriteTool(session)
+
+	// Combine base tools with todo tools
+	allTools := append(baseTools, todoReadTool, todoWriteTool)
+
+	// Create agent with all tools
+	session.Agent = fantasy.NewAgent(model, fantasy.WithTools(allTools...), fantasy.WithSystemPrompt(systemPrompt))
+
+	// Update processor with the created agent
+	if session.Processor != nil {
+		session.Processor.Agent = session.Agent
+	}
+
 	// Start input reader goroutine that reads TLV from input stream
 	go session.readFromInput()
 	return session
@@ -354,6 +359,20 @@ func (s *Session) sendSystemInfo() {
 	s.Processor.Output.Flush()
 }
 
+// sendTodoList sends the current todo list to adaptors via TagTodo
+func (s *Session) sendTodoList() {
+	s.mu.Lock()
+	todos := s.Todos
+	s.mu.Unlock()
+
+	data, err := json.Marshal(todos)
+	if err != nil {
+		return
+	}
+	stream.WriteTLV(s.Processor.Output, stream.TagTodo, string(data))
+	s.Processor.Output.Flush()
+}
+
 // queueTask adds a task to the queue (non-blocking)
 func (s *Session) queueTask(task Task) bool {
 	select {
@@ -406,6 +425,7 @@ type SessionData struct {
 	Messages      []fantasy.Message `json:"messages"`
 	TotalSpent    fantasy.Usage     `json:"total_spent"`
 	ContextTokens int64             `json:"context_tokens"`
+	Todos         todo.TodoList     `json:"todos"`
 	CreatedAt     time.Time         `json:"created_at"`
 	UpdatedAt     time.Time         `json:"updated_at"`
 }
@@ -553,6 +573,7 @@ func (s *Session) SaveSession(path string) error {
 		Messages:      messagesToSave,
 		TotalSpent:    s.TotalSpent,
 		ContextTokens: s.ContextTokens,
+		Todos:         s.Todos,
 		UpdatedAt:     time.Now(),
 	}
 
@@ -569,18 +590,35 @@ func (s *Session) SaveSession(path string) error {
 }
 
 // RestoreFromSession restores a session from saved session data
-func RestoreFromSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor, sessionData *SessionData, sessionFile string) *Session {
+func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, processor *Processor, sessionData *SessionData, sessionFile string) *Session {
+	// Create session without agent first
 	session := &Session{
 		Processor:     processor,
 		Messages:      sessionData.Messages,
-		Agent:         agent,
 		BaseURL:       baseURL,
 		ModelName:     modelName,
 		SessionFile:   sessionFile,
 		TotalSpent:    sessionData.TotalSpent,
 		ContextTokens: sessionData.ContextTokens,
+		Todos:         sessionData.Todos,
 		taskQueue:     make(chan Task, 10),
 	}
+
+	// Create todo tools with session reference
+	todoReadTool := tools.NewTodoReadTool(session)
+	todoWriteTool := tools.NewTodoWriteTool(session)
+
+	// Combine base tools with todo tools
+	allTools := append(baseTools, todoReadTool, todoWriteTool)
+
+	// Create agent with all tools
+	session.Agent = fantasy.NewAgent(model, fantasy.WithTools(allTools...), fantasy.WithSystemPrompt(systemPrompt))
+
+	// Update processor with the created agent
+	if session.Processor != nil {
+		session.Processor.Agent = session.Agent
+	}
+
 	// Start input reader goroutine
 	go session.readFromInput()
 	return session
@@ -643,23 +681,40 @@ func (s *Session) GetTodos() todo.TodoList {
 	return s.Todos
 }
 
-// SetTodos sets the todo list
+// SetTodos sets the todo list and sends it to adaptors
 func (s *Session) SetTodos(todos todo.TodoList) {
+	s.mu.Lock()
 	s.Todos = todos
+	s.mu.Unlock()
+	s.sendTodoList()
 }
 
 // GetSetTodos applies a function to the current todo list and returns the result
+// It sends the updated todos to adaptors
 func (s *Session) GetSetTodos(fn func(todo.TodoList) todo.TodoList) todo.TodoList {
+	s.mu.Lock()
 	result := fn(s.Todos)
 	s.Todos = result
+	s.mu.Unlock()
+	s.sendTodoList()
 	return result
+}
+
+// GetTodoBridge returns a bridge that connects to session methods
+// This allows todo tools to work with the session as their data source
+func (s *Session) GetTodoBridge() interface {
+	GetTodos() todo.TodoList
+	SetTodos(todo.TodoList)
+	GetSetTodos(func(todo.TodoList) todo.TodoList) todo.TodoList
+} {
+	return s
 }
 
 // LoadOrNewSession loads an existing session or creates a new one
 // If sessionFile is specified, it loads that specific session
 // Otherwise, it always creates a new session
 // Returns the session and the session file path
-func LoadOrNewSession(agent fantasy.Agent, baseURL, modelName string, processor *Processor, sessionFile string) (*Session, string) {
+func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, processor *Processor, sessionFile string) (*Session, string) {
 	var sessionData *SessionData
 
 	// Expand ~ to home directory if present
@@ -678,11 +733,11 @@ func LoadOrNewSession(agent fantasy.Agent, baseURL, modelName string, processor 
 
 	// Create or restore session
 	if sessionData != nil {
-		return RestoreFromSession(agent, baseURL, modelName, processor, sessionData, sessionFile), sessionFile
+		return RestoreFromSession(model, baseTools, systemPrompt, baseURL, modelName, processor, sessionData, sessionFile), sessionFile
 	}
 
 	// Create new session (without auto-saving)
-	session := NewSession(agent, baseURL, modelName, processor, sessionFile)
+	session := NewSession(model, baseTools, systemPrompt, baseURL, modelName, processor, sessionFile)
 
 	return session, sessionFile
 }

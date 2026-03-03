@@ -12,7 +12,6 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/config"
 	debugpkg "github.com/wallacegibbon/coreclaw/internal/debug"
 	"github.com/wallacegibbon/coreclaw/internal/skills"
-	"github.com/wallacegibbon/coreclaw/internal/todo"
 	"github.com/wallacegibbon/coreclaw/internal/tools"
 )
 
@@ -43,7 +42,6 @@ type Config struct {
 	Cfg          *config.Settings
 	Model        fantasy.LanguageModel
 	SkillsMgr    *skills.Manager
-	TodoMgr      *todo.Manager
 	AgentTools   []fantasy.AgentTool
 	SystemPrompt string
 }
@@ -82,12 +80,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		systemPrompt = systemPrompt + "\n\n" + skillsFragment
 	}
 
-	// Create todo manager
-	todoManager := todo.NewManager()
-
 	readFileTool := tools.NewReadFileTool()
-	todoReadTool := tools.NewTodoReadTool(todoManager)
-	todoWriteTool := tools.NewTodoWriteTool(todoManager)
 	writeFileTool := tools.NewWriteFileTool()
 	activateSkillTool := tools.NewActivateSkillTool(skillsManager)
 	posixShellTool := tools.NewPosixShellTool()
@@ -96,8 +89,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		Cfg:          cfg,
 		Model:        model,
 		SkillsMgr:    skillsManager,
-		TodoMgr:      todoManager,
-		AgentTools:   []fantasy.AgentTool{readFileTool, todoReadTool, todoWriteTool, writeFileTool, activateSkillTool, posixShellTool},
+		AgentTools:   []fantasy.AgentTool{readFileTool, writeFileTool, activateSkillTool, posixShellTool},
 		SystemPrompt: systemPrompt,
 	}, nil
 }
@@ -109,7 +101,9 @@ func (c *Config) CreateAgent() fantasy.Agent {
 
 // AgentFactory returns a function that creates new agents (for WebSocket)
 func (c *Config) AgentFactory() func() fantasy.Agent {
-	return c.CreateAgent
+	return func() fantasy.Agent {
+		return fantasy.NewAgent(c.Model, fantasy.WithTools(c.AgentTools...), fantasy.WithSystemPrompt(c.SystemPrompt))
+	}
 }
 
 // CreateProvider creates a provider based on type

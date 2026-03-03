@@ -8,16 +8,21 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
 
+// TodoReader is an interface for reading todos
+type TodoReader interface {
+	GetTodos() todo.TodoList
+}
+
 // TodoReadInput represents the input for the todo_read tool
 type TodoReadInput struct{}
 
 // NewTodoReadTool creates a tool for reading the todo list
-func NewTodoReadTool(todoMgr *todo.Manager) fantasy.AgentTool {
+func NewTodoReadTool(todoReader TodoReader) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		"todo_read",
 		"Read the current todo list",
 		func(ctx context.Context, input TodoReadInput, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			todos := todoMgr.GetTodos()
+			todos := todoReader.GetTodos()
 
 			data, err := json.MarshalIndent(todos, "", "  ")
 			if err != nil {

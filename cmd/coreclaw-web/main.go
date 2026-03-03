@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// Create WebSocket adaptor
-	adaptor := adaptors.NewWebSocketAdaptor(port, appCfg.AgentFactory(), appCfg.Cfg.BaseURL, appCfg.Cfg.ModelName, appCfg.Cfg.Session, appCfg.TodoMgr)
+	adaptor := adaptors.NewWebSocketAdaptor(port, appCfg)
 	adaptor.Start()
 
 	// Wait for interrupt

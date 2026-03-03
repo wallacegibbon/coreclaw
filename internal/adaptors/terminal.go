@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
+	"github.com/wallacegibbon/coreclaw/internal/app"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
@@ -53,28 +54,18 @@ func (d *DisplayBuffer) GetAll() string {
 
 // TerminalAdaptor is a terminal adaptor with a Terminal interface
 type TerminalAdaptor struct {
-	AgentFactory AgentFactory
-	BaseURL      string
-	ModelName    string
-	processor    *agentpkg.Processor
-	session      *agentpkg.Session
-	sessionFile  string
-	TodoMgr      *todo.Manager
+	Config      *app.Config
+	processor   *agentpkg.Processor
+	session     *agentpkg.Session
+	sessionFile string
 }
 
 // NewTerminalAdaptor creates a new Terminal adaptor
-func NewTerminalAdaptor(agentFactory AgentFactory, baseURL, modelName string) *TerminalAdaptor {
+func NewTerminalAdaptor(cfg *app.Config) *TerminalAdaptor {
 	return &TerminalAdaptor{
-		AgentFactory: agentFactory,
-		BaseURL:      baseURL,
-		ModelName:    modelName,
-		sessionFile:  "",
+		Config:      cfg,
+		sessionFile: "",
 	}
-}
-
-// SetTodoMgr sets the todo manager
-func (a *TerminalAdaptor) SetTodoMgr(todoMgr *todo.Manager) {
-	a.TodoMgr = todoMgr
 }
 
 // SetSessionFile sets the session file path
@@ -84,21 +75,22 @@ func (a *TerminalAdaptor) SetSessionFile(sessionFile string) {
 
 // Start runs the Terminal
 func (a *TerminalAdaptor) Start() {
-	agent := a.AgentFactory()
-
 	// Create input and output streams
 	inputStream := stream.NewChanInput(10)
 	terminalOutput := newTerminalOutput()
-	processor := agentpkg.NewProcessorWithIO(agent, inputStream, terminalOutput)
+	processor := agentpkg.NewProcessorWithIO(nil, inputStream, terminalOutput)
 	a.processor = processor
 
 	// Load or create session
-	a.session, a.sessionFile = agentpkg.LoadOrNewSession(agent, a.BaseURL, a.ModelName, processor, a.sessionFile)
-
-	// Set TodoMgr on session
-	if a.TodoMgr != nil {
-		a.session.SetTodoMgr(a.TodoMgr)
-	}
+	a.session, a.sessionFile = agentpkg.LoadOrNewSession(
+		a.Config.Model,
+		a.Config.AgentTools,
+		a.Config.SystemPrompt,
+		a.Config.Cfg.BaseURL,
+		a.Config.Cfg.ModelName,
+		a.processor,
+		a.sessionFile,
+	)
 
 	// Display loaded messages if session has any
 	if len(a.session.Messages) > 0 {
@@ -108,7 +100,6 @@ func (a *TerminalAdaptor) Start() {
 	}
 
 	t := NewTerminal(a.session, terminalOutput, inputStream, a.sessionFile)
-	t.SetTodoMgr(a.TodoMgr)
 
 	p := tea.NewProgram(t, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
@@ -201,7 +192,7 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 	}
 
 	switch tag {
-	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagNotify, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap:
+	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagNotify, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap, stream.TagTodo:
 		triggerUpdate()
 	}
 
@@ -232,6 +223,9 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 				w.status = baseStyle.Render(fmt.Sprintf("Context: %d | Total: %d", info.ContextTokens, info.TotalTokens))
 			}
 		}
+		return
+	case stream.TagTodo:
+		// Update todos from session - handled by Terminal's update loop
 		return
 	case stream.TagPromptStart:
 		w.display.Append(strings.TrimRight(w.promptStyle.Render("> ")+w.userInputStyle.Render(value), " "))
@@ -320,7 +314,6 @@ type Terminal struct {
 	showingWelcome   bool          // true while welcome text is still displayed
 	welcomeText      string        // colored welcome text for comparison
 	sessionFile      string        // session file path for saving on quit
-	todoMgr          *todo.Manager // todo manager
 	todos            todo.TodoList // cached todos for display
 
 	inputStyle  lipgloss.Style
@@ -370,17 +363,9 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	return m
 }
 
-// SetTodoMgr sets the todo manager
-func (m *Terminal) SetTodoMgr(todoMgr *todo.Manager) {
-	m.todoMgr = todoMgr
-	m.updateTodos()
-}
-
-// updateTodos updates the cached todos from the todo manager
+// updateTodos updates the cached todos from the session
 func (m *Terminal) updateTodos() {
-	if m.todoMgr != nil {
-		m.todos = m.todoMgr.GetTodos()
-	}
+	m.todos = m.session.GetTodos()
 	m.updateDisplayHeight()
 }
 
@@ -446,9 +431,9 @@ func (m *Terminal) renderTodos() string {
 	}
 
 	todoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af"))                  // Yellow
-	pendingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff"))               // White
+	pendingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))             // Dimmed white
 	inProgressStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true) // Green bold
-	completedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1"))             // Green
+	completedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6a8a6a"))          // Dimmed green
 
 	var sb strings.Builder
 	sb.WriteString(todoStyle.Render("TODO LIST"))
@@ -516,6 +501,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		m.updateDisplayContent()
 		m.updateStatus()
+		m.updateTodos()
 		if m.session != nil && m.session.IsInProgress() {
 			return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
 				return tickMsg{}

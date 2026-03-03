@@ -9,13 +9,18 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
 
+// TodoWriter is an interface for writing todos
+type TodoWriter interface {
+	SetTodos(todos todo.TodoList)
+}
+
 // TodoWriteInput represents the input for the todo_write tool
 type TodoWriteInput struct {
 	Todos string `json:"todos" description:"JSON array of todo items with content, active_form, and status"`
 }
 
 // NewTodoWriteTool creates a tool for writing/updating the todo list
-func NewTodoWriteTool(todoMgr *todo.Manager) fantasy.AgentTool {
+func NewTodoWriteTool(todoWriter TodoWriter) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		"todo_write",
 		"Write or update the todo list. Input is a JSON array of todo items. IMPORTANT: The 'content' field must remain exactly the same when updating status. Fields: content (task description, must not change when updating status), active_form (present continuous verb form), status (pending, in_progress, completed). Example: {\"content\":\"Install dependencies\",\"active_form\":\"Installing dependencies\",\"status\":\"pending\"}",
@@ -46,8 +51,8 @@ func NewTodoWriteTool(todoMgr *todo.Manager) fantasy.AgentTool {
 				}
 			}
 
-			// Set todos via manager
-			todoMgr.SetTodos(todos)
+			// Set todos via session (this will send TagTodo to adaptors)
+			todoWriter.SetTodos(todos)
 
 			// Check if all todos are completed, if so clear the list
 			allCompleted := true
@@ -58,7 +63,7 @@ func NewTodoWriteTool(todoMgr *todo.Manager) fantasy.AgentTool {
 				}
 			}
 			if allCompleted && len(todos) > 0 {
-				todoMgr.SetTodos(todo.TodoList{})
+				todoWriter.SetTodos(todo.TodoList{})
 				return fantasy.NewTextResponse("All tasks completed! Todo list cleared."), nil
 			}
 

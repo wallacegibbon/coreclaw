@@ -16,6 +16,7 @@ const (
 	TagSystem        = 'S' // System messages (queue status, etc.)
 	TagStreamGap     = 'G' // Stream gap to separate data
 	TagPromptStart   = 'P' // Prompt started processing (show user message + context/total)
+	TagTodo          = 'F' // Todo list updates (JSON wrapped in TagTodo)
 )
 
 // ChanInput implements Input using a channel for writing
