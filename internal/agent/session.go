@@ -220,11 +220,6 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	if err != nil {
 		// Track usage even on error (tokens were still spent)
 		s.trackUsage(usage)
-		// Save partial assistant message if it has content (tool calls, etc.)
-		// This preserves valuable work done before cancellation
-		if assistantMsg.Role != "" {
-			s.Messages = append(s.Messages, assistantMsg)
-		}
 		s.writeError(err.Error())
 		return
 	}
@@ -320,6 +315,7 @@ func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
 func (s *Session) cancelTask() {
 	if s.inProgress && s.cancelCurrent != nil {
 		s.cancelCurrent()
+		s.SetTodos(todo.TodoList{})
 		return
 	}
 	s.writeError("nothing to cancel")
