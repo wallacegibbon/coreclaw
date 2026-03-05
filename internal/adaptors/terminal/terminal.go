@@ -98,6 +98,7 @@ type Terminal struct {
 	quitting            bool
 	confirmDialog       bool
 	cancelConfirmDialog bool
+	cancelFromCommand   bool          // true if cancel triggered by /cancel command, false if by Ctrl+G
 	focusedWindow       string        // "display" or "input"
 	userScrolledAway    bool          // true after user manually scrolls up
 	windowWidth         int           // actual window width
@@ -359,11 +360,15 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 		switch msg.String() {
 		case "y", "Y":
 			m.cancelConfirmDialog = false
-			m.input.SetValue("")
-			return m.submitCommand("cancel", true), true
+			if m.cancelFromCommand {
+				m.input.SetValue("")
+			}
+			return m.submitCommand("cancel", m.cancelFromCommand), true
 		case "n", "N", "esc", "ctrl+c":
 			m.cancelConfirmDialog = false
-			m.input.SetValue("")
+			if m.cancelFromCommand {
+				m.input.SetValue("")
+			}
 			return nil, true
 		}
 		return nil, true
@@ -429,6 +434,7 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
 	case "ctrl+g":
 		m.cancelConfirmDialog = true
+		m.cancelFromCommand = false
 		return nil, true
 	case "ctrl+c":
 		if m.focusedWindow == "input" {
@@ -474,6 +480,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 		}
 		if command == "cancel" {
 			m.cancelConfirmDialog = true
+			m.cancelFromCommand = true
 			return nil
 		}
 		return m.submitCommand(command, true)
