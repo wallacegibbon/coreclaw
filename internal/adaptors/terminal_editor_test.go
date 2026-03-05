@@ -228,7 +228,7 @@ func TestWordwrapPreservesANSI(t *testing.T) {
 	widths := []int{20, 40, 60}
 	for _, width := range widths {
 		t.Run(fmt.Sprintf("width-%d", width), func(t *testing.T) {
-			wrapped := wordwrap(styledText, width)
+			wrapped := lipgloss.Wrap(styledText, width, " ")
 			lines := strings.Split(strings.TrimSuffix(wrapped, "\n"), "\n")
 			if len(lines) == 0 {
 				t.Fatal("No lines after wrapping")
@@ -249,5 +249,111 @@ func TestWordwrapPreservesANSI(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCtrlCClearsInput(t *testing.T) {
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal.input.SetValue("test input text")
+
+	// Press Ctrl+C while in input window
+	terminal.focusedWindow = "input"
+	terminal.input.Focus()
+	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
+
+	model, cmd := terminal.Update(msg)
+
+	// Should return a model and no command
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Input should be cleared
+	if terminal.input.Value() != "" {
+		t.Errorf("Input should be cleared after Ctrl+C in input window, got %q", terminal.input.Value())
+	}
+
+	// Should not emit any command (cmd should be nil)
+	if cmd != nil {
+		t.Errorf("Ctrl+C in input window should not emit command, got %v", cmd)
+	}
+}
+
+func TestCtrlCInDisplayWindow(t *testing.T) {
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal.input.SetValue("test input text")
+
+	// Press Ctrl+C while in display window
+	terminal.focusedWindow = "display"
+	terminal.input.Blur()
+	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
+
+	model, cmd := terminal.Update(msg)
+
+	// Should return a model and no command
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Should not emit any command
+	if cmd != nil {
+		t.Errorf("Ctrl+C in display window should not emit command, got %v", cmd)
+	}
+
+	// Input should NOT be cleared
+	if terminal.input.Value() != "test input text" {
+		t.Errorf("Input should NOT be cleared when Ctrl+C is pressed in display window, got %q", terminal.input.Value())
+	}
+}
+
+func TestCtrlGTriggersCancel(t *testing.T) {
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal.input.SetValue("test input text")
+
+	// Press Ctrl+G (should work regardless of focus)
+	terminal.focusedWindow = "input"
+	msg := tea.KeyPressMsg(tea.Key{Code: 'g', Mod: tea.ModCtrl})
+
+	model, cmd := terminal.Update(msg)
+
+	// Should return a model and a command
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	if cmd == nil {
+		t.Fatal("Ctrl+G should emit cancel command")
+	}
+
+	// Input should remain unchanged
+	if terminal.input.Value() != "test input text" {
+		t.Errorf("Input should remain unchanged after Ctrl+G, got %q", terminal.input.Value())
+	}
+}
+
+func TestCtrlUDoesNothingInInput(t *testing.T) {
+	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal.input.SetValue("test input text")
+
+	// Press Ctrl+U while in input window
+	terminal.focusedWindow = "input"
+	terminal.input.Focus()
+	msg := tea.KeyPressMsg(tea.Key{Code: 'u', Mod: tea.ModCtrl})
+
+	model, cmd := terminal.Update(msg)
+
+	// Should return a model and no command
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Input should remain unchanged
+	if terminal.input.Value() != "test input text" {
+		t.Errorf("Input should remain unchanged after Ctrl+U in input window, got %q", terminal.input.Value())
+	}
+
+	// Should not emit any command
+	if cmd != nil {
+		t.Errorf("Ctrl+U in input window should not emit command, got %v", cmd)
 	}
 }

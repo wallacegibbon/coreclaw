@@ -112,7 +112,8 @@ When running the Terminal version:
 | `Ctrl+D` | Scroll down half page (when display focused) |
 | `Ctrl+U` | Scroll up half page (when display focused) |
 | `/` | Switch to input with "/" prefix (when display focused) |
-| `Ctrl+C` | Cancel current request |
+| `Ctrl+C` | Clear input (when input focused) |
+| `Ctrl+G` | Cancel current request |
 | `/quit`, `/exit` | Exit with confirmation (press y/n) |
 
 ## Session Commands

@@ -431,11 +431,20 @@
         });
         prompt.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'c') {
+                // Ctrl+C clears input (when input is focused)
+                e.preventDefault();
+                prompt.value = '';
+            } else if (e.ctrlKey && e.key === 'g') {
+                // Ctrl+G sends /cancel command
                 e.preventDefault();
                 sendCancelCommand();
             } else if (e.ctrlKey && e.key === 's') {
+                // Ctrl+S sends /save command
                 e.preventDefault();
                 sendSaveCommand();
+            } else if (e.ctrlKey && e.key === 'u') {
+                // Ctrl+U is disabled (prevent textinput's clear line behavior)
+                e.preventDefault();
             }
         });
 

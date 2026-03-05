@@ -148,7 +148,7 @@ For this project, simplicity is more important than efficiency.
   - Solutions implemented:
     1. **Per-line styling**: Added `renderMultiline` helper that splits text by newlines and applies styling per line
     2. **Session format consistency**: Updated `session.go:DisplayMessages()` to match live streaming format with proper TagStreamGap separators and tool formatting
-    3. **Wordwrap ANSI preservation**: Enhanced `wordwrap()` function to preserve both prefix (styling) and suffix (reset) ANSI escape sequences across line breaks
+    3. **Wordwrap ANSI preservation**: Replaced custom `wordwrap()` with `lipgloss.Wrap()` which automatically preserves ANSI escape sequences across line breaks
     4. **Panic fix**: Fixed slice bounds panic when line contains only escape sequences by extracting suffix from remaining text after prefix removal
   - Testing:
     - Added `TestWordwrapPreservesANSI` to verify each wrapped line starts with styling and ends with reset sequence
@@ -191,20 +191,27 @@ For this project, simplicity is more important than efficiency.
 
 - ✅ **Fixed wordwrap orphan prevention**
   - **Problem**: Last word sometimes placed on new line even when the previous line had space remaining, creating short "orphan" lines (e.g., "first.", "properly." on separate lines)
-  - **Root cause**: Greedy wordwrap algorithm filled each line to maximum width without considering balance between lines, causing short final words to be isolated
-  - **Solution**: Added orphan detection in `wordwrap()` function:
-    - When breaking at a space would create a short segment (< 30% of width)
-    - Check if the remaining text can be packed onto the current line without exceeding 120% of width
-    - If so, find an earlier space to break at, or pack entire remaining segment onto current line
-  - **Implementation**: Enhanced `wordwrap()` with orphan detection logic that looks for previous spaces and packs short segments together
+  - **Root cause**: Greedy character-based wordwrap algorithm filled each line to maximum width without considering word boundaries
+  - **Solution**: Replaced custom `wordwrap()` with `lipgloss.Wrap()` which:
+    - Uses word-based wrapping (breaks at spaces, not mid-character)
+    - Has built-in orphan prevention to avoid short final words on separate lines
+    - Automatically preserves ANSI escape sequences across line breaks
+  - **Implementation**: Deleted custom `wordwrap.go` (~190 lines) and replaced all calls with `lipgloss.Wrap(text, width, " ")`
   - **Testing**: Added `TestWordwrapOrphanPrevention` with multiple test cases to verify no short orphan lines appear
+
+- ✅ **Disabled Ctrl+U in input window**
+  - **Problem**: Ctrl+U in input box cleared the visual display but not the actual content, creating misleading behavior
+  - **Root cause**: textinput component's default Ctrl+U behavior clears the visible text but may leave internal state
+  - **Solution**: Disabled Ctrl+U when input window is focused
+  - **Implementation**: Added early return in `handleKeyMsg()` when `focusedWindow == "input"` and key is Ctrl+U
+  - **Testing**: Added `TestCtrlUDoesNothingInInput` to verify input remains unchanged after Ctrl+U in input window
 
 - ✅ **Upgraded to bubbletea/lipgloss/bubbles v2.x**
   - Updated go.mod with v2 versions from charm.land vanity domain:
     - charm.land/bubbletea/v2@v2.0.1
     - charm.land/lipgloss/v2@v2.0.0
     - charm.land/bubbles/v2@v2.0.0
-  - Updated all imports across internal/adaptors/ (terminal.go, wordwrap.go, test files)
+  - Updated all imports across internal/adaptors/ (terminal.go, test files)
   - Fixed breaking API changes:
     - View() return type: `string` → `tea.View` (wrap with `tea.NewView()`)
     - KeyMsg API: changed from struct to interface with `msg.String()` for comparison

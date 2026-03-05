@@ -344,7 +344,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	hasExistingContent := len(terminalOutput.display.Messages) > 0
 	if hasExistingContent {
 		existingContent := terminalOutput.display.GetAll()
-		wrapped := wordwrap(existingContent, display.Width())
+		wrapped := lipgloss.Wrap(existingContent, display.Width(), " ")
 		newlineCount := strings.Count(wrapped, "\n")
 		display.SetContent(wrapped)
 		display.SetYOffset(max(0, newlineCount-display.Height()))
@@ -381,7 +381,7 @@ func (m *Terminal) updateDisplayHeight() {
 	if oldHeight != newHeight {
 		// Get raw content and word-wrap to count lines
 		rawContent := m.terminalOutput.display.GetAll()
-		wrapped := wordwrap(rawContent, m.display.Width())
+		wrapped := lipgloss.Wrap(rawContent, m.display.Width(), " ")
 		totalLines := strings.Count(wrapped, "\n") + 1 // content may have trailing newline
 		// Ensure totalLines is at least 1
 		if totalLines < 1 {
@@ -488,7 +488,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.windowWidth = msg.Width
 		m.windowHeight = msg.Height
 		m.display.SetWidth(max(0, msg.Width-8)) // Leave room for padding (4 on each side)
-		m.input.SetWidth(max(0, msg.Width-4))   // Leave room for border padding (2 on each side)
+		m.input.SetWidth(max(0, msg.Width-8))   // Leave room for border padding (2 on each side)
 		m.updateDisplayHeight()
 		m.centerWelcomeText()
 		m.updateTodos()
@@ -605,9 +605,23 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "ctrl+c":
-		// Cancel the current request
+	case "ctrl+g":
+		// Cancel current request
 		return m, m.submitCommand("cancel", false)
+	case "ctrl+c":
+		// If input window is focused, clear input
+		if m.focusedWindow == "input" {
+			m.input.SetValue("")
+			m.editorContent = ""
+			return m, nil
+		}
+		// Otherwise, do nothing
+		return m, nil
+	case "ctrl+u":
+		// If input window is focused, disable Ctrl+U (prevent textinput's clear line behavior)
+		if m.focusedWindow == "input" {
+			return m, nil
+		}
 	case "ctrl+s":
 		// Save session
 		return m, m.submitCommand("save", false)
@@ -796,7 +810,7 @@ func (m *Terminal) updateDisplayContent() {
 	width := m.display.Width()
 
 	if width > 0 {
-		newContent = wordwrap(newContent, width)
+		newContent = lipgloss.Wrap(newContent, width, " ")
 	}
 	m.display.SetContent(newContent)
 	// Auto-scroll by default, unless user has manually scrolled away
