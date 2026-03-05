@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/wallacegibbon/coreclaw/internal/adaptors"
+	"github.com/wallacegibbon/coreclaw/internal/adaptors/websocket"
 	"github.com/wallacegibbon/coreclaw/internal/app"
 	"github.com/wallacegibbon/coreclaw/internal/config"
 )
@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// Create WebSocket adaptor
-	adaptor := adaptors.NewWebSocketAdaptor(port, appCfg)
+	adaptor := websocket.NewWebSocketAdaptor(port, appCfg)
 	adaptor.Start()
 
 	// Wait for interrupt

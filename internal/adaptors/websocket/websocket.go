@@ -1,4 +1,4 @@
-package adaptors
+package websocket
 
 import (
 	"net/http"
@@ -9,6 +9,7 @@ import (
 
 	_ "embed"
 
+	"github.com/wallacegibbon/coreclaw/internal/adaptors/common"
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/app"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
@@ -46,7 +47,7 @@ func (a *WebSocketAdaptor) Start() {
 // serveIndex serves the embedded chat UI.
 func serveIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	html := strings.Replace(string(indexHTML), "{{welcome}}", WelcomeText, 1)
+	html := strings.Replace(string(indexHTML), "{{welcome}}", common.WelcomeText, 1)
 	w.Write([]byte(html))
 }
 

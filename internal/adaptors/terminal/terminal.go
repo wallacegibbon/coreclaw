@@ -1,4 +1,4 @@
-package adaptors
+package terminal
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/wallacegibbon/coreclaw/internal/adaptors/common"
 	agentpkg "github.com/wallacegibbon/coreclaw/internal/agent"
 	"github.com/wallacegibbon/coreclaw/internal/app"
 	"github.com/wallacegibbon/coreclaw/internal/stream"
@@ -40,7 +41,7 @@ func (a *TerminalAdaptor) SetSessionFile(sessionFile string) {
 func (a *TerminalAdaptor) Start() {
 	// Create input and output streams
 	inputStream := stream.NewChanInput(10)
-	terminalOutput := newTerminalOutput()
+	terminalOutput := NewTerminalOutput()
 	// Load or create session
 	var session *agentpkg.Session
 	session, a.sessionFile = agentpkg.LoadOrNewSession(
@@ -119,7 +120,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	input.SetWidth(76)
 
 	styles := DefaultStyles()
-	coloredWelcome := colorizeWelcomeText(WelcomeText)
+	coloredWelcome := colorizeWelcomeText(common.WelcomeText)
 	display := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 
 	m := &Terminal{

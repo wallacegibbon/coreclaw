@@ -1,4 +1,4 @@
-package adaptors
+package terminal
 
 import (
 	"encoding/binary"
@@ -53,7 +53,7 @@ type terminalOutput struct {
 	styles     *Styles       // UI styles
 }
 
-func newTerminalOutput() *terminalOutput {
+func NewTerminalOutput() *terminalOutput {
 	return &terminalOutput{
 		display:    NewDisplayBuffer(),
 		updateChan: make(chan struct{}, 1),

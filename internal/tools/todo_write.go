@@ -32,7 +32,7 @@ func NewTodoWriteTool(todoWriter TodoWriter) fantasy.AgentTool {
 
 			var todos todo.TodoList
 			if err := json.Unmarshal([]byte(input.Todos), &todos); err != nil {
-				return fantasy.NewTextErrorResponse("invalid todos JSON: "+err.Error()), nil
+				return fantasy.NewTextErrorResponse("invalid todos JSON: " + err.Error()), nil
 			}
 
 			// Validate todo items
@@ -105,7 +105,7 @@ func NewTodoWriteTool(todoWriter TodoWriter) fantasy.AgentTool {
 				return fantasy.NewTextResponse("All tasks completed! Todo list cleared."), nil
 			}
 
-			return fantasy.NewTextResponse("Todo list updated with "+fmt.Sprintf("%d", len(todos))+" items"), nil
+			return fantasy.NewTextResponse("Todo list updated with " + fmt.Sprintf("%d", len(todos)) + " items"), nil
 		},
 	)
 }

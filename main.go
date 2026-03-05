@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/wallacegibbon/coreclaw/internal/adaptors"
+	"github.com/wallacegibbon/coreclaw/internal/adaptors/terminal"
 	"github.com/wallacegibbon/coreclaw/internal/app"
 	"github.com/wallacegibbon/coreclaw/internal/config"
 )
@@ -28,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	adaptor := adaptors.NewTerminalAdaptor(appCfg)
+	adaptor := terminal.NewTerminalAdaptor(appCfg)
 	adaptor.SetSessionFile(appCfg.Cfg.Session)
 	adaptor.Start()
 }

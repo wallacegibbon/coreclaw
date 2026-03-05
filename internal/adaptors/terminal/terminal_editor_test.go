@@ -1,4 +1,4 @@
-package adaptors
+package terminal
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestCtrlOOpensEditor(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 
 	msg := tea.KeyPressMsg(tea.Key{
 		Code: 'o',
@@ -30,7 +30,7 @@ func TestCtrlOOpensEditor(t *testing.T) {
 }
 
 func TestCtrlOWithExistingContent(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.input.SetValue("existing input text")
 
 	msg := tea.KeyPressMsg(tea.Key{
@@ -54,7 +54,7 @@ func TestCtrlOWithExistingContent(t *testing.T) {
 }
 
 func TestEditorFinishedMsg(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 
 	msg := editorFinishedMsg{
 		content: "test content from editor",
@@ -80,7 +80,7 @@ func TestEditorFinishedMsg(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 
 	msg := editorFinishedMsg{
 		content: "  content with leading and trailing spaces  \n",
@@ -100,7 +100,7 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 }
 
 func TestEditorContentSubmittedOnEnter(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.editorContent = "line1\nline2\nline3"
 
 	// editorContent is cleared before submission when Enter is pressed
@@ -111,7 +111,7 @@ func TestEditorContentSubmittedOnEnter(t *testing.T) {
 }
 
 func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.editorContent = "editor content"
 	terminal.input.SetValue("input value")
 
@@ -123,7 +123,7 @@ func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithError(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.input.SetValue("original content")
 
 	msg := editorFinishedMsg{
@@ -163,7 +163,7 @@ func TestEditorSelectionOrder(t *testing.T) {
 func TestRenderMultiline(t *testing.T) {
 	// Note: lipgloss.SetColorProfile is no longer needed in v2
 
-	output := newTerminalOutput()
+	output := NewTerminalOutput()
 	// Use existing reasoning style which should produce ANSI codes
 	style := output.styles.Reasoning
 	// First test direct rendering
@@ -197,7 +197,7 @@ func TestRenderMultiline(t *testing.T) {
 func TestColorizeToolMultiline(t *testing.T) {
 	// Note: lipgloss.SetColorProfile is no longer needed in v2
 
-	output := newTerminalOutput()
+	output := NewTerminalOutput()
 	// Test multiline tool output with colon on first line
 	value := "tool_name: first line\nsecond line\nthird line"
 	result := output.colorizeTool(value)
@@ -253,7 +253,7 @@ func TestWordwrapPreservesANSI(t *testing.T) {
 }
 
 func TestCtrlCClearsInput(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in input window
@@ -280,7 +280,7 @@ func TestCtrlCClearsInput(t *testing.T) {
 }
 
 func TestCtrlCInDisplayWindow(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in display window
@@ -307,7 +307,7 @@ func TestCtrlCInDisplayWindow(t *testing.T) {
 }
 
 func TestCtrlGTriggersCancel(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+G (should work regardless of focus)
@@ -351,7 +351,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 }
 
 func TestCtrlUDoesNothingInInput(t *testing.T) {
-	terminal := NewTerminal(nil, newTerminalOutput(), stream.NewChanInput(10), "")
+	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+U while in input window

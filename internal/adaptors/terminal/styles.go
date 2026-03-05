@@ -1,4 +1,4 @@
-package adaptors
+package terminal
 
 import "charm.land/lipgloss/v2"
 
