@@ -53,7 +53,7 @@ Flags:
   -api-key string    API key for the provider (required)
   -model string      Model name to use
   -system string     Override system prompt
-  -skill string      Skills directory path (can be specified multiple times)
+  -skill strings     Skills directory path (can be specified multiple times)
   -addr string       Server address to listen on (default ":8080")
   -session string    Session file path to load/save conversations
   -debug-api         Write raw API requests and responses to log file
@@ -65,5 +65,6 @@ Examples:
   coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4
   coreclaw-web --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --addr :9090
   coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/my-session.json
+  coreclaw-web --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --skill ./skills1 --skill ./skills2
 `)
 }

@@ -9,15 +9,15 @@ import (
 
 // Manager handles skill discovery and loading
 type Manager struct {
-	skills   []Skill
-	skillDir string
+	skills    []Skill
+	skillDirs []string
 }
 
 // NewManager creates a new skill manager
 func NewManager(skillPaths []string) (*Manager, error) {
 	m := &Manager{
-		skills:   []Skill{},
-		skillDir: "",
+		skills:    []Skill{},
+		skillDirs: skillPaths,
 	}
 
 	// If no skill paths provided, return empty manager
@@ -25,9 +25,7 @@ func NewManager(skillPaths []string) (*Manager, error) {
 		return m, nil
 	}
 
-	m.skillDir = skillPaths[0]
-
-	// Discover and load skill metadata
+	// Discover and load skill metadata from all paths
 	if err := m.discoverSkills(); err != nil {
 		return nil, fmt.Errorf("failed to discover skills: %w", err)
 	}
@@ -35,38 +33,47 @@ func NewManager(skillPaths []string) (*Manager, error) {
 	return m, nil
 }
 
-// discoverSkills scans the skills directory for skills
+// discoverSkills scans all skill directories for skills
 func (m *Manager) discoverSkills() error {
-	entries, err := os.ReadDir(m.skillDir)
-	if err != nil {
-		// If directory doesn't exist, that's OK - no skills
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		skillPath := filepath.Join(m.skillDir, entry.Name())
-		skillFile := filepath.Join(skillPath, "SKILL.md")
-
-		if _, err := os.Stat(skillFile); os.IsNotExist(err) {
-			continue
-		}
-
-		// Load only metadata at startup
-		skill, err := m.loadSkillMetadata(skillFile, entry.Name())
+	for _, skillDir := range m.skillDirs {
+		entries, err := os.ReadDir(skillDir)
 		if err != nil {
-			// Skip invalid skills but log warning
-			fmt.Fprintf(os.Stderr, "Warning: failed to load skill %s: %v\n", entry.Name(), err)
-			continue
+			// If directory doesn't exist, that's OK - no skills
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
 		}
 
-		m.skills = append(m.skills, skill)
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			skillPath := filepath.Join(skillDir, entry.Name())
+			skillFile := filepath.Join(skillPath, "SKILL.md")
+
+			if _, err := os.Stat(skillFile); os.IsNotExist(err) {
+				continue
+			}
+
+			// Load only metadata at startup
+			skill, err := m.loadSkillMetadata(skillFile, entry.Name())
+			if err != nil {
+				// Skip invalid skills but log warning
+				fmt.Fprintf(os.Stderr, "Warning: failed to load skill %s from %s: %v\n", entry.Name(), skillDir, err)
+				continue
+			}
+
+			// Check for duplicate skill names
+			for _, existing := range m.skills {
+				if existing.Name == skill.Name {
+					fmt.Fprintf(os.Stderr, "Warning: duplicate skill name '%s' found, using version from %s\n", skill.Name, skillDir)
+				}
+			}
+
+			m.skills = append(m.skills, skill)
+		}
 	}
 
 	return nil

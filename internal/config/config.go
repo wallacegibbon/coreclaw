@@ -2,9 +2,28 @@ package config
 
 import (
 	"flag"
+	"strings"
 
 	"github.com/wallacegibbon/coreclaw/internal/provider"
 )
+
+// stringSlice implements flag.Value for multiple string flags
+type stringSlice struct {
+	slice []string
+}
+
+func (s *stringSlice) String() string {
+	return strings.Join(s.slice, ",")
+}
+
+func (s *stringSlice) Set(value string) error {
+	s.slice = append(s.slice, value)
+	return nil
+}
+
+func (s *stringSlice) Get() []string {
+	return s.slice
+}
 
 const Version = "0.1.0"
 
@@ -33,16 +52,14 @@ func Parse() *Settings {
 	baseURL := flag.String("base-url", "", "Base URL for the API endpoint (requires --api-key, ignores env vars)")
 	modelName := flag.String("model", "", "Model name to use (defaults to provider default)")
 	providerType := flag.String("type", "", "Provider type: anthropic, openai (overrides auto-detection)")
-	skill := flag.String("skill", "", "Skill path (can be specified multiple times)")
+	skill := &stringSlice{}
+	flag.Var(skill, "skill", "Skill path (can be specified multiple times)")
 	addr := flag.String("addr", ":8080", "Server address to listen on (for web server)")
 	session := flag.String("session", "", "Session file path to load/save conversations")
 	flag.Parse()
 
 	// Collect skill paths
-	var skillPaths []string
-	if *skill != "" {
-		skillPaths = append(skillPaths, *skill)
-	}
+	skillPaths := skill.Get()
 
 	s := &Settings{
 		ShowVersion:  *showVersion,
