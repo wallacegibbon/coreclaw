@@ -1,7 +1,7 @@
 # CoreClaw Project Status
 
 ## Overview
-CoreClaw is a minimal AI Agent that can handle toolcalling. It provides six tools: `read_file` (supports line range), `todo_read`, `todo_write`, `write_file`, `activate_skill`, and `posix_shell`.
+CoreClaw is a minimal AI Agent that can handle toolcalling. It provides seven tools: `read_file` (supports line range), `todo_read`, `todo_write`, `edit_file` (unified diff), `write_file`, `activate_skill`, and `posix_shell`.
 All skills are based on these tools.
 
 For this project, simplicity is more important than efficiency.
@@ -239,7 +239,7 @@ For this project, simplicity is more important than efficiency.
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
-- **Tools**: read_file, todo_read, todo_write, write_file, activate_skill, posix_shell
+- **Tools**: read_file, todo_read, todo_write, edit_file, write_file, activate_skill, posix_shell
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 - **Stream Protocol**: TLV (Tag-Length-Value) for structured output
@@ -259,7 +259,7 @@ internal/
   skills/      - Skills system (discovery, parsing, activation)
   stream/      - IOStream interfaces and TLV protocol
   todo/        - Todo list management for task planning
-  tools/       - Tool implementations (posix_shell, read_file, write_file, activate_skill, todo_read, todo_write)
+  tools/       - Tool implementations (posix_shell, read_file, edit_file, write_file, activate_skill, todo_read, todo_write)
 cmd/coreclaw-web/       - coreclaw-web entry point
 main.go        - coreclaw entry point
 ```

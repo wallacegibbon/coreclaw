@@ -79,7 +79,7 @@ coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $AN
 
 ## Features
 
-- Tools: read_file, todo_read, todo_write, write_file, activate_skill, posix_shell
+- Tools: read_file, todo_read, todo_write, edit_file, write_file, activate_skill, posix_shell
 - Multi-step conversations with tool calls
 - Token usage tracking
 - Error handling for command execution

@@ -144,6 +144,7 @@ CoreClaw provides the following tools (ordered from safest to most dangerous):
 | `read_file` | Read the contents of a file. Supports optional line range using start_line and end_line parameters (1-indexed). |
 | `todo_read` | Read the current todo list |
 | `todo_write` | Write or update the todo list |
+| `edit_file` | Apply changes to a file using unified diff format. Requires reading file first to generate accurate diffs with matching context lines. |
 | `write_file` | Create a new file or replace entire file content |
 | `activate_skill` | Load and execute a skill |
 | `posix_shell` | Execute shell commands |
@@ -250,6 +251,7 @@ Tools must be ordered from safest to most dangerous:
 1. `read_file` - Read file contents (supports line range with start_line and end_line parameters, 1-indexed)
 2. `todo_read` - Read todo list
 3. `todo_write` - Write/update todo list
-4. `write_file` - Create or replace files (full overwrite)
-5. `activate_skill` - Load and execute skills
-6. `posix_shell` - Execute shell commands (most dangerous)
+4. `edit_file` - Apply changes to a file using unified diff format
+5. `write_file` - Create or replace files (full overwrite)
+6. `activate_skill` - Load and execute skills
+7. `posix_shell` - Execute shell commands (most dangerous)

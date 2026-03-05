@@ -532,6 +532,19 @@ func formatToolCall(toolName, input string) string {
 		if len(args) > 0 {
 			return fmt.Sprintf("%s: %s", toolName, strings.Join(args, ", "))
 		}
+	case "edit_file":
+		args := []string{}
+		if path, ok := fields["path"].(string); ok {
+			args = append(args, path)
+		}
+		var diffStr string
+		if diff, ok := fields["diff"].(string); ok {
+			diffStr = diff
+			args = append(args, "<diff>")
+		}
+		if len(args) > 0 {
+			return fmt.Sprintf("%s: %s\n%s", toolName, strings.Join(args, ", "), diffStr)
+		}
 	case "todo_read":
 		return "todo_read: Reading todo list"
 	case "todo_write":

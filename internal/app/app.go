@@ -81,12 +81,13 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	writeFileTool := tools.NewWriteFileTool()
 	activateSkillTool := tools.NewActivateSkillTool(skillsManager)
 	posixShellTool := tools.NewPosixShellTool()
+	editFileTool := tools.NewEditFileTool()
 
 	return &Config{
 		Cfg:          cfg,
 		Model:        model,
 		SkillsMgr:    skillsManager,
-		AgentTools:   []fantasy.AgentTool{readFileTool, writeFileTool, activateSkillTool, posixShellTool},
+		AgentTools:   []fantasy.AgentTool{readFileTool, editFileTool, writeFileTool, activateSkillTool, posixShellTool},
 		SystemPrompt: systemPrompt,
 	}, nil
 }
