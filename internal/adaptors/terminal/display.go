@@ -295,7 +295,7 @@ func (m *DisplayModel) MoveWindowCursorUp() {
 	}
 }
 
-// EnsureCursorVisible scrolls the viewport to make the cursor window visible.
+// EnsureCursorVisible scrolls the viewport to make the cursor window fully visible.
 func (m *DisplayModel) EnsureCursorVisible() {
 	if m.windowCursor < 0 {
 		return
@@ -308,16 +308,18 @@ func (m *DisplayModel) EnsureCursorVisible() {
 	viewportHeight := m.viewport.Height()
 	viewportBottom := viewportTop + viewportHeight
 
-	// If window is above viewport, scroll up
+	// If window is above viewport, scroll up to show it
 	if startLine < viewportTop {
 		m.viewport.SetYOffset(startLine)
+		m.userScrolledAway = true
 		return
 	}
 
-	// If window is below viewport, scroll down
+	// If window end is below viewport, scroll down to show it fully
 	if endLine > viewportBottom {
 		newTop := endLine - viewportHeight
 		m.viewport.SetYOffset(newTop)
+		m.userScrolledAway = true
 	}
 }
 

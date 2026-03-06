@@ -277,13 +277,13 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
 	case "j":
 		m.display.MoveWindowCursorDown()
-		m.display.EnsureCursorVisible()
 		m.display.updateContent()
+		m.display.EnsureCursorVisible()
 		return nil, true
 	case "k":
 		m.display.MoveWindowCursorUp()
-		m.display.EnsureCursorVisible()
 		m.display.updateContent()
+		m.display.EnsureCursorVisible()
 		return nil, true
 	case "G":
 		m.display.GotoBottom()
