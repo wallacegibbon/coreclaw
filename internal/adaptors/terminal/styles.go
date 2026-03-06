@@ -40,7 +40,7 @@ func DefaultStyles() *Styles {
 		Reasoning:   baseStyle.Foreground(lipgloss.Color("#6c7086")).Italic(true),
 		Error:       baseStyle.Foreground(lipgloss.Color("#f38ba8")),
 		System:      baseStyle.Foreground(lipgloss.Color("#6c7086")),
-		Prompt:      baseStyle.Foreground(lipgloss.Color("#a6e3a1")).Bold(true),
+		Prompt:      baseStyle.Foreground(lipgloss.Color("#89d4fa")).Bold(true),
 
 		// Display styles
 		Input:  baseStyle,
