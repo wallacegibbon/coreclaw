@@ -139,8 +139,8 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status.SetStatus(m.terminalOutput.status)
 		m.todo.SetTodos(m.terminalOutput.todos)
 		m.updateDisplayHeight()
-		// Update cursor to last window if no cursor set
-		if m.display.GetWindowCursor() < 0 {
+		// Update cursor to last window if user hasn't moved it away
+		if !m.display.UserMovedCursorAway() {
 			m.display.SetCursorToLastWindow()
 			m.display.updateContent()
 		}
@@ -276,11 +276,17 @@ func (m *Terminal) toggleFocus() {
 func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
 	case "j":
+		m.display.ScrollDown(1)
+		return nil, true
+	case "k":
+		m.display.ScrollUp(1)
+		return nil, true
+	case "J":
 		m.display.MoveWindowCursorDown()
 		m.display.updateContent()
 		m.display.EnsureCursorVisible()
 		return nil, true
-	case "k":
+	case "K":
 		m.display.MoveWindowCursorUp()
 		m.display.updateContent()
 		m.display.EnsureCursorVisible()

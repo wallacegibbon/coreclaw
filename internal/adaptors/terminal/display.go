@@ -18,15 +18,16 @@ type DisplayMsg struct {
 
 // DisplayModel handles the main content viewport
 type DisplayModel struct {
-	viewport         viewport.Model
-	userScrolledAway bool
-	showingWelcome   bool
-	welcomeText      string
-	windowBuffer     *WindowBuffer
-	styles           *Styles
-	width            int
-	height           int
-	windowCursor     int // index of the currently selected window (-1 means no selection)
+	viewport            viewport.Model
+	userScrolledAway    bool
+	showingWelcome      bool
+	welcomeText         string
+	windowBuffer        *WindowBuffer
+	styles              *Styles
+	width               int
+	height              int
+	windowCursor        int  // index of the currently selected window (-1 means no selection)
+	userMovedCursorAway bool // true if user manually moved cursor away from last window
 }
 
 // NewDisplayModel creates a new display model
@@ -36,14 +37,15 @@ func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 	vp.SetContent(coloredWelcome)
 
 	return DisplayModel{
-		viewport:       vp,
-		showingWelcome: true,
-		welcomeText:    coloredWelcome,
-		windowBuffer:   windowBuffer,
-		styles:         styles,
-		width:          80,
-		height:         20,
-		windowCursor:   -1,
+		viewport:            vp,
+		showingWelcome:      true,
+		welcomeText:         coloredWelcome,
+		windowBuffer:        windowBuffer,
+		styles:              styles,
+		width:               80,
+		height:              20,
+		windowCursor:        -1,
+		userMovedCursorAway: false,
 	}
 }
 
@@ -64,7 +66,7 @@ func (m DisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "content_update":
 			m.updateContent()
 		case "scroll_down":
-			m.scrollDown(1)
+			m.ScrollDown(1)
 		case "scroll_up":
 			m.viewport.ScrollUp(1)
 			m.userScrolledAway = true
@@ -75,7 +77,7 @@ func (m DisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.GotoTop()
 			m.userScrolledAway = true
 		case "scroll_half_down":
-			m.scrollDown(m.viewport.Height() / 2)
+			m.ScrollDown(m.viewport.Height() / 2)
 		case "scroll_half_up":
 			m.viewport.ScrollUp(m.viewport.Height() / 2)
 			m.userScrolledAway = true
@@ -129,8 +131,8 @@ func (m *DisplayModel) updateContent() {
 	}
 }
 
-// scrollDown scrolls the display and updates userScrolledAway
-func (m *DisplayModel) scrollDown(lines int) {
+// ScrollDown scrolls down by lines and updates userScrolledAway.
+func (m *DisplayModel) ScrollDown(lines int) {
 	m.viewport.ScrollDown(lines)
 	m.userScrolledAway = !m.viewport.AtBottom()
 }
@@ -267,6 +269,12 @@ func (m *DisplayModel) SetWindowCursor(index int) {
 		index = windowCount - 1
 	}
 	m.windowCursor = index
+	// Update userMovedCursorAway based on whether we're at the last window
+	if windowCount > 0 && index == windowCount-1 {
+		m.userMovedCursorAway = false
+	} else if index >= 0 {
+		m.userMovedCursorAway = true
+	}
 }
 
 // MoveWindowCursorDown moves the window cursor down by one window.
@@ -277,8 +285,14 @@ func (m *DisplayModel) MoveWindowCursorDown() {
 	}
 	if m.windowCursor < 0 || m.windowCursor >= windowCount-1 {
 		m.windowCursor = windowCount - 1
+		m.userMovedCursorAway = false // reached last window, resume auto-follow
 	} else {
 		m.windowCursor++
+		if m.windowCursor < windowCount-1 {
+			m.userMovedCursorAway = true // moved away from last window
+		} else {
+			m.userMovedCursorAway = false // reached last window
+		}
 	}
 }
 
@@ -293,6 +307,7 @@ func (m *DisplayModel) MoveWindowCursorUp() {
 	} else {
 		m.windowCursor--
 	}
+	m.userMovedCursorAway = true // moving up always means moving away from last
 }
 
 // EnsureCursorVisible scrolls the viewport to make the cursor window fully visible.
@@ -331,4 +346,9 @@ func (m *DisplayModel) SetCursorToLastWindow() {
 	} else {
 		m.windowCursor = windowCount - 1
 	}
+}
+
+// UserMovedCursorAway returns true if the user has manually moved the cursor away from the last window.
+func (m *DisplayModel) UserMovedCursorAway() bool {
+	return m.userMovedCursorAway
 }
