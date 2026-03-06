@@ -304,13 +304,15 @@ func (s *Session) processPrompt(ctx context.Context, prompt string, history []fa
 		return nil
 	}
 
-	call.OnTextDelta = func(id, text string) error {
-		stream.WriteTLV(s.Output, stream.TagAssistantText, assembleId(id)+text)
+	// The `id` in the callback is not reliable, it does not work for some providers.
+	// Here we only need to distinguish the delta type, so we give numbers directly.
+	call.OnTextDelta = func(_, text string) error {
+		stream.WriteTLV(s.Output, stream.TagAssistantText, assembleId("t")+text)
 		s.Output.Flush()
 		return nil
 	}
-	call.OnReasoningDelta = func(id, text string) error {
-		stream.WriteTLV(s.Output, stream.TagReasoning, assembleId(id)+text)
+	call.OnReasoningDelta = func(_, text string) error {
+		stream.WriteTLV(s.Output, stream.TagReasoning, assembleId("r")+text)
 		s.Output.Flush()
 		return nil
 	}

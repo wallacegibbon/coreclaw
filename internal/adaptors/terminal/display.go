@@ -365,3 +365,12 @@ func (m *DisplayModel) SetCursorToLastWindow() {
 func (m *DisplayModel) UserMovedCursorAway() bool {
 	return m.userMovedCursorAway
 }
+
+// ToggleWindowWrap toggles the wrap state of the currently selected window.
+// Returns true if a window was toggled, false if no window is selected.
+func (m *DisplayModel) ToggleWindowWrap() bool {
+	if m.windowCursor < 0 {
+		return false
+	}
+	return m.windowBuffer.ToggleWrap(m.windowCursor)
+}

@@ -309,6 +309,11 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.input.SetValue(":")
 		m.input.CursorEnd()
 		return nil, true
+	case "space":
+		if m.display.ToggleWindowWrap() {
+			m.display.updateContent()
+		}
+		return nil, true
 	}
 	return nil, false
 }

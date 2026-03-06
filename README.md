@@ -122,7 +122,7 @@ The terminal organizes concurrent streams into separate windows with synchronize
 
 ### Window Cursor
 
-A Window Cursor highlights one window with a bright border. Use `J`/`K` to navigate. The cursor stays visible during scrolling and defaults to the newest window.
+A Window Cursor highlights one window with a bright border. Use `J`/`K` to navigate. The cursor stays visible during scrolling and defaults to the newest window. Press `Space` to toggle wrap mode on the active window, which shows only the last 3 lines of content with a `Wrapped - Space to expand` indicator.
 
 ## Session Commands
 
