@@ -187,8 +187,8 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.input.SetWidth(max(0, msg.Width))
 	m.todo.SetWidth(max(0, msg.Width))
 	m.status.SetWidth(max(0, msg.Width))
-	m.display.centerWelcomeText()
 	m.updateDisplayHeight()
+	m.display.centerWelcomeText()
 	return m, nil
 }
 
