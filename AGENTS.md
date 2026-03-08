@@ -162,6 +162,8 @@ When running the Terminal version:
 | `Ctrl+O` | Open external editor for multi-line input |
 | `j` | Move window cursor down (when display focused) |
 | `k` | Move window cursor up (when display focused) |
+| `J` | Move screen down (when display focused) |
+| `K` | Move screen up (when display focused) |
 | `g` | Go to top of display (when display focused) |
 | `G` | Go to bottom of display (when display focused) |
 | `:` | Switch to input with ":" prefix (when display focused) |

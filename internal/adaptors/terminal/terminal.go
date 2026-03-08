@@ -279,22 +279,22 @@ func (m *Terminal) toggleFocus() {
 func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
 	case "j":
-		m.display.ScrollDown(1)
-		return nil, true
-	case "k":
-		m.display.ScrollUp(1)
-		return nil, true
-	case "J":
 		if m.display.MoveWindowCursorDown() {
 			m.display.updateContent()
 			m.display.EnsureCursorVisible()
 		}
 		return nil, true
-	case "K":
+	case "k":
 		if m.display.MoveWindowCursorUp() {
 			m.display.updateContent()
 			m.display.EnsureCursorVisible()
 		}
+		return nil, true
+	case "J":
+		m.display.ScrollDown(1)
+		return nil, true
+	case "K":
+		m.display.ScrollUp(1)
 		return nil, true
 	case "G":
 		m.display.GotoBottom()

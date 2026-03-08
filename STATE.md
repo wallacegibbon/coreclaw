@@ -274,7 +274,7 @@ For this project, simplicity is more important than efficiency.
 
 - ✅ **Window Cursor feature for navigating between windows**
   - **Problem**: Users had no way to visually track or navigate between different windows in the display area.
-  - **Solution**: Added a Window Cursor that highlights one window at a time with a bright border, and `j`/`k` keys to navigate (like vi).
+  - **Solution**: Added a Window Cursor that highlights one window at a time with a bright border, and `j`/`k` keys to navigate (like vi). `J`/`K` for screen scrolling.
   - **Implementation**:
     - Added `windowCursor` field to `DisplayModel` (index of selected window, -1 for none)
     - Added `cursorStyle` to `WindowBuffer` with bright blue border (`#89b4fa`)
@@ -282,6 +282,7 @@ For this project, simplicity is more important than efficiency.
     - Added window line height tracking in `WindowBuffer` for scroll synchronization
     - Added cursor management methods: `MoveWindowCursorUp()`, `MoveWindowCursorDown()`, `SetCursorToLastWindow()`, `EnsureCursorVisible()`
     - `j`/`k` moves window cursor down/up (when display focused)
+    - `J`/`K` moves screen down/up (when display focused)
     - `g`/`G` jumps to first/last window
     - Cursor defaults to last window and updates when new windows are created
   - **Testing**: All existing tests pass; cursorIndex parameter added to test calls.
