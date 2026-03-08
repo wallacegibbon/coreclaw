@@ -329,7 +329,7 @@ main.go        - coreclaw entry point
 - Proper conversation history management for multi-turn tool calls
 - IOStream abstraction with TLV protocol
 - Web server with WebSocket support and chat UI
-- Session commands: :save, :cancel, :summarize, :quit, :exit
+- Session commands: :save, :cancel, :summarize, :quit, :q
 - Session file persistence for conversation history
 
 ### Usage
@@ -366,7 +366,7 @@ main.go        - coreclaw entry point
 - `:save [filename]` - Save session to file (uses configured session file if no filename provided)
 - `:cancel` - Cancel current request and clear todo list
 - `:summarize` - Summarize the entire conversation to a single message to reduce token usage
-- `:quit`, `:exit` - Exit with confirmation
+- `:quit`, `:q` - Exit with confirmation
 
 ### coreclaw-web (WebSocket Server)
 ```sh

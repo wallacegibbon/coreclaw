@@ -356,7 +356,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 	}
 
 	if command, found := strings.CutPrefix(prompt, ":"); found {
-		if command == "quit" || command == "exit" {
+		if command == "quit" || command == "q" {
 			m.confirmDialog = true
 			return nil
 		}

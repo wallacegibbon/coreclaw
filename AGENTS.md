@@ -171,7 +171,7 @@ When running the Terminal version:
 | `Ctrl+C` | Clear input (when input focused) |
 | `Ctrl+G` | Cancel current request (with confirmation) |
 | `:cancel` | Cancel current request (with confirmation) |
-| `:quit`, `:exit` | Exit with confirmation (press y/n) |
+| `:quit`, `:q` | Exit with confirmation (press y/n) |
 ## Window Container
 
 CoreClaw's terminal adaptor organizes concurrent streams into separate windows with synchronized widths. Each stream (reasoning, text, tool outputs) appears in its own window with dimmed borders.

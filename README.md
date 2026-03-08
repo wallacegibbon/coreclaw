@@ -115,7 +115,7 @@ When running the Terminal version:
 | `Ctrl+C` | Clear input (when input focused) |
 | `Ctrl+G` | Cancel current request (with confirmation) |
 | `:cancel` | Cancel current request (with confirmation) |
-| `:quit`, `:exit` | Exit with confirmation (press y/n) |
+| `:quit`, `:q` | Exit with confirmation (press y/n) |
 ## Window Container
 
 The terminal organizes concurrent streams into separate windows with synchronized widths. Stream IDs include monotonic suffixes to prevent collisions across conversation turns.
@@ -129,7 +129,7 @@ A Window Cursor highlights one window with a bright border. Use `j`/`k` to navig
 - `:save [filename]` - Save session to file
 - `:cancel` - Cancel current request and clear todos (with confirmation)
 - `:summarize` - Summarize conversation to reduce token usage
-- `:quit`, `:exit` - Exit with confirmation
+- `:quit`, `:q` - Exit with confirmation
 
 ## Project Status
 
