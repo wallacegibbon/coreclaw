@@ -369,6 +369,7 @@ func (m *DisplayModel) SetCursorToLastWindow() {
 		m.windowCursor = -1
 	} else {
 		m.windowCursor = windowCount - 1
+		m.userMovedCursorAway = false // cursor is now following the last window
 	}
 }
 

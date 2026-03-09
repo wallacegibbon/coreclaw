@@ -135,15 +135,14 @@ type tickMsg struct{}
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	select {
 	case <-m.terminalOutput.updateChan:
-		m.display.updateContent()
 		m.status.SetStatus(m.terminalOutput.status)
 		m.todo.SetTodos(m.terminalOutput.todos)
 		m.updateDisplayHeight()
 		// Update cursor to last window if user hasn't moved it away
 		if !m.display.UserMovedCursorAway() {
 			m.display.SetCursorToLastWindow()
-			m.display.updateContent()
 		}
+		m.display.updateContent()
 	default:
 	}
 
