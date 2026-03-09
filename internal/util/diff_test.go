@@ -1,6 +1,7 @@
 package util
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -780,6 +781,43 @@ func TestApplyUnifiedDiff(t *testing.T) {
 			wantError: true,
 			errorMsg:  "start line 10 out of range",
 		},
+		{
+			name:            "mismatched context line - wrong line number in header",
+			originalContent: "package main\n\nimport (\n\t\"fmt\"\n)\n\nfunc main() {\n\tfmt.Println(\"Hello\")\n}\n",
+			diffStr: `@@ -5,5 +5,5 @@ func main() {
+-    fmt.Println("Hello, this is line 1")
+-    fmt.Println("Hello, this is line 2")
++    fmt.Println("HELLO")
++    fmt.Println("HELLO 2")
+ }
+`,
+			wantError: true,
+			errorMsg:  "remove line mismatch at line 5",
+		},
+		{
+			name:            "mismatched context line - context doesn't match file",
+			originalContent: "line1\nline2\nline3\n",
+			diffStr: `@@ -1,3 +1,3 @@
+ wrong context
+-line2
++new line2
+ line3
+`,
+			wantError: true,
+			errorMsg:  "context line mismatch at line 1",
+		},
+		{
+			name:            "mismatched remove line - content doesn't match file",
+			originalContent: "line1\nline2\nline3\n",
+			diffStr: `@@ -1,3 +1,3 @@
+ line1
+-wrong line
++new line2
+ line3
+`,
+			wantError: true,
+			errorMsg:  "remove line mismatch at line 2",
+		},
 	}
 
 	for _, tt := range tests {
@@ -789,8 +827,8 @@ func TestApplyUnifiedDiff(t *testing.T) {
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("ApplyUnifiedDiff() expected error containing %q, got nil", tt.errorMsg)
-				} else if err.Error() != tt.errorMsg {
-					t.Errorf("ApplyUnifiedDiff() expected error %q, got %q", tt.errorMsg, err.Error())
+				} else if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("ApplyUnifiedDiff() expected error containing %q, got %q", tt.errorMsg, err.Error())
 				}
 				return
 			}

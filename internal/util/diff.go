@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // Edit represents a byte range replacement
@@ -235,11 +236,29 @@ func hunkToEdit(originalLines []string, lineOffsets []int, hunk Hunk) (Edit, err
 	for i, hl := range hunk.Lines {
 		switch hl.Op {
 		case ' ':
-			if origLineIndex < len(originalLines) {
-				newContent.WriteString(originalLines[origLineIndex])
-				origLineIndex++
+			if origLineIndex >= len(originalLines) {
+				return Edit{}, fmt.Errorf("context line %d out of range", origLineIndex+1)
 			}
+			// Validate that context line matches original file
+			origLine := originalLines[origLineIndex]
+			origContent := strings.TrimSuffix(origLine, "\n")
+			hunkContent := strings.TrimSuffix(hl.Content, "\n")
+			if hunkContent != origContent {
+				return Edit{}, fmt.Errorf("context line mismatch at line %d: diff has %q but file has %q", origLineIndex+1, hunkContent, origContent)
+			}
+			newContent.WriteString(origLine)
+			origLineIndex++
 		case '-':
+			if origLineIndex >= len(originalLines) {
+				return Edit{}, fmt.Errorf("remove line %d out of range", origLineIndex+1)
+			}
+			// Validate that removed line matches original file
+			origLine := originalLines[origLineIndex]
+			origContent := strings.TrimSuffix(origLine, "\n")
+			hunkContent := strings.TrimSuffix(hl.Content, "\n")
+			if hunkContent != origContent {
+				return Edit{}, fmt.Errorf("remove line mismatch at line %d: diff has %q but file has %q", origLineIndex+1, hunkContent, origContent)
+			}
 			origLineIndex++
 		case '+':
 			newContent.WriteString(hl.Content)
@@ -248,7 +267,7 @@ func hunkToEdit(originalLines []string, lineOffsets []int, hunk Hunk) (Edit, err
 			// 2. For replacements (OrigCount>0): check if the replaced line ended with newline
 			if i == len(hunk.Lines)-1 {
 				shouldAddNewline := false
-				if hunk.OrigCount == 0 && startByte < len(lineOffsets)*2 && startLine < len(originalLines) && len(originalLines[startLine]) > 0 {
+				if hunk.OrigCount == 0 && startLine < len(originalLines) && len(originalLines[startLine]) > 0 {
 					// Insertion: check if line at startLine has a newline
 					lastChar := originalLines[startLine][len(originalLines[startLine])-1]
 					shouldAddNewline = (lastChar == '\n')
