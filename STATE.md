@@ -1,7 +1,7 @@
 # CoreClaw Project Status
 
 ## Overview
-CoreClaw is a minimal AI Agent that can handle toolcalling. It provides seven tools: `read_file` (supports line range), `todo_read`, `todo_write`, `edit_file` (unified diff), `write_file`, `activate_skill`, and `posix_shell`.
+CoreClaw is a minimal AI Agent that can handle toolcalling. It provides seven tools: `read_file` (supports line range), `todo_read`, `todo_write`, `edit_file` (search/replace), `write_file`, `activate_skill`, and `posix_shell`.
 All skills are based on these tools.
 
 For this project, simplicity is more important than efficiency.

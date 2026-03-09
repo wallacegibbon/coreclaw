@@ -19,7 +19,8 @@ func TestEditFileTool(t *testing.T) {
 	tests := []struct {
 		name        string
 		initial     string
-		diff        string
+		oldString   string
+		newString   string
 		expected    string
 		expectError bool
 		errorMsg    string
@@ -27,42 +28,119 @@ func TestEditFileTool(t *testing.T) {
 		{
 			name:        "empty path",
 			initial:     "",
-			diff:        "",
+			oldString:   "",
+			newString:   "",
 			expected:    "",
 			expectError: true,
 			errorMsg:    "path is required",
 		},
 		{
-			name:        "empty diff",
+			name:        "empty old_string",
 			initial:     "line 1\nline 2\nline 3",
-			diff:        "",
+			oldString:   "",
+			newString:   "new",
 			expected:    "",
 			expectError: true,
-			errorMsg:    "diff is required",
+			errorMsg:    "old_string is required",
 		},
 		{
-			name:     "single line change",
-			initial:  "line 1\nline 2\nline 3",
-			diff:     "--- a/test.txt\n+++ b/test.txt\n@@ -1,3 +1,3 @@\n line 1\n-line 2\n+line 2 modified\n line 3",
-			expected: "line 1\nline 2 modified\nline 3",
+			name:      "single line replacement",
+			initial:   "line 1\nline 2\nline 3",
+			oldString: "line 2",
+			newString: "line 2 modified",
+			expected:  "line 1\nline 2 modified\nline 3",
 		},
 		{
-			name:     "add line",
-			initial:  "line 1\nline 3",
-			diff:     "--- a/test.txt\n+++ b/test.txt\n@@ -1,2 +1,3 @@\n line 1\n+line 2\n line 3",
-			expected: "line 1\nline 2\nline 3",
+			name:      "multiline replacement",
+			initial:   "line 1\nline 2\nline 3\nline 4",
+			oldString: "line 2\nline 3",
+			newString: "new line 2\nnew line 3",
+			expected:  "line 1\nnew line 2\nnew line 3\nline 4",
 		},
 		{
-			name:     "remove line",
-			initial:  "line 1\nline 2\nline 3",
-			diff:     "--- a/test.txt\n+++ b/test.txt\n@@ -1,3 +1,2 @@\n line 1\n-line 2\n line 3",
-			expected: "line 1\nline 3",
+			name:      "add content",
+			initial:   "line 1\nline 3",
+			oldString: "line 1\nline 3",
+			newString: "line 1\nline 2\nline 3",
+			expected:  "line 1\nline 2\nline 3",
 		},
 		{
-			name:     "multiple hunks",
-			initial:  "line 1\nline 2\nline 3\nline 4\nline 5",
-			diff:     "--- a/test.txt\n+++ b/test.txt\n@@ -1,3 +1,3 @@\n line 1\n-line 2\n+line 2 modified\n line 3\n@@ -3,3 +3,3 @@\n line 3\n-line 4\n+line 4 modified\n line 5",
-			expected: "line 1\nline 2 modified\nline 3\nline 4 modified\nline 5",
+			name:      "remove content",
+			initial:   "line 1\nline 2\nline 3",
+			oldString: "\nline 2",
+			newString: "",
+			expected:  "line 1\nline 3",
+		},
+		{
+			name:      "replace with empty",
+			initial:   "line 1\nline 2\nline 3",
+			oldString: "\nline 2",
+			newString: "",
+			expected:  "line 1\nline 3",
+		},
+		{
+			name:      "replace entire file",
+			initial:   "old content",
+			oldString: "old content",
+			newString: "new content",
+			expected:  "new content",
+		},
+		{
+			name:      "replace with indentation",
+			initial:   "func main() {\n    fmt.Println(\"hello\")\n}",
+			oldString: "    fmt.Println(\"hello\")",
+			newString: "    fmt.Println(\"goodbye\")",
+			expected:  "func main() {\n    fmt.Println(\"goodbye\")\n}",
+		},
+		{
+			name:        "old_string not found",
+			initial:     "line 1\nline 2\nline 3",
+			oldString:   "nonexistent",
+			newString:   "new",
+			expected:    "",
+			expectError: true,
+			errorMsg:    "old_string not found in file",
+		},
+		{
+			name:        "old_string appears multiple times",
+			initial:     "line\nline\nline",
+			oldString:   "line",
+			newString:   "new",
+			expected:    "",
+			expectError: true,
+			errorMsg:    "old_string found 3 times",
+		},
+		{
+			name:        "file not found",
+			initial:     "",
+			oldString:   "something",
+			newString:   "new",
+			expected:    "",
+			expectError: true,
+			errorMsg:    "file not found",
+		},
+		{
+			name:      "unique context for multiple occurrences",
+			initial:   "first\nline\nmiddle\nline\nlast",
+			oldString: "middle\nline",
+			newString: "middle\nnew line",
+			expected:  "first\nline\nmiddle\nnew line\nlast",
+		},
+		{
+			name:      "preserve tabs",
+			initial:   "\tif true {\n\t\treturn\n\t}",
+			oldString: "\t\treturn",
+			newString: "\t\treturn nil",
+			expected:  "\tif true {\n\t\treturn nil\n\t}",
+		},
+		{
+			name:        "empty file to content",
+			initial:     "",
+			oldString:   "",
+			newString:   "new content",
+			expected:    "",
+			expectError: true,
+			errorMsg:    "old_string is required",
 		},
 	}
 
@@ -73,16 +151,19 @@ func TestEditFileTool(t *testing.T) {
 				if err := os.WriteFile(testFile, []byte(tt.initial), 0644); err != nil {
 					t.Fatalf("failed to write initial file: %v", err)
 				}
+			} else {
+				// Remove file if it exists from previous test
+				os.Remove(testFile)
 			}
 
 			// Create tool input
-			var inputPath string
-			if tt.initial != "" {
-				inputPath = testFile
-			}
 			input := EditFileInput{
-				Path: inputPath,
-				Diff: tt.diff,
+				Path:      testFile,
+				OldString: tt.oldString,
+				NewString: tt.newString,
+			}
+			if tt.name == "empty path" {
+				input.Path = ""
 			}
 
 			// Run tool
@@ -93,19 +174,15 @@ func TestEditFileTool(t *testing.T) {
 				Input: toJSON(input),
 			})
 
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
 			if tt.expectError {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-					return
-				}
 				if !strings.Contains(resp.Content, tt.errorMsg) {
 					t.Errorf("expected error containing %q, got %q", tt.errorMsg, resp.Content)
 				}
 				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
 			}
 
 			// Check result
@@ -121,7 +198,7 @@ func TestEditFileTool(t *testing.T) {
 
 			result := string(content)
 			if result != tt.expected {
-				t.Errorf("expected:\n%s\n\ngot:\n%s", tt.expected, result)
+				t.Errorf("expected:\n%q\n\ngot:\n%q", tt.expected, result)
 			}
 		})
 	}

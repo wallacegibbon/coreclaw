@@ -98,6 +98,11 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 		case stream.TagReasoning:
 			styled = output(w.styles.Reasoning, content)
 		case stream.TagTool:
+			// Check if this is an edit_file with raw diff data
+			if diffPath, diffLines := w.parseRawDiff(content); diffLines != nil {
+				w.windowBuffer.AppendDiff(id, diffPath, diffLines)
+				return
+			}
 			styled = strings.TrimRight(w.colorizeTool(content), " ")
 		}
 		w.windowBuffer.AppendOrUpdate(id, tag, styled)
@@ -200,9 +205,54 @@ func (w *terminalOutput) colorizeMultiLineTool(lines []string) string {
 
 	for _, line := range lines[1:] {
 		result.WriteString("\n")
-		result.WriteString(strings.TrimRight(w.styles.ToolContent.Render(line), " "))
+		// Fallback for other lines
+		if strings.HasPrefix(line, "- ") {
+			result.WriteString(strings.TrimRight(w.styles.DiffRemove.Render(line), " "))
+		} else if strings.HasPrefix(line, "+ ") {
+			result.WriteString(strings.TrimRight(w.styles.DiffAdd.Render(line), " "))
+		} else {
+			result.WriteString(strings.TrimRight(w.styles.ToolContent.Render(line), " "))
+		}
 	}
 	return result.String()
+}
+
+// parseRawDiff checks if content is an edit_file with raw diff data.
+// Returns (path, lines) if it's a raw diff, or ("", nil) otherwise.
+func (w *terminalOutput) parseRawDiff(content string) (string, []DiffLinePair) {
+	lines := strings.Split(content, "\n")
+	if len(lines) < 2 {
+		return "", nil
+	}
+
+	// Check first line is "edit_file: <path>"
+	if !strings.HasPrefix(lines[0], "edit_file: ") {
+		return "", nil
+	}
+	path := strings.TrimPrefix(lines[0], "edit_file: ")
+
+	// Check if remaining lines have raw diff format (\x00 prefix)
+	var diffLines []DiffLinePair
+	for _, line := range lines[1:] {
+		if !strings.HasPrefix(line, "\x00") {
+			return "", nil
+		}
+		// Parse: \x00old\x00new
+		parts := strings.SplitN(line[1:], "\x00", 2)
+		if len(parts) != 2 {
+			return "", nil
+		}
+		diffLines = append(diffLines, DiffLinePair{
+			Old: parts[0],
+			New: parts[1],
+		})
+	}
+
+	if len(diffLines) == 0 {
+		return "", nil
+	}
+
+	return path, diffLines
 }
 
 // parseStreamID extracts stream ID prefix from value.

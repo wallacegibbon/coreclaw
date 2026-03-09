@@ -17,9 +17,13 @@ type Window struct {
 	Style   lipgloss.Style // border style (dimmed)
 	Wrapped bool           // true if window is in wrapped (3-row) mode
 
+	// For diff windows - if non-nil, Content is ignored and Diff is rendered instead
+	Diff *DiffContainer
+
 	// Cached rendering state
 	lastContentLen int    // length of content when last rendered (for quick change detection)
 	cachedRender   string // cached rendered output
+	cachedWidth    int    // width used for cached render
 }
 
 // WindowBuffer holds a sequence of windows in order of creation.
@@ -30,10 +34,23 @@ type WindowBuffer struct {
 	width        int
 	borderStyle  lipgloss.Style
 	cursorStyle  lipgloss.Style
-	lineHeights  []int  // cached line heights for each window (after rendering)
-	totalLines   int    // total lines across all windows
-	dirty        bool   // true if content has changed and needs re-render
-	cachedRender string // cached full render of all windows
+	styles       *Styles // styles for diff rendering
+	lineHeights  []int   // cached line heights for each window (after rendering)
+	totalLines   int     // total lines across all windows
+	dirty        bool    // true if content has changed and needs re-render
+	cachedRender string  // cached full render of all windows
+}
+
+// DiffContainer holds two panes side by side for diff display
+type DiffContainer struct {
+	Path  string         // file path for header
+	Lines []DiffLinePair // raw line pairs
+}
+
+// DiffLinePair represents a pair of old/new lines in a diff
+type DiffLinePair struct {
+	Old string
+	New string
 }
 
 // NewWindowBuffer creates a new window buffer with given width.
@@ -56,6 +73,7 @@ func NewWindowBuffer(width int) *WindowBuffer {
 		width:       width,
 		borderStyle: dimmedBorder,
 		cursorStyle: cursorBorder,
+		styles:      DefaultStyles(),
 		lineHeights: []int{},
 	}
 }
@@ -68,6 +86,13 @@ func (wb *WindowBuffer) SetWidth(width int) {
 		wb.width = width
 		wb.dirty = true
 	}
+}
+
+// Width returns the current window width.
+func (wb *WindowBuffer) Width() int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	return wb.width
 }
 
 // AppendOrUpdate adds content to an existing window identified by id,
@@ -98,6 +123,35 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag byte, content string) {
 	wb.dirty = true
 }
 
+// AppendDiff adds a diff window with side-by-side old/new content.
+// The window will be rendered with adaptive width on each render.
+func (wb *WindowBuffer) AppendDiff(id string, path string, lines []DiffLinePair) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+
+	// Create diff container
+	diff := &DiffContainer{
+		Path:  path,
+		Lines: lines,
+	}
+
+	// Create window with diff
+	window := &Window{
+		ID:    id,
+		Tag:   stream.TagTool,
+		Style: wb.borderStyle,
+		Diff:  diff,
+	}
+	wb.Windows = append(wb.Windows, window)
+	wb.idIndex[id] = len(wb.Windows) - 1
+	wb.dirty = true
+}
+
+// IsDiffWindow returns true if the window is a diff window
+func (w *Window) IsDiffWindow() bool {
+	return w.Diff != nil
+}
+
 // GetAll returns the concatenated rendered windows as a single string.
 // Each window is rendered with its border and padded to the current width.
 // If cursorIndex >= 0, that window is highlighted with cursor border style.
@@ -111,7 +165,13 @@ func (wb *WindowBuffer) GetAll(cursorIndex int) string {
 	if !needsRender {
 		// Check if any window content has changed (quick length check)
 		for _, w := range wb.Windows {
-			if len(w.Content) != w.lastContentLen {
+			if w.IsDiffWindow() {
+				// Diff windows need re-render if width changed
+				if w.cachedWidth != wb.width {
+					needsRender = true
+					break
+				}
+			} else if len(w.Content) != w.lastContentLen {
 				needsRender = true
 				break
 			}
@@ -154,6 +214,7 @@ func (wb *WindowBuffer) rebuildCache() {
 		wb.lineHeights[i] = lineCount
 		wb.totalLines += lineCount
 		w.cachedRender = styled
+		w.cachedWidth = wb.width
 		w.lastContentLen = len(w.Content)
 	}
 	wb.cachedRender = sb.String()
@@ -168,10 +229,12 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 			sb.WriteString("\n")
 		}
 
-		// Use cached render for non-cursor windows
-		if i != cursorIndex && w.cachedRender != "" && len(w.Content) == w.lastContentLen {
-			sb.WriteString(w.cachedRender)
-			continue
+		// Use cached render for non-cursor windows (if still valid)
+		if i != cursorIndex && w.cachedRender != "" && w.cachedWidth == wb.width {
+			if w.IsDiffWindow() || len(w.Content) == w.lastContentLen {
+				sb.WriteString(w.cachedRender)
+				continue
+			}
 		}
 
 		// Render cursor window (or uncached window) with appropriate style
@@ -190,6 +253,11 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 
 // renderWindowContent renders the content of a window (wrapping, truncation for wrapped mode)
 func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
+	// Handle diff windows
+	if w.IsDiffWindow() {
+		return wb.renderDiffContent(w.Diff, innerWidth)
+	}
+
 	if w.Wrapped {
 		// In wrapped mode, show only last 3 visual lines
 		// Grab last 3 logical lines (enough since wrapping only expands, never merges)
@@ -211,6 +279,81 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 		return wrappedContent
 	}
 	return lipgloss.Wrap(w.Content, innerWidth, " ")
+}
+
+// renderDiffContent renders a diff container side by side
+func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int) string {
+	var lines []string
+
+	// Add header with file path
+	lines = append(lines, wb.styles.Tool.Render("edit_file: ")+wb.styles.ToolContent.Render(diff.Path))
+
+	// Calculate width for each side
+	// Line format: "= " + paddedOld + " " + "|" + " " + "+ " + newPart
+	// Total: 2 + sideWidth + 3 + 2 + sideWidth = 2*sideWidth + 7
+	// We need: 2*sideWidth + 7 <= innerWidth
+	// So: sideWidth <= (innerWidth - 7) / 2
+	sideWidth := (innerWidth - 7) / 2
+	if sideWidth < 10 {
+		sideWidth = 10 // minimum width
+	}
+
+	for _, pair := range diff.Lines {
+		// Escape any literal newlines in content (shouldn't happen, but be safe)
+		oldPart := strings.ReplaceAll(expandTabs(pair.Old), "\n", "\\n")
+		newPart := strings.ReplaceAll(expandTabs(pair.New), "\n", "\\n")
+
+		// Check if content is the same (before truncation)
+		isSame := pair.Old == pair.New
+
+		// Truncate if needed (use rune count for proper Unicode handling)
+		oldRunes := []rune(oldPart)
+		newRunes := []rune(newPart)
+		if len(oldRunes) > sideWidth {
+			oldPart = string(oldRunes[:sideWidth-3]) + "..."
+		}
+		if len(newRunes) > sideWidth {
+			newPart = string(newRunes[:sideWidth-3]) + "..."
+		}
+
+		// Pad old part to fixed width (use rune count)
+		paddedOld := oldPart + strings.Repeat(" ", max(0, sideWidth-len([]rune(oldPart))))
+
+		if isSame {
+			// Dimmed style for unchanged content
+			left := wb.styles.DiffSame.Render("= " + paddedOld)
+			sep := wb.styles.DiffSep.Render("|")
+			right := wb.styles.DiffSame.Render("= " + newPart)
+			lines = append(lines, left+" "+sep+" "+right)
+		} else {
+			// Colored style for changed content
+			left := wb.styles.DiffRemove.Render("- " + paddedOld)
+			sep := wb.styles.DiffSep.Render("|")
+			right := wb.styles.DiffAdd.Render("+ " + newPart)
+			lines = append(lines, left+" "+sep+" "+right)
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// expandTabs converts tabs to spaces, treating tabs as 8-space width
+func expandTabs(s string) string {
+	var result strings.Builder
+	col := 0
+	for _, r := range s {
+		if r == '\t' {
+			// Calculate spaces needed to reach next 8-space boundary
+			next := ((col / 8) + 1) * 8
+			spaces := next - col
+			result.WriteString(strings.Repeat(" ", spaces))
+			col = next
+		} else {
+			result.WriteRune(r)
+			col++
+		}
+	}
+	return result.String()
 }
 
 // Clear removes all windows.

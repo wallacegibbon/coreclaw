@@ -542,18 +542,33 @@ func formatToolCall(toolName, input string) string {
 			return fmt.Sprintf("%s: %s", toolName, strings.Join(args, ", "))
 		}
 	case "edit_file":
-		args := []string{}
-		if path, ok := fields["path"].(string); ok {
-			args = append(args, path)
+		path, _ := fields["path"].(string)
+		oldStr, _ := fields["old_string"].(string)
+		newStr, _ := fields["new_string"].(string)
+
+		var lines []string
+		lines = append(lines, fmt.Sprintf("%s: %s", toolName, path))
+
+		oldLines := strings.Split(oldStr, "\n")
+		newLines := strings.Split(newStr, "\n")
+
+		// Pair up old and new lines
+		maxLines := max(len(oldLines), len(newLines))
+
+		// Use null byte as separator for raw data - terminal will format with adaptive width
+		for i := range maxLines {
+			var oldPart, newPart string
+			if i < len(oldLines) {
+				oldPart = strings.ReplaceAll(oldLines[i], "\n", "\\n")
+			}
+			if i < len(newLines) {
+				newPart = strings.ReplaceAll(newLines[i], "\n", "\\n")
+			}
+			// Format: \x00old_content\x00new_content
+			lines = append(lines, fmt.Sprintf("\x00%s\x00%s", oldPart, newPart))
 		}
-		var diffStr string
-		if diff, ok := fields["diff"].(string); ok {
-			diffStr = diff
-			args = append(args, "<diff>")
-		}
-		if len(args) > 0 {
-			return fmt.Sprintf("%s: %s\n%s", toolName, strings.Join(args, ", "), diffStr)
-		}
+
+		return strings.Join(lines, "\n")
 	case "todo_read":
 		return "todo_read: Reading todo list"
 	case "todo_write":

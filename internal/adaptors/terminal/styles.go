@@ -13,6 +13,10 @@ type Styles struct {
 	Error       lipgloss.Style
 	System      lipgloss.Style
 	Prompt      lipgloss.Style
+	DiffRemove  lipgloss.Style
+	DiffAdd     lipgloss.Style
+	DiffSame    lipgloss.Style // dimmed for unchanged lines
+	DiffSep     lipgloss.Style // dimmed separator |
 
 	// Display styles
 	Input  lipgloss.Style
@@ -41,6 +45,10 @@ func DefaultStyles() *Styles {
 		Error:       baseStyle.Foreground(lipgloss.Color("#f38ba8")),
 		System:      baseStyle.Foreground(lipgloss.Color("#6c7086")),
 		Prompt:      baseStyle.Foreground(lipgloss.Color("#89d4fa")).Bold(true),
+		DiffRemove:  baseStyle.Foreground(lipgloss.Color("#f38ba8")),
+		DiffAdd:     baseStyle.Foreground(lipgloss.Color("#a6e3a1")),
+		DiffSame:    baseStyle.Foreground(lipgloss.Color("#6c7086")),
+		DiffSep:     baseStyle.Foreground(lipgloss.Color("#6c7086")),
 
 		// Display styles
 		Input:  baseStyle,
