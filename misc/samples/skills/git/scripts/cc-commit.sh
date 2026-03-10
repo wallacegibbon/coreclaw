@@ -83,20 +83,12 @@ if [[ " ${GIT_ARGS[*]} " =~ " --amend " ]]; then
 	exec git commit "${GIT_ARGS[@]}" "${EXTRA_ARGS[@]}"
 fi
 
-# If no message provided, check if we should open editor
+# If no message provided, error out to prevent interactive editor
 if [[ -z "$MESSAGE" ]]; then
-	# No message provided, let git open the editor
-	# Create a temp file with attribution template
-	TEMP_FILE=$(mktemp)
-	echo "# Enter commit message above this line" >> "$TEMP_FILE"
-	echo "# Lines starting with # will be ignored" >> "$TEMP_FILE"
-	echo "$ATTRIBUTION" >> "$TEMP_FILE"
-
-	# Run git commit with the template
-	git commit -t "$TEMP_FILE" "${GIT_ARGS[@]}" "${EXTRA_ARGS[@]}"
-	EXIT_CODE=$?
-	rm -f "$TEMP_FILE"
-	exit $EXIT_CODE
+	echo "Error: No commit message provided" >&2
+	echo "Usage: cc-commit.sh \"your message\" or cc-commit.sh -m \"your message\"" >&2
+	echo "Interactive editor is disabled to prevent hanging in non-interactive environments" >&2
+	exit 1
 fi
 
 # Check if message already contains attribution
