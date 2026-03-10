@@ -135,31 +135,30 @@ type tickMsg struct{}
 
 // Update handles messages
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	select {
-	case <-m.terminalOutput.updateChan:
-		// Only update if there's actual content
-		if m.terminalOutput.windowBuffer.GetWindowCount() > 0 {
-			m.status.SetStatus(m.terminalOutput.status)
-			m.todo.SetTodos(m.terminalOutput.todos)
-			m.updateDisplayHeight()
-			// Update cursor to last window if user hasn't moved it away
-			if !m.display.UserMovedCursorAway() {
-				m.display.SetCursorToLastWindow()
-			}
-			m.display.updateContent()
-		}
-	default:
-	}
-
+	// Process user-facing messages FIRST to avoid blocking keyboard input.
+	// Display updates run after so keypress returns immediately.
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tickMsg:
-		// Only update status and todos on tick, not content (content updates via updateChan)
-		m.status.SetStatus(m.terminalOutput.status)
-		m.todo.SetTodos(m.terminalOutput.todos)
+		// Drain pending display updates (non-blocking) so streaming content appears
+		select {
+		case <-m.terminalOutput.updateChan:
+			if m.terminalOutput.windowBuffer.GetWindowCount() > 0 {
+				m.status.SetStatus(m.terminalOutput.status)
+				m.todo.SetTodos(m.terminalOutput.todos)
+				m.updateDisplayHeight()
+				if !m.display.UserMovedCursorAway() {
+					m.display.SetCursorToLastWindow()
+				}
+				m.display.updateContent()
+			}
+		default:
+			m.status.SetStatus(m.terminalOutput.status)
+			m.todo.SetTodos(m.terminalOutput.todos)
+		}
 		if m.terminalOutput.inProgress {
 			return m, tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
 				return tickMsg{}

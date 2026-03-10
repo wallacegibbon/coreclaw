@@ -299,6 +299,17 @@ For this project, simplicity is more important than efficiency.
     - **Critical fix**: Added `v.ReportFocus = true` in `View()` method to enable focus event reporting (without this, FocusMsg/BlurMsg are never sent)
   - **Result**: Both display border and input prompt now appear dimmed when user switches away; focus is restored when switching back.
 
+- ✅ **Terminal display performance optimizations**
+  - **Problem**: Severe lag and delayed keyboard input when many delta blocks arrive or many message windows are stacked.
+  - **Root causes**: (1) display update ran before key handling, blocking the event loop; (2) duplicate GetAll() per update; (3) update throttle too aggressive.
+  - **Solution**: See docs/PERFORMANCE_ANALYSIS.md for full analysis.
+  - **Implementation**:
+    - KeyMsg now returns immediately; display updates only on tickMsg (every 500ms during streaming)
+    - updateChan drained in tick handler so streaming content still appears
+    - UpdateHeightForTodos uses GetTotalLines() instead of GetAll()+strings.Count (avoids full render string allocation)
+    - GetTotalLines() ensures cache is built when dirty, returns line count only
+    - Update throttle increased 100ms → 150ms
+
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
 - **Tools**: read_file, todo_read, todo_write, edit_file, write_file, activate_skill, posix_shell

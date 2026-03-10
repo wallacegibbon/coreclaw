@@ -428,9 +428,29 @@ func (wb *WindowBuffer) GetWindowEndLine(windowIndex int) int {
 }
 
 // GetTotalLines returns the total number of lines across all windows.
+// Ensures cache is built first when dirty, so the count is accurate without allocating the full render string.
 func (wb *WindowBuffer) GetTotalLines() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
+
+	needsRender := wb.dirty
+	if !needsRender {
+		for _, w := range wb.Windows {
+			if w.IsDiffWindow() {
+				if w.cachedWidth != wb.width {
+					needsRender = true
+					break
+				}
+			} else if len(w.Content) != w.lastContentLen {
+				needsRender = true
+				break
+			}
+		}
+	}
+	if needsRender {
+		wb.rebuildCache()
+		wb.dirty = false
+	}
 	return wb.totalLines
 }
 

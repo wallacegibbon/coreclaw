@@ -21,7 +21,7 @@ type terminalOutput struct {
 	buffer        []byte
 	mu            sync.Mutex
 	updateChan    chan struct{}
-	done          chan struct{}  // Signal goroutine to stop
+	done          chan struct{} // Signal goroutine to stop
 	status        string        // Status bar content from TagSystem
 	todos         todo.TodoList // Current todo list
 	inProgress    bool          // Whether session has task in progress
@@ -32,7 +32,7 @@ type terminalOutput struct {
 	updateMu      sync.Mutex    // Mutex for update throttling
 }
 
-const updateThrottleInterval = 100 * time.Millisecond
+const updateThrottleInterval = 150 * time.Millisecond
 
 func NewTerminalOutput() *terminalOutput {
 	to := &terminalOutput{

@@ -240,8 +240,7 @@ func (m *DisplayModel) UpdateHeightForTodos(totalHeight int, todoCount int) {
 	oldHeight := m.viewport.Height()
 
 	if oldHeight != newHeight {
-		rawContent := m.windowBuffer.GetAll(m.windowCursor)
-		totalLines := max(1, strings.Count(rawContent, "\n")+1)
+		totalLines := max(1, m.windowBuffer.GetTotalLines())
 
 		topLine := m.viewport.YOffset()
 		var newTopLine int
