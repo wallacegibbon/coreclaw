@@ -23,9 +23,10 @@ type Window struct {
 	Diff *DiffContainer
 
 	// Cached rendering state
-	lastContentLen int    // length of content when last rendered (for quick change detection)
-	cachedRender   string // cached rendered output
-	cachedWidth    int    // width used for cached render
+	lastContentLen     int    // length of content when last rendered (for quick change detection)
+	cachedRender       string // full output with border
+	cachedInnerContent string // inner content before border (for cursor border swap)
+	cachedWidth        int    // width used for cached render
 }
 
 // WindowBuffer holds a sequence of windows in order of creation.
@@ -244,23 +245,25 @@ func (wb *WindowBuffer) rebuildOneWindow(idx int) {
 }
 
 // renderAndCacheWindow renders a window, updates its cache and lineHeights[i], returns styled string.
-// Caller recalculates totalLines from lineHeights.
+// Stores cachedInnerContent for cursor border swap (avoid re-calling renderWindowContent).
 func (wb *WindowBuffer) renderAndCacheWindow(i int, w *Window) string {
 	innerWidth := max(0, wb.width-4)
-	contentToRender := wb.renderWindowContent(w, innerWidth)
-	styled := w.Style.Width(wb.width).Render(contentToRender)
+	innerContent := wb.renderWindowContent(w, innerWidth)
+	styled := w.Style.Width(wb.width).Render(innerContent)
 	lineCount := strings.Count(styled, "\n") + 1
 
 	if i < len(wb.lineHeights) {
 		wb.lineHeights[i] = lineCount
 	}
 	w.cachedRender = styled
+	w.cachedInnerContent = innerContent
 	w.cachedWidth = wb.width
 	w.lastContentLen = len(w.Content)
 	return styled
 }
 
-// renderWithCursor renders all windows with cursor highlighting on the specified window
+// renderWithCursor renders all windows with cursor highlighting on the specified window.
+// For the cursor window: reuse cachedInnerContent, only swap border style (no lipgloss.Wrap).
 func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 	var sb strings.Builder
 
@@ -269,30 +272,39 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 			sb.WriteString("\n")
 		}
 
-		// Use cached render for non-cursor windows (if still valid)
-		if i != cursorIndex && w.cachedRender != "" && w.cachedWidth == wb.width {
-			if w.IsDiffWindow() || len(w.Content) == w.lastContentLen {
+		// Non-cursor window: use cached render if valid
+		if i != cursorIndex {
+			if w.cachedRender != "" && w.cachedWidth == wb.width &&
+				(w.IsDiffWindow() || len(w.Content) == w.lastContentLen) {
 				sb.WriteString(w.cachedRender)
 				continue
 			}
-		}
-
-		// Render cursor window (or uncached window) with appropriate style
-		innerWidth := max(0, wb.width-4)
-		contentToRender := wb.renderWindowContent(w, innerWidth)
-
-		// Use cursor style only for the cursor window
-		var styled string
-		if i == cursorIndex {
-			styled = wb.cursorStyle.Width(wb.width).Render(contentToRender)
-		} else {
-			styled = w.Style.Width(wb.width).Render(contentToRender)
-			// Cache the non-cursor render for future use
+			// Fallback: re-render and cache
+			innerWidth := max(0, wb.width-4)
+			innerContent := wb.renderWindowContent(w, innerWidth)
+			styled := w.Style.Width(wb.width).Render(innerContent)
 			w.cachedRender = styled
+			w.cachedInnerContent = innerContent
 			w.cachedWidth = wb.width
 			w.lastContentLen = len(w.Content)
+			sb.WriteString(styled)
+			continue
 		}
-		sb.WriteString(styled)
+
+		// Cursor window: border swap - reuse cachedInnerContent, avoid renderWindowContent
+		if w.cachedInnerContent != "" && w.cachedWidth == wb.width &&
+			(w.IsDiffWindow() || len(w.Content) == w.lastContentLen) {
+			sb.WriteString(wb.cursorStyle.Width(wb.width).Render(w.cachedInnerContent))
+		} else {
+			innerWidth := max(0, wb.width-4)
+			innerContent := wb.renderWindowContent(w, innerWidth)
+			styled := wb.cursorStyle.Width(wb.width).Render(innerContent)
+			w.cachedRender = w.Style.Width(wb.width).Render(innerContent) // cache dimmed for next time
+			w.cachedInnerContent = innerContent
+			w.cachedWidth = wb.width
+			w.lastContentLen = len(w.Content)
+			sb.WriteString(styled)
+		}
 	}
 	return sb.String()
 }

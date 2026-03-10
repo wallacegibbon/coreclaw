@@ -68,6 +68,5 @@ Session goroutine holds `w.mu` while parsing all TLV messages, calling `renderMu
    - dirtyIndex: -1=clean, >=0=single window dirty, fullRebuild(-2)=all
    - rebuildOneWindow re-renders one window, concatenates with others' cache
 
-## Remaining (lower priority)
-
-5. **Cursor-only border swap** - When cursor changes, reuse content and only swap border style
+5. **Cursor-only border swap** ✅ - When cursor changes, reuse cachedInnerContent, only swap border style
+   - cachedInnerContent stores pre-border content; no lipgloss.Wrap when switching cursor

@@ -20,7 +20,7 @@ const (
 // Timing constants
 const (
 	UpdateThrottleInterval = 150 * time.Millisecond // batch rapid display updates
-	TickInterval          = 500 * time.Millisecond  // polling during streaming
-	FlusherInterval       = 50 * time.Millisecond   // update flusher tick
-	SubmitTickDelay       = 50 * time.Millisecond   // delay before first tick after submit
+	TickInterval           = 500 * time.Millisecond // polling during streaming
+	FlusherInterval        = 50 * time.Millisecond  // update flusher tick
+	SubmitTickDelay        = 50 * time.Millisecond  // delay before first tick after submit
 )

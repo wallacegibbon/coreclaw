@@ -15,7 +15,7 @@
 // Session writes TLV bytes → OutputWriter.Write() → parses tags, styles, appends to WindowBuffer
 // → throttled updateChan signal → Terminal drains on tick → DisplayModel.updateContent()
 //
-// User input → Terminal.handleKeyMsg → InputModel or DisplayModel or session commands
+// # User input → Terminal.handleKeyMsg → InputModel or DisplayModel or session commands
 //
 // # Key Files
 //

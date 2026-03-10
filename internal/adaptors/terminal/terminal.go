@@ -113,18 +113,18 @@ func NewTerminal(session *agentpkg.Session, out *outputWriter, inputStream *stre
 	styles := DefaultStyles()
 
 	m := &Terminal{
-		session:     session,
-		out:         out,
-		streamInput: inputStream,
-		display:     NewDisplayModel(out.windowBuffer, styles),
-		todo:           NewTodoModel(styles),
-		input:          NewInputModel(styles),
-		status:         NewStatusModel(styles),
-		windowWidth:    DefaultWidth,
-		styles:         styles,
-		focusedWindow:  "input",
-		sessionFile:    sessionFile,
-		hasFocus:       true, // program starts with focus
+		session:       session,
+		out:           out,
+		streamInput:   inputStream,
+		display:       NewDisplayModel(out.windowBuffer, styles),
+		todo:          NewTodoModel(styles),
+		input:         NewInputModel(styles),
+		status:        NewStatusModel(styles),
+		windowWidth:   DefaultWidth,
+		styles:        styles,
+		focusedWindow: "input",
+		sessionFile:   sessionFile,
+		hasFocus:      true, // program starts with focus
 	}
 
 	return m

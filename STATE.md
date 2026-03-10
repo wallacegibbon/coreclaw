@@ -316,6 +316,10 @@ For this project, simplicity is more important than efficiency.
   - rebuildOneWindow re-renders one window and concatenates with others' cache
   - Full rebuild on width change or when multiple windows updated before render
 
+- ✅ **Cursor-only border swap**
+  - When cursor highlights a window, reuse cachedInnerContent and apply cursor border
+  - Avoids lipgloss.Wrap on cursor change (j/k navigation)
+
 - ✅ **Terminal adaptor refactor for clarity and maintainability**
   - Added doc.go with package-level architecture docs (message flow, key files)
   - Added constants.go: DefaultWidth/Height, LayoutGap, TodoHeaderRows, timing constants
