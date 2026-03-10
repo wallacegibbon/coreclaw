@@ -28,7 +28,7 @@ For this project, simplicity is more important than efficiency.
 - ✅ CLI flags for version and help information
 - ✅ Custom system prompts (--system) to override default behavior
 - ✅ README.md with comprehensive documentation
-- ✅ Readline library integration for proper terminal input handling
+- ✅ Terminal input handling (bubbles textinput)
   - Automatic TTY detection
   - Command history support (~/.coreclaw_history, max 1000 entries)
   - Proper backspace/delete for all character encodings
@@ -69,7 +69,7 @@ For this project, simplicity is more important than efficiency.
   - Displays "Request cancelled." message when interrupted
 - ✅ Refactored codebase for better maintainability
   - Extracted CLI flag parsing to `internal/config` package
-  - Removed terminal.go (consolidated isValidTag into common.go)
+  - Refactored terminal adaptor structure
   - Simplified main.go to ~80 lines of minimal glue code
 - ✅ CLI-based provider configuration
   - All config via CLI flags: --type, --base-url, --api-key, --model
@@ -111,7 +111,7 @@ For this project, simplicity is more important than efficiency.
 - ✅ Adaptors in internal/adaptors/
   - terminal.go - Terminal adaptor with Terminal (lipgloss/bubbletea)
   - websocket.go - WebSocket server with per-client sessions
-  - colors.go - ANSI color styling (now in common.go)
+  - styles.go - lipgloss styling for terminal UI
   - chat.html - Embedded chat UI
   - Removed NewSession function - create processor/session directly
 - ✅ coreclaw-web command
@@ -125,7 +125,7 @@ For this project, simplicity is more important than efficiency.
   - This ensures cancel always works regardless of context recreation
 - ✅ Tab key to switch focus between display and input windows
   - Focused window has bright border (#89d4fa), unfocused has dimmed border (#45475a)
-  - When display window is focused, j/k scrolls content like vim
+  - When display focused: j/k move window cursor; J/K scroll screen
 - ✅ TLV protocol for user-to-session communication
   - Added TagUserText='A' for user text input from client to session
   - Session reads TLV messages from input stream and unwraps TagUserText
@@ -159,13 +159,8 @@ For this project, simplicity is more important than efficiency.
   - Fixed incorrect initial display position when loading content from session files
   - **Problem**: When loading session content, viewport stayed at welcome text offset (centered) instead of scrolling to bottom of actual content
   - **Root cause**: Welcome text centering added empty lines; viewport YOffset didn't reset when session content replaced welcome
-  - **Solution**: Detect existing content in display buffer during Terminal initialization; show session content immediately instead of welcome
-  - **Implementation**:
-    1. Added check in `NewTerminal()`: if `terminalOutput.display.GetAll()` is non-empty, set viewport content to word-wrapped session content and `GotoBottom()`
-    2. Skip welcome text and centering when session content exists
-    3. Added `firstScrollDone` flag to track initial scroll state
-    4. Updated `updateDisplayContent()` to respect scroll state
-  - **Result**: Session content now displays at correct scroll position; scrolling works smoothly without large jumps
+  - **Solution**: When `updateContent()` runs (e.g. on WindowSizeMsg), if windowBuffer has content it replaces welcome and scrolls to bottom
+  - **Result**: Session content displays at correct scroll position; scrolling works smoothly without large jumps
 - ✅ **Todo system with display and runtime management**
   - Implemented todo_read and todo_write tools for task planning
   - TodoManager provides thread-safe todo list management
@@ -277,7 +272,7 @@ For this project, simplicity is more important than efficiency.
   - **Solution**: Added a Window Cursor that highlights one window at a time with a bright border, and `j`/`k` keys to navigate (like vi). `J`/`K` for screen scrolling.
   - **Implementation**:
     - Added `windowCursor` field to `DisplayModel` (index of selected window, -1 for none)
-    - Added `cursorStyle` to `WindowBuffer` with bright blue border (`#89b4fa`)
+    - Added `cursorStyle` to `WindowBuffer` with orange border (`#fab387`)
     - Updated `GetAll()` to accept cursorIndex parameter and highlight the selected window
     - Added window line height tracking in `WindowBuffer` for scroll synchronization
     - Added cursor management methods: `MoveWindowCursorUp()`, `MoveWindowCursorDown()`, `SetCursorToLastWindow()`, `EnsureCursorVisible()`

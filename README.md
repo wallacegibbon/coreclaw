@@ -111,8 +111,11 @@ When running the Terminal version:
 | `k` | Move window cursor up (when display focused) |
 | `J` | Move screen down (when display focused) |
 | `K` | Move screen up (when display focused) |
-| `g` | Go to top of display (when display focused) |
-| `G` | Go to bottom of display (when display focused) |
+| `g` | Go to first window and top of display (when display focused) |
+| `G` | Go to last window and bottom of display (when display focused) |
+| `H` | Move cursor to window at top of visible area (when display focused) |
+| `L` | Move cursor to window at bottom of visible area (when display focused) |
+| `M` | Move cursor to window at center of visible area (when display focused) |
 | `:` | Switch to input with ":" prefix (when display focused) |
 | `Space` | Toggle wrap mode for active window (when display focused) |
 | `Ctrl+C` | Clear input (when input focused) |
