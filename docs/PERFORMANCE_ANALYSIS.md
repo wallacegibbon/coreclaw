@@ -70,3 +70,21 @@ Session goroutine holds `w.mu` while parsing all TLV messages, calling `renderMu
 
 5. **Cursor-only border swap** ✅ - When cursor changes, reuse cachedInnerContent, only swap border style
    - cachedInnerContent stores pre-border content; no lipgloss.Wrap when switching cursor
+
+## Refresh Rate Tuning (Post-Optimization)
+
+After the above optimizations, per-tick cost is significantly reduced. We can safely increase refresh frequency.
+
+| Parameter | Before | After | Effect |
+|-----------|--------|-------|--------|
+| TickInterval | 500ms | 250ms | Display refresh: 2→4 Hz during streaming |
+| UpdateThrottleInterval | 150ms | 100ms | Sooner signal when deltas arrive |
+
+**Benefits:**
+- Smoother streaming: content appears within ~250ms of arrival (was ~500ms)
+- More responsive feeling without blocking keys (KeyMsg still returns immediately)
+
+**Performance impact:**
+- 2× more tick handlers per second during streaming
+- Per-tick cost is low: GetTotalLines (no full render), incremental GetAll (dirty window only), viewport update
+- Keyboard input unaffected (tick runs on separate event; KeyMsg handled first)

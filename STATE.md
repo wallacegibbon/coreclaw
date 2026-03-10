@@ -304,11 +304,11 @@ For this project, simplicity is more important than efficiency.
   - **Root causes**: (1) display update ran before key handling, blocking the event loop; (2) duplicate GetAll() per update; (3) update throttle too aggressive.
   - **Solution**: See docs/PERFORMANCE_ANALYSIS.md for full analysis.
   - **Implementation**:
-    - KeyMsg now returns immediately; display updates only on tickMsg (every 500ms during streaming)
+    - KeyMsg now returns immediately; display updates only on tickMsg (every 250ms during streaming)
     - updateChan drained in tick handler so streaming content still appears
     - UpdateHeightForTodos uses GetTotalLines() instead of GetAll()+strings.Count (avoids full render string allocation)
     - GetTotalLines() ensures cache is built when dirty, returns line count only
-    - Update throttle increased 100ms → 150ms
+    - Update throttle 100ms; TickInterval 250ms (post-optimization: faster refresh, per-tick cost low)
 
 - ✅ **Incremental window rendering**
   - Only re-render the window that changed; reuse cached renders for others
