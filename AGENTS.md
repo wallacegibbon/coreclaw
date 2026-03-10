@@ -35,106 +35,19 @@ go build
 go build ./cmd/coreclaw-web/
 ```
 
-## Usage
 
-All configuration must be specified via command line flags:
-
-```sh
-# Local Ollama OpenAI-compatible server
-coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3
-
-# Local Ollama Anthropic-compatible server
-coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --model gpt-oss:20b
-
-# MiniMax (Anthropic-compatible)
-coreclaw --type anthropic --base-url $MINIMAXI_API_URL --api-key $MINIMAXI_API_KEY --model MiniMax-M2.5
-
-# DeepSeek (OpenAI-compatible)
-coreclaw --type openai --base-url $DEEPSEEK_API_URL --api-key $DEEPSEEK_API_KEY --model deepseek-chat
-
-# ZAI (OpenAI-compatible)
-coreclaw --type openai --base-url $ZAI_API_URL --api-key $ZAI_API_KEY --model GLM-4.7
-```
-
-Running with skills
-```sh
-coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --model gpt-oss:20b --skill ~/playground/coreclaw/misc/samples/skills/
-```
-
-
-## CLI Flags
-
-- `-type string` - Provider type: `anthropic` or `openai` (required)
-- `-base-url string` - API endpoint URL (required)
-- `-api-key string` - API key (required)
-- `-model string` - Model name to use
-- `-version` - Show version information
-- `-help` - Show help information
-- `-debug-api` - Write raw API requests and responses to log file
-- `-system string` - Override system prompt
-- `-skill string` - Skills directory path (can be specified multiple times)
-- `-session string` - Session file path to load/save conversations
-- `-proxy string` - HTTP proxy URL (supports HTTP, HTTPS, and SOCKS5 proxies, e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`)
-
-
-## Session Persistence
-
-CoreClaw allows you to save and restore conversations manually using session files.
-
-### Behavior
-
-- **Manual-save**: Sessions are saved only when you use `:save [filename]` or press `Ctrl+S`
-- **Load**: On startup, CoreClaw creates a new empty session unless you specify `--session` to load an existing one
-- **Path expansion**: Paths like `~/mysession.md` are expanded to your home directory
-
-### What's Saved
-
-- Message history (user prompts and assistant responses)
-- Token usage statistics (total and context)
-- Provider configuration (BaseURL, ModelName)
-
-### What's Not Saved
-
-- Reasoning/thinking content (streamed output not stored)
-- Tool call details (only message history is preserved)
-
-### Session Commands
+## Quick Start
 
 ```sh
-:save                    # Save to current session file (if set with --session)
-:save ~/mysession.md    # Save to specific file
-:cancel                  # Cancel current request and clear todos (with confirmation)
-:summarize              # Summarize the entire conversation to a single message
-```
-
-### Loading Sessions
-
-You can load an existing session using the `--session` flag:
-
-```sh
-# Load a specific session file
-coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/mysession.md
-
-# Start fresh with a new session (default behavior)
+# OpenAI-compatible server
 coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+
+# Anthropic-compatible server
+coreclaw --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4
 ```
 
+See [CLI Reference](docs/cli-reference.md) for all flags and usage examples.
 
-## Web Server
-
-`coreclaw-web` runs a WebSocket server with a built-in chat UI.
-
-```sh
-# Start WebSocket server
-coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
-
-# Custom address
-coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4 --addr :9090
-```
-
-- **Web UI**: Open `http://localhost:8080` in browser
-- **WebSocket**: `ws://localhost:8080/ws`
-- Each browser tab gets its own independent agent session
 
 ## Tools
 
@@ -142,120 +55,23 @@ CoreClaw provides the following tools (ordered from safest to most dangerous):
 
 | Tool | Description |
 |------|-------------|
-| `read_file` | Read the contents of a file. Supports optional line range using start_line and end_line parameters (1-indexed). |
+| `read_file` | Read the contents of a file. Supports optional line range. |
 | `todo_read` | Read the current todo list |
 | `todo_write` | Write or update the todo list |
-| `edit_file` | Apply search/replace edit to a file. Requires reading file first to get exact text including whitespace. |
+| `edit_file` | Apply search/replace edit to a file |
 | `write_file` | Create a new file or replace entire file content |
 | `activate_skill` | Load and execute a skill |
 | `posix_shell` | Execute shell commands |
 
 
-## Terminal Controls
+## Documentation
 
-When running the Terminal version:
-
-| Key | Action |
-|-----|--------|
-| `Tab` | Switch focus between display and input window |
-| `Enter` | Submit prompt (when input focused) |
-| `Ctrl+S` | Save session to file |
-| `Ctrl+O` | Open external editor for multi-line input |
-| `j` | Move window cursor down (when display focused) |
-| `k` | Move window cursor up (when display focused) |
-| `J` | Move screen down (when display focused) |
-| `K` | Move screen up (when display focused) |
-| `g` | Go to first window and top of display (when display focused) |
-| `G` | Go to last window and bottom of display (when display focused) |
-| `H` | Move cursor to window at top of visible area (when display focused) |
-| `L` | Move cursor to window at bottom of visible area (when display focused) |
-| `M` | Move cursor to window at center of visible area (when display focused) |
-| `:` | Switch to input with ":" prefix (when display focused) |
-| `Space` | Toggle wrap mode for active window (when display focused) |
-| `Ctrl+C` | Clear input (when input focused) |
-| `Ctrl+G` | Cancel current request (with confirmation) |
-| `:cancel` | Cancel current request (with confirmation) |
-| `:quit`, `:q` | Exit with confirmation (press y/n) |
-## Window Container
-
-CoreClaw's terminal adaptor organizes concurrent streams into separate windows with synchronized widths. Each stream (reasoning, text, tool outputs) appears in its own window with dimmed borders.
-
-- **Stream ID suffix**: To prevent collisions across conversation turns, stream IDs include a monotonic suffix (e.g., `0-1`, `1-1` for first turn; `0-2`, `1-2` for second turn). This ensures each turn's content appears in distinct windows while keeping related deltas grouped within a turn.
-- **Width synchronization**: All windows match the input box width for consistent layout.
-- **Delta routing**: Content with stream ID prefix `[:id:]` is routed to the appropriate window via `parseStreamID()`.
-
-### Window Cursor
-
-The Window Cursor highlights one window in the display area with a brighter border. Use `j` and `k` keys to navigate between windows.
-
-- **Default position**: The cursor defaults to the last window and updates automatically when new windows are created.
-- **Auto-follow**: When new message windows are appended, cursor moves to the new window and viewport scrolls to bottom. Leaving the last window (k, g, H, L, M, etc.) disables follow; pressing G or j to return to the last window re-enables it.
-- **Focus-dependent highlighting**: The orange border cursor only appears when the display area is focused (Tab to switch between display and input).
-- **Highlighted border**: The selected window displays an orange border (`#fab387`) when the display area is focused. Unselected windows have invisible borders that match the background, preserving layout when windows are selected.
-- **Wrap mode**: Press `Space` to toggle the active window between normal and wrap mode. In wrap mode, the window shows only the last 3 lines of content, displaying the newest content. Wrapped windows display a `Wrapped - Space to expand` indicator with a subtle background color.
-
-## Skills System
-
-CoreClaw supports the Agent Skills specification from [agentskills.io](https://agentskills.io). Skills are packages of instructions, scripts, and resources that agents can discover and use to perform specific tasks.
-
-### Usage
-
-```sh
-# With skills directory
-coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --skill ./skills "extract text from document.pdf"
-```
-
-### Skill Directory Structure
-
-```
-skills/
-├── SKILL.md          # Required: instructions + metadata
-├── scripts/          # Optional: executable code
-├── references/      # Optional: documentation
-└── assets/          # Optional: templates, resources
-```
-
-### SKILL.md Format
-
-Skills use YAML frontmatter followed by Markdown content:
-
-```yaml
----
-name: pdf-processing
-description: Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable.
-license: Apache-2.0
----
-
-# PDF Processing Skill
-
-Instructions for the agent...
-```
-
-### How Skills Work
-
-1. **Discovery**: At startup, CoreClaw scans the skills directory and loads only skill names and descriptions
-2. **Activation**: When a task matches a skill's description, the agent can activate it to load full instructions
-3. **Execution**: The agent follows the instructions, optionally running bundled scripts
-
-Skills metadata is injected into the system prompt using XML format:
-
-```xml
-<available_skills>
-  <skill>
-    <name>pdf-processing</name>
-    <description>Extract text and tables from PDF files...</description>
-    <location>/path/to/skills/pdf/SKILL.md</location>
-  </skill>
-</available_skills>
-```
-
-### Skill Specification
-
-- **name**: 1-64 characters, lowercase letters, numbers, and hyphens only
-- **description**: 1-1024 characters, describes what the skill does AND when to use it
-- **license**: Optional, license name or reference
-- **compatibility**: Optional, environment requirements
-- **allowed-tools**: Optional, space-delimited list of pre-approved tools
+- [CLI Reference](docs/cli-reference.md) - All CLI flags and usage examples
+- [Session Persistence](docs/sessions.md) - Save and restore conversations
+- [Terminal Controls](docs/terminal-controls.md) - Keyboard shortcuts and navigation
+- [Window Container](docs/window-container.md) - UI organization and cursor behavior
+- [Skills System](docs/skills.md) - Agent Skills specification and usage
+- [Web Server](docs/web-server.md) - WebSocket server with built-in chat UI
 
 
 ## Agent Instructions
@@ -269,10 +85,10 @@ Skills metadata is injected into the system prompt using XML format:
 
 Tools must be ordered from safest to most dangerous:
 
-1. `read_file` - Read file contents (supports line range with start_line and end_line parameters, 1-indexed)
+1. `read_file` - Read file contents
 2. `todo_read` - Read todo list
 3. `todo_write` - Write/update todo list
 4. `edit_file` - Apply search/replace edit to a file
-5. `write_file` - Create or replace files (full overwrite)
+5. `write_file` - Create or replace files
 6. `activate_skill` - Load and execute skills
 7. `posix_shell` - Execute shell commands (most dangerous)
