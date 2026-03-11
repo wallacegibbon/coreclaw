@@ -429,7 +429,7 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 	return false
 }
 
-// MoveWindowCursorToCenter moves the window cursor to the window at the center of the visible screen.
+// MoveWindowCursorToCenter moves the window cursor to the middle window among visible windows.
 // Returns true if the cursor moved, false otherwise.
 func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 	windowCount := m.windowBuffer.GetWindowCount()
@@ -437,27 +437,30 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 		return false
 	}
 
-	viewportCenter := m.viewport.YOffset() + m.viewport.Height()/2
+	// Get viewport bounds
+	viewportTop := m.viewport.YOffset()
+	viewportBottom := viewportTop + m.viewport.Height()
 
-	// Find the window that contains the center line of the viewport
+	// Find all windows that are at least partially visible
+	var visibleWindows []int
 	for i := 0; i < windowCount; i++ {
 		startLine := m.windowBuffer.GetWindowStartLine(i)
 		endLine := m.windowBuffer.GetWindowEndLine(i)
-		// If this window contains the center line
-		if startLine <= viewportCenter && endLine > viewportCenter {
-			m.windowCursor = i
-			m.userMovedCursorAway = (i < windowCount-1)
-			return true
-		}
-		// If past the center, pick the previous window (or this one if first)
-		if startLine > viewportCenter {
-			m.windowCursor = max(0, i-1)
-			m.userMovedCursorAway = true
-			return true
+		// Window is visible if it overlaps with viewport
+		if startLine < viewportBottom && endLine > viewportTop {
+			visibleWindows = append(visibleWindows, i)
 		}
 	}
-	// If center is past all windows, select the last one
-	m.windowCursor = windowCount - 1
-	m.userMovedCursorAway = false
+
+	if len(visibleWindows) == 0 {
+		return false
+	}
+
+	// Select the middle window among visible windows
+	middleIndex := len(visibleWindows) / 2
+	targetWindow := visibleWindows[middleIndex]
+
+	m.windowCursor = targetWindow
+	m.userMovedCursorAway = (targetWindow < windowCount-1)
 	return true
 }
