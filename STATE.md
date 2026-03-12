@@ -98,6 +98,14 @@ For this project, simplicity is more important than efficiency.
 - ✅ TLV protocol for user-to-session communication
   - Added TagUserText='A' for user text input from client to session
   - Session reads TLV messages from input stream and unwraps TagUserText
+- ✅ Simplified auto-summarize mechanism
+  - Removed `skipAutoSummarize` flag and `prependTasks` function
+  - Auto-summarize now runs synchronously before processing user prompt
+  - Cleaner linear control flow without task queue manipulation
+  - `shouldAutoSummarize()` helper for threshold check
+  - `autoSummarize()` delegates to shared `summarize()` function
+  - `:cancel` command calls `handleCommandSync()` directly for immediate execution (not queued)
+  - Other commands are queued like user prompts via `submitTask()`
   - Session validates tags and emits TagError for invalid ones
   - Session detects commands (starts with ":") and routes to handler
   - Session checks command errors and emits TagError to user

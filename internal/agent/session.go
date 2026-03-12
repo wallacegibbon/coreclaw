@@ -55,12 +55,11 @@ type Session struct {
 	Output        stream.Output
 	ModelManager  *ModelManager
 
-	taskQueue         []Task
-	taskAvailable     chan struct{}
-	inProgress        bool
-	cancelCurrent     func()
-	skipAutoSummarize bool // Prevent auto-summarize loops
-	mu                sync.Mutex
+	taskQueue     []Task
+	taskAvailable chan struct{}
+	inProgress    bool
+	cancelCurrent func()
+	mu            sync.Mutex
 }
 
 // SessionMeta is the YAML frontmatter metadata.
@@ -173,7 +172,12 @@ func (s *Session) readFromInput() {
 			continue
 		}
 		if len(value) > 0 && value[0] == ':' {
-			s.submitCommand(value[1:])
+			// :cancel is immediate, other commands are queued
+			if string(value[1:]) == "cancel" {
+				s.handleCommandSync(context.Background(), "cancel")
+			} else {
+				s.submitTask(CommandPrompt{Command: value[1:]})
+			}
 		} else {
 			s.submitTask(UserPrompt(value))
 		}
@@ -203,14 +207,6 @@ func (s *Session) submitTask(task Task) {
 	} else {
 		go s.runTaskQueue()
 	}
-}
-
-// prependTasks inserts tasks at the front of the queue (for auto-summarize)
-func (s *Session) prependTasks(tasks ...Task) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.taskQueue = append(tasks, s.taskQueue...)
-	s.signalTaskAvailable()
 }
 
 // signalTaskAvailable notifies the task runner that a new task is available
@@ -287,21 +283,9 @@ func (s *Session) appendCancelMessage() {
 
 func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	// Auto-summarize when context usage reaches 80% of the limit
-	// Skip if we've already attempted auto-summarize (prevents loops)
-	if !s.skipAutoSummarize && s.ContextLimit > 0 && s.ContextTokens > 0 {
-		threshold := s.ContextLimit * 80 / 100
-		if s.ContextTokens >= threshold {
-			s.writeNotify(fmt.Sprintf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...", s.ContextTokens, s.ContextLimit, float64(s.ContextTokens)*100/float64(s.ContextLimit)))
-			// Set flag to prevent auto-summarize loop
-			s.skipAutoSummarize = true
-			// Put current task back to front, then insert summarize command before it
-			s.prependTasks(CommandPrompt{Command: "summarize"}, UserPrompt(prompt))
-			return
-		}
+	if s.shouldAutoSummarize() {
+		s.autoSummarize(ctx)
 	}
-
-	// Clear the flag - we're either processing normally or after auto-summarize
-	s.skipAutoSummarize = false
 
 	s.Messages = append(s.Messages, fantasy.NewUserMessage(prompt))
 	history := s.Messages[:len(s.Messages)-1]
@@ -314,6 +298,20 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	if msg.Role != "" {
 		s.Messages = append(s.Messages, msg)
 	}
+}
+
+// shouldAutoSummarize checks if context usage exceeds 80% threshold
+func (s *Session) shouldAutoSummarize() bool {
+	return s.ContextLimit > 0 && s.ContextTokens > 0 &&
+		s.ContextTokens >= s.ContextLimit*80/100
+}
+
+// autoSummarize performs synchronous summarization to reduce context
+func (s *Session) autoSummarize(ctx context.Context) {
+	usage := float64(s.ContextTokens) * 100 / float64(s.ContextLimit)
+	s.writeNotify(fmt.Sprintf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
+		s.ContextTokens, s.ContextLimit, usage))
+	s.summarize(ctx)
 }
 
 var promptCount uint64
@@ -397,14 +395,6 @@ func (s *Session) trackUsage(usage fantasy.Usage) {
 // Command Handling
 // ============================================================================
 
-func (s *Session) submitCommand(cmd string) {
-	if cmd == "summarize" {
-		s.submitTask(CommandPrompt{Command: cmd})
-	} else {
-		s.handleCommandSync(context.Background(), cmd)
-	}
-}
-
 func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
@@ -438,6 +428,7 @@ func (s *Session) cancelTask() {
 	s.writeError("nothing to cancel")
 }
 
+// summarize replaces the conversation history with a concise summary
 func (s *Session) summarize(ctx context.Context) {
 	prompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
 	msg, usage, err := s.processPrompt(ctx, prompt, s.Messages)
@@ -446,9 +437,6 @@ func (s *Session) summarize(ctx context.Context) {
 		return
 	}
 	s.Messages = []fantasy.Message{msg}
-	// After summarization, the context is just the summary message.
-	// Estimate the new context size based on output tokens (the generated summary).
-	// This is an approximation, but more accurate than keeping the old (large) value.
 	if usage.OutputTokens > 0 {
 		s.ContextTokens = usage.OutputTokens
 	}

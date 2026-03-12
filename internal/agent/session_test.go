@@ -76,7 +76,7 @@ func TestSaveAndLoadSession(t *testing.T) {
 		ContextTokens: sessionData.ContextTokens,
 		Input:         &stream.NopInput{},
 		Output:        &stream.NopOutput{},
-		taskQueue:     make(chan Task, 10),
+		taskQueue:     make([]Task, 0),
 	}
 
 	// Save session
@@ -142,7 +142,7 @@ func TestLoadLatestSession_WithFiles(t *testing.T) {
 			ModelName: data.ModelName,
 			Input:     &stream.NopInput{},
 			Output:    &stream.NopOutput{},
-			taskQueue: make(chan Task, 10),
+			taskQueue: make([]Task, 0),
 		}
 
 		if err := session.saveSessionToFile(filename); err != nil {
@@ -212,7 +212,7 @@ func Test_displayMessages(t *testing.T) {
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hi there!"}},
 			},
 		},
-		taskQueue: make(chan Task, 10),
+		taskQueue: make([]Task, 0),
 	}
 
 	// Display messages should not panic
@@ -273,7 +273,7 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		ContextTokens: 200,
 		Input:         &stream.NopInput{},
 		Output:        &stream.NopOutput{},
-		taskQueue:     make(chan Task, 10),
+		taskQueue:     make([]Task, 0),
 	}
 
 	// Save
@@ -361,7 +361,7 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 		TotalSpent: fantasy.Usage{TotalTokens: 100},
 		Input:      &stream.NopInput{},
 		Output:     &stream.NopOutput{},
-		taskQueue:  make(chan Task, 10),
+		taskQueue:  make([]Task, 0),
 	}
 
 	if err := session.saveSessionToFile(sessionPath); err != nil {
@@ -412,7 +412,7 @@ func TestReasoningOnlyMessage(t *testing.T) {
 		ModelName: "gpt-4",
 		Input:     &stream.NopInput{},
 		Output:    &stream.NopOutput{},
-		taskQueue: make(chan Task, 10),
+		taskQueue: make([]Task, 0),
 	}
 
 	if err := session.saveSessionToFile(sessionPath); err != nil {
@@ -472,7 +472,7 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		ModelName: "gpt-4",
 		Input:     &stream.NopInput{},
 		Output:    &stream.NopOutput{},
-		taskQueue: make(chan Task, 10),
+		taskQueue: make([]Task, 0),
 	}
 
 	if err := session.saveSessionToFile(sessionPath); err != nil {
