@@ -67,6 +67,12 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		return nil, fmt.Errorf("failed to initialize skills: %w", err)
 	}
 
+	// Add current working directory to system prompt
+	cwd, _ := os.Getwd()
+	if cwd != "" {
+		systemPrompt = systemPrompt + "\n\nCurrent working directory: " + cwd + "\nDo NOT prefix shell commands with 'cd' - they already run in this directory."
+	}
+
 	// Generate skills fragment for system prompt
 	skillsFragment := skillsManager.GenerateSystemPromptFragment()
 	if skillsFragment != "" {
