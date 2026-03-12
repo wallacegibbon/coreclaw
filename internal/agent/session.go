@@ -179,11 +179,24 @@ func (s *Session) initAgent(model fantasy.LanguageModel, baseTools []fantasy.Age
 	// If model is nil and there's an active model config, send full config for adaptor to switch
 	if model == nil && s.ModelManager != nil {
 		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
+			s.applyModelContextLimit(activeModel)
 			s.sendSystemInfoWithModel(activeModel)
 			return
 		}
 	}
 	s.sendSystemInfo()
+}
+
+// applyModelContextLimit updates the session's ContextLimit from a model config
+// when the model defines a positive context limit. A zero limit means "no
+// override" and keeps the existing session-level limit (e.g. from CLI).
+func (s *Session) applyModelContextLimit(model *ModelConfig) {
+	if model == nil || model.ContextLimit <= 0 {
+		return
+	}
+	s.mu.Lock()
+	s.ContextLimit = int64(model.ContextLimit)
+	s.mu.Unlock()
 }
 
 // initModelManager initializes the ModelManager by setting the active model from runtime config

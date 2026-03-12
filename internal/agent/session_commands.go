@@ -131,6 +131,9 @@ func (s *Session) handleModelSet(args []string) {
 		_ = s.RuntimeManager.SetActiveModel(model.Name)
 	}
 
+	// Update session context limit for this model, if configured.
+	s.applyModelContextLimit(model)
+
 	// Send system info with full model config (terminal needs API key to switch)
 	s.sendSystemInfoWithModel(model)
 }
@@ -155,6 +158,13 @@ func (s *Session) handleModelLoad() {
 	// Restore active model from runtime config
 	s.initModelManager()
 
-	// Send system info with model list to adaptor via TagSystem
+	// Send system info with model list to adaptor via TagSystem.
+	// If an active model is known, also apply its context limit and
+	// include full config so the adaptor can recreate the provider.
+	if active := s.ModelManager.GetActive(); active != nil {
+		s.applyModelContextLimit(active)
+		s.sendSystemInfoWithModel(active)
+		return
+	}
 	s.sendSystemInfo()
 }
