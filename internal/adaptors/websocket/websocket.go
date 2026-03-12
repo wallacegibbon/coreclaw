@@ -1,5 +1,11 @@
 package websocket
 
+// Package websocket provides a thin adaptor that exposes the core
+// TLV-based session over WebSocket. Each connected client gets its
+// own agent session wired to a ChanInput/Output pair; the adaptor
+// is responsible only for upgrading HTTP, shuttling TLV bytes, and
+// serving the embedded HTML chat UI.
+
 import (
 	"net/http"
 	"strings"

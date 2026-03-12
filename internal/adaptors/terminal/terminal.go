@@ -230,8 +230,10 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Err != nil {
 			m.out.WriteNotify(fmt.Sprintf("Error editing file %s: %v", msg.Path, msg.Err))
 		}
-		// If it was the model config file, reload models
-		if strings.Contains(msg.Path, "models.json") {
+		// If it was the model config file, reload models.
+		// Model configs are stored in models.conf (or a custom path), so we
+		// just check for the default filename suffix here.
+		if strings.HasSuffix(msg.Path, "models.conf") {
 			m.streamInput.EmitTLV(stream.TagUserText, ":model_load")
 		}
 		return m, nil
