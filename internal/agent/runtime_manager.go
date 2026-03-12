@@ -1,0 +1,162 @@
+package agent
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+)
+
+// RuntimeConfig holds runtime configuration that can change during execution
+type RuntimeConfig struct {
+	ActiveModel string `json:"active_model"` // Model name (from models.conf)
+}
+
+// RuntimeManager manages runtime configuration
+type RuntimeManager struct {
+	config  RuntimeConfig
+	mu      sync.RWMutex
+	path    string
+	modPath string // path to models.conf for default runtime.conf location
+}
+
+// NewRuntimeManager creates a new runtime manager
+// If runtimePath is empty, it defaults to the same directory as modelConfigPath with filename "runtime.conf"
+// If modelConfigPath is also empty, it uses the default ~/.alayacore/runtime.conf
+func NewRuntimeManager(runtimePath, modelConfigPath string) *RuntimeManager {
+	rm := &RuntimeManager{
+		modPath: modelConfigPath,
+	}
+
+	if runtimePath != "" {
+		rm.path = runtimePath
+	} else {
+		// Determine the directory for runtime.conf
+		var dir string
+		if modelConfigPath != "" {
+			// Use same directory as models.conf
+			dir = filepath.Dir(modelConfigPath)
+		} else {
+			// Use default ~/.alayacore directory
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return rm
+			}
+			dir = filepath.Join(home, ".alayacore")
+		}
+		rm.path = filepath.Join(dir, "runtime.conf")
+	}
+
+	// Load if path is set
+	if rm.path != "" {
+		_ = rm.Load()
+	}
+
+	return rm
+}
+
+// Load reads the runtime config from file
+func (rm *RuntimeManager) Load() error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	if rm.path == "" {
+		return nil
+	}
+
+	data, err := os.ReadFile(rm.path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Create the file with default content (already holding lock)
+			return rm.saveLocked()
+		}
+		return err
+	}
+
+	rm.config = parseRuntimeConfig(string(data))
+	return nil
+}
+
+// Save writes the runtime config to file
+func (rm *RuntimeManager) Save() error {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+
+	return rm.saveLocked()
+}
+
+// saveLocked writes the runtime config to file (caller must hold lock)
+func (rm *RuntimeManager) saveLocked() error {
+	if rm.path == "" {
+		return nil
+	}
+
+	// Ensure directory exists
+	dir := filepath.Dir(rm.path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	content := formatRuntimeConfig(rm.config)
+	return os.WriteFile(rm.path, []byte(content), 0644)
+}
+
+// parseRuntimeConfig parses the YAML-like runtime config format
+func parseRuntimeConfig(content string) RuntimeConfig {
+	config := RuntimeConfig{}
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse: active_model: "Model Name"
+		if strings.HasPrefix(line, "active_model:") {
+			value := strings.TrimSpace(strings.TrimPrefix(line, "active_model:"))
+			// Remove surrounding quotes if present
+			if (strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`)) ||
+				(strings.HasPrefix(value, `'`) && strings.HasSuffix(value, `'`)) {
+				value = value[1 : len(value)-1]
+			}
+			config.ActiveModel = value
+		}
+	}
+
+	return config
+}
+
+// formatRuntimeConfig formats the runtime config as YAML-like text
+func formatRuntimeConfig(config RuntimeConfig) string {
+	var sb strings.Builder
+	sb.WriteString("# AlayaCore runtime configuration\n")
+	sb.WriteString("# This file is automatically updated when you switch models\n")
+	sb.WriteString("\n")
+	sb.WriteString("active_model: \"")
+	sb.WriteString(config.ActiveModel)
+	sb.WriteString("\"\n")
+	return sb.String()
+}
+
+// GetActiveModel returns the active model name
+func (rm *RuntimeManager) GetActiveModel() string {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.config.ActiveModel
+}
+
+// SetActiveModel sets the active model name and saves to file
+func (rm *RuntimeManager) SetActiveModel(name string) error {
+	rm.mu.Lock()
+	rm.config.ActiveModel = name
+	rm.mu.Unlock()
+	return rm.Save()
+}
+
+// GetPath returns the runtime config file path
+func (rm *RuntimeManager) GetPath() string {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.path
+}

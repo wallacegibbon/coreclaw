@@ -42,17 +42,18 @@ type SystemInfo struct {
 
 // Session manages conversation state and task execution.
 type Session struct {
-	Messages      []fantasy.Message
-	Agent         fantasy.Agent
-	BaseURL       string
-	ModelName     string
-	SessionFile   string
-	TotalSpent    fantasy.Usage
-	ContextTokens int64
-	ContextLimit  int64
-	Input         stream.Input
-	Output        stream.Output
-	ModelManager  *ModelManager
+	Messages       []fantasy.Message
+	Agent          fantasy.Agent
+	BaseURL        string
+	ModelName      string
+	SessionFile    string
+	TotalSpent     fantasy.Usage
+	ContextTokens  int64
+	ContextLimit   int64
+	Input          stream.Input
+	Output         stream.Output
+	ModelManager   *ModelManager
+	RuntimeManager *RuntimeManager
 
 	taskQueue     []Task
 	taskAvailable chan struct{}
@@ -87,28 +88,29 @@ type SessionData struct {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath string) (*Session, string) {
+func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, data, sessionFile, contextLimit, modelConfigPath), sessionFile
+			return RestoreFromSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, data, sessionFile, contextLimit, modelConfigPath, runtimeConfigPath), sessionFile
 		}
 	}
-	return NewSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, sessionFile, contextLimit, modelConfigPath), sessionFile
+	return NewSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, sessionFile, contextLimit, modelConfigPath, runtimeConfigPath), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath string) *Session {
+func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string) *Session {
 	s := &Session{
-		BaseURL:       baseURL,
-		ModelName:     modelName,
-		SessionFile:   sessionFile,
-		ContextLimit:  contextLimit,
-		Input:         input,
-		Output:        output,
-		ModelManager:  NewModelManager(modelConfigPath),
-		taskQueue:     make([]Task, 0),
-		taskAvailable: make(chan struct{}, 1),
+		BaseURL:        baseURL,
+		ModelName:      modelName,
+		SessionFile:    sessionFile,
+		ContextLimit:   contextLimit,
+		Input:          input,
+		Output:         output,
+		ModelManager:   NewModelManager(modelConfigPath),
+		RuntimeManager: NewRuntimeManager(runtimeConfigPath, modelConfigPath),
+		taskQueue:      make([]Task, 0),
+		taskAvailable:  make(chan struct{}, 1),
 	}
 	s.initAgent(model, baseTools, systemPrompt)
 	go s.readFromInput()
@@ -116,20 +118,21 @@ func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, syst
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, data *SessionData, sessionFile string, contextLimit int64, modelConfigPath string) *Session {
+func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, data *SessionData, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string) *Session {
 	s := &Session{
-		Messages:      data.Messages,
-		BaseURL:       baseURL,
-		ModelName:     modelName,
-		SessionFile:   sessionFile,
-		TotalSpent:    data.TotalSpent,
-		ContextTokens: data.ContextTokens,
-		ContextLimit:  contextLimit,
-		Input:         input,
-		Output:        output,
-		ModelManager:  NewModelManager(modelConfigPath),
-		taskQueue:     make([]Task, 0),
-		taskAvailable: make(chan struct{}, 1),
+		Messages:       data.Messages,
+		BaseURL:        baseURL,
+		ModelName:      modelName,
+		SessionFile:    sessionFile,
+		TotalSpent:     data.TotalSpent,
+		ContextTokens:  data.ContextTokens,
+		ContextLimit:   contextLimit,
+		Input:          input,
+		Output:         output,
+		ModelManager:   NewModelManager(modelConfigPath),
+		RuntimeManager: NewRuntimeManager(runtimeConfigPath, modelConfigPath),
+		taskQueue:      make([]Task, 0),
+		taskAvailable:  make(chan struct{}, 1),
 	}
 	s.initAgent(model, baseTools, systemPrompt)
 	go s.readFromInput()
@@ -217,10 +220,14 @@ func (s *Session) signalTaskAvailable() {
 }
 
 func (s *Session) runTaskQueue() {
+	s.mu.Lock()
 	s.inProgress = true
+	s.mu.Unlock()
 	s.sendSystemInfo()
 	defer func() {
+		s.mu.Lock()
 		s.inProgress = false
+		s.mu.Unlock()
 		s.sendSystemInfo()
 	}()
 
@@ -420,8 +427,12 @@ func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
 }
 
 func (s *Session) cancelTask() {
-	if s.inProgress && s.cancelCurrent != nil {
-		s.cancelCurrent()
+	s.mu.Lock()
+	inProgress := s.inProgress
+	cancelCurrent := s.cancelCurrent
+	s.mu.Unlock()
+	if inProgress && cancelCurrent != nil {
+		cancelCurrent()
 		return
 	}
 	s.writeError("nothing to cancel")
@@ -481,15 +492,6 @@ func (s *Session) handleModelGetAll() {
 func (s *Session) handleModelSet(args []string) {
 	if s.ModelManager == nil {
 		s.writeError("model manager not initialized")
-		return
-	}
-
-	// Check if a task is currently running
-	s.mu.Lock()
-	inProgress := s.inProgress
-	s.mu.Unlock()
-	if inProgress {
-		s.writeError("cannot switch model while task is running")
 		return
 	}
 

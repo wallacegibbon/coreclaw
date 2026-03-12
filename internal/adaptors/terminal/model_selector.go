@@ -318,8 +318,8 @@ func (ms *ModelSelector) handleListKey(key string) bool {
 	case "enter":
 		if len(ms.models) > 0 && ms.selectedIdx >= 0 {
 			ms.activeModel = &ms.models[ms.selectedIdx]
+			ms.modelJustSelected = true
 			ms.state = ModelSelectorClosed
-			// Note: We do NOT save to file - user must edit file manually
 		}
 		return true
 	case "e":

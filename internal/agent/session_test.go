@@ -95,7 +95,7 @@ func TestLoadOrNewSession(t *testing.T) {
 	systemPrompt := "test system prompt"
 
 	// Test creating a new session without specifying session file
-	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, "https://api.test.com", "test-model", &stream.NopInput{}, &stream.NopOutput{}, "", 0, "")
+	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, "https://api.test.com", "test-model", &stream.NopInput{}, &stream.NopOutput{}, "", 0, "", "")
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 	}
@@ -482,7 +482,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	// Check that the model was switched (no error should be in output)
 	foundError := false
 	for _, msg := range output.Messages {
-		if strings.Contains(msg, "cannot switch model while task is running") {
+		if strings.Contains(msg, "error") || strings.Contains(msg, "Error") {
 			foundError = true
 			break
 		}
@@ -491,21 +491,21 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		t.Error("model_set should succeed when no task is running, but got error")
 	}
 
-	// Test 2: model_set should fail when task is running
+	// Test 2: model_set should also work when task is running (no restriction)
 	output.Messages = nil // Clear previous messages
 	session.inProgress = true
 	session.handleModelSet([]string{"test-model-1"})
 
-	// Check that the error message was written
+	// Check that the model was switched (no error should be in output)
 	foundError = false
 	for _, msg := range output.Messages {
-		if strings.Contains(msg, "cannot switch model while task is running") {
+		if strings.Contains(msg, "error") || strings.Contains(msg, "Error") {
 			foundError = true
 			break
 		}
 	}
-	if !foundError {
-		t.Error("model_set should fail when task is running, but no error was returned")
+	if foundError {
+		t.Error("model_set should succeed even when task is running, but got error")
 	}
 
 	// Test 3: model_set should work again after task completes
@@ -516,7 +516,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	// Check that the model was switched (no error should be in output)
 	foundError = false
 	for _, msg := range output.Messages {
-		if strings.Contains(msg, "cannot switch model while task is running") {
+		if strings.Contains(msg, "error") || strings.Contains(msg, "Error") {
 			foundError = true
 			break
 		}

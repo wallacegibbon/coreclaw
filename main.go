@@ -45,6 +45,7 @@ Flags:
   -api-key string     API key for the provider (optional if models.conf exists)
   -model string       Model name to use
   -model-config string  Model config file path (default: ~/.alayacore/models.conf)
+  -runtime-config string  Runtime config file path (default: same dir as model-config/runtime.conf)
   -system string      Override system prompt
   -skill strings      Skills directory path (can be specified multiple times)
   -session string     Session file path to load/save conversations

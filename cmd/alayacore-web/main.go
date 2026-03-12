@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/adaptors/websocket"
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/config"
 )

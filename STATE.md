@@ -182,9 +182,21 @@ For this project, simplicity is more important than efficiency.
   - **All CLI arguments are optional** - can run with just `alayacore` if models.conf exists
   - Located in `internal/adaptors/terminal/model_selector.go`
 
+- ✅ **Runtime Configuration for persisting active model**
+  - `runtime.conf` file stores runtime data that changes during execution
+  - Default location: same directory as `models.conf` (e.g., `~/.alayacore/runtime.conf`)
+  - Custom path via `--runtime-config` CLI flag
+  - Currently stores: `active_model: "Model Name"` (the active model's name)
+  - On startup: loads `runtime.conf` after `models.conf`, finds model by name, sets it active
+  - When model is switched: saves new active model name to `runtime.conf`
+  - **File is created automatically** if it doesn't exist (unlike readonly models.conf)
+  - RuntimeManager in `internal/agent/runtime_manager.go` handles load/save
+  - File format is YAML-like for consistency with models.conf
+  - **Fixed**: Tick handler now always runs (not just during streaming) to process model switches
+
 - ✅ **Model Management Commands**
   - `:model_get_all` - Get all available models (returns via TagSystem with models field)
-  - `:model_set <ID>` - Switch to a model by its ID
+  - `:model_set <ID>` - Switch to a model by its ID (works even during task execution)
   - `:model_load [file]` - Load models from config file (default: path from --model-config or ~/.alayacore/models.conf)
   - ModelManager in `internal/agent/model_manager.go` manages models with runtime IDs
   - Model info included in SystemInfo struct (models, active_model_id, active_model_config)
@@ -204,6 +216,7 @@ For this project, simplicity is more important than efficiency.
   - Ensures model configuration consistency during active operations
   - Users must wait for task completion before switching models
   - Check implemented with mutex-protected `inProgress` flag in session
+  - **Fixed race condition**: all reads/writes to `inProgress` now properly protected by mutex
   - Focus is restored to previously focused window when model selector closes
   - Provides better visual feedback and prevents accidental input
 

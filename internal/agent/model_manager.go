@@ -396,3 +396,25 @@ func (mm *ModelManager) ModelCount() int {
 	defer mm.mu.RUnlock()
 	return len(mm.models)
 }
+
+// FindModelByName finds a model by its name and returns its ID
+func (mm *ModelManager) FindModelByName(name string) string {
+	mm.mu.RLock()
+	defer mm.mu.RUnlock()
+
+	for _, m := range mm.models {
+		if m.Name == name {
+			return m.ID
+		}
+	}
+	return ""
+}
+
+// SetActiveByName sets the active model by name (does NOT persist to file)
+func (mm *ModelManager) SetActiveByName(name string) error {
+	id := mm.FindModelByName(name)
+	if id == "" {
+		return fmt.Errorf("model not found: %s", name)
+	}
+	return mm.SetActive(id)
+}

@@ -51,6 +51,7 @@ func (a *TerminalAdaptor) Start() {
 		a.sessionFile,
 		a.Config.Cfg.ContextLimit,
 		a.Config.Cfg.ModelConfig,
+		a.Config.Cfg.RuntimeConfig,
 	)
 
 	// Set initial model from CLI - this appends CLI model to the runtime list
@@ -60,6 +61,17 @@ func (a *TerminalAdaptor) Start() {
 		a.Config.Cfg.APIKey,
 		a.Config.Cfg.ModelName,
 	)
+
+	// Load active model from runtime.conf if no CLI model was provided
+	if a.Config.Model == nil && session.RuntimeManager != nil {
+		activeModelName := session.RuntimeManager.GetActiveModel()
+		if activeModelName != "" {
+			// Find and set active model by name
+			if err := session.ModelManager.SetActiveByName(activeModelName); err == nil {
+				// Successfully set active model from runtime.conf
+			}
+		}
+	}
 
 	// Check if we have any models available
 	if !session.ModelManager.HasModels() {
@@ -207,12 +219,10 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			m.status.SetStatus(m.out.status)
 		}
-		if m.out.inProgress {
-			return m, tea.Tick(TickInterval, func(t time.Time) tea.Msg {
-				return tickMsg{}
-			})
-		}
-		return m, nil
+		// Always keep ticking to check for model switches and other updates
+		return m, tea.Tick(TickInterval, func(t time.Time) tea.Msg {
+			return tickMsg{}
+		})
 	case editorFinishedMsg:
 		if msg.err != nil {
 			m.out.AppendError("Editor error: %v", msg.err)
@@ -568,6 +578,11 @@ func (m *Terminal) applyModelSwitch(model *agentpkg.ModelConfig) {
 
 	// Switch the session to the new model
 	m.session.SwitchModel(newModel, model.BaseURL, model.ModelName, m.appConfig.AgentTools, m.appConfig.SystemPrompt)
+
+	// Save the active model name to runtime config
+	if m.session.RuntimeManager != nil {
+		_ = m.session.RuntimeManager.SetActiveModel(model.Name)
+	}
 
 	// Show notification
 	m.out.WriteNotify("Switched to model: " + model.Name + " (" + model.ModelName + ")")

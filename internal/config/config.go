@@ -56,20 +56,21 @@ const Version = "0.1.0"
 
 // Settings holds all CLI configuration
 type Settings struct {
-	ShowVersion  bool
-	ShowHelp     bool
-	DebugAPI     bool
-	SystemPrompt string
-	APIKey       string
-	BaseURL      string
-	ModelName    string
-	ProviderType string
-	Skills       []string
-	Addr         string
-	Session      string
-	Proxy        string
-	ContextLimit int64
-	ModelConfig  string
+	ShowVersion   bool
+	ShowHelp      bool
+	DebugAPI      bool
+	SystemPrompt  string
+	APIKey        string
+	BaseURL       string
+	ModelName     string
+	ProviderType  string
+	Skills        []string
+	Addr          string
+	Session       string
+	Proxy         string
+	ContextLimit  int64
+	ModelConfig   string
+	RuntimeConfig string
 }
 
 // Parse parses CLI flags and returns settings
@@ -89,6 +90,7 @@ func Parse() *Settings {
 	proxy := flag.String("proxy", "", "HTTP proxy URL (e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080)")
 	contextLimitStr := flag.String("context-limit", "0", "Provider context window size in tokens (supports K/M suffix, e.g., 200K, 1M; 0 = unknown)")
 	modelConfig := flag.String("model-config", "", "Model config file path (default: ~/.alayacore/models.json)")
+	runtimeConfig := flag.String("runtime-config", "", "Runtime config file path (default: same dir as model-config/runtime.conf)")
 	flag.Parse()
 
 	// Parse context limit with optional K/M suffix
@@ -102,20 +104,21 @@ func Parse() *Settings {
 	skillPaths := skill.Get()
 
 	s := &Settings{
-		ShowVersion:  *showVersion,
-		ShowHelp:     *showHelp,
-		DebugAPI:     *debugAPI,
-		SystemPrompt: *systemPrompt,
-		APIKey:       *apiKey,
-		BaseURL:      *baseURL,
-		ModelName:    *modelName,
-		ProviderType: *providerType,
-		Skills:       skillPaths,
-		Addr:         *addr,
-		Session:      *session,
-		Proxy:        *proxy,
-		ContextLimit: contextLimit,
-		ModelConfig:  *modelConfig,
+		ShowVersion:   *showVersion,
+		ShowHelp:      *showHelp,
+		DebugAPI:      *debugAPI,
+		SystemPrompt:  *systemPrompt,
+		APIKey:        *apiKey,
+		BaseURL:       *baseURL,
+		ModelName:     *modelName,
+		ProviderType:  *providerType,
+		Skills:        skillPaths,
+		Addr:          *addr,
+		Session:       *session,
+		Proxy:         *proxy,
+		ContextLimit:  contextLimit,
+		ModelConfig:   *modelConfig,
+		RuntimeConfig: *runtimeConfig,
 	}
 
 	return s
