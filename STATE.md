@@ -254,6 +254,11 @@ For this project, simplicity is more important than efficiency.
   - Fixed by releasing mutex before calling initAgent()
   - Pattern: lock → update fields → unlock → call methods that may need the lock
 
+- ✅ **Simplified session task runner + state safety**
+  - Replaced spawn-per-submit task runner and 100ms idle timeout with a single long-lived task runner goroutine
+  - Protected shared session state more consistently (cancel func under mutex; per-session prompt IDs via atomic counter)
+  - Centralized TagSystem emission into one helper (optional ActiveModelConfig)
+
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
 - **Tools**: read_file, edit_file, write_file, activate_skill, posix_shell

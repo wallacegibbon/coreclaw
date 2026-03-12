@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"charm.land/fantasy"
@@ -64,6 +65,7 @@ type Session struct {
 	taskAvailable chan struct{}
 	inProgress    bool
 	cancelCurrent func()
+	nextPromptID  uint64
 	mu            sync.Mutex
 }
 
@@ -121,6 +123,7 @@ func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, syst
 	}
 	s.initAgent(model, baseTools, systemPrompt)
 	go s.readFromInput()
+	go s.taskRunner()
 	return s
 }
 
@@ -145,6 +148,7 @@ func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTo
 	}
 	s.initAgent(model, baseTools, systemPrompt)
 	go s.readFromInput()
+	go s.taskRunner()
 
 	if len(s.Messages) > 0 {
 		s.displayMessages()
@@ -235,14 +239,13 @@ func (s *Session) submitTask(task Task) {
 		return
 	}
 	s.taskQueue = append(s.taskQueue, task)
+	inProgress := s.inProgress
 	s.signalTaskAvailable()
 	s.mu.Unlock()
 
-	if s.inProgress {
+	if inProgress {
 		s.writeNotify("Queued. Previous task in progress. Will run after completion.")
 		s.sendSystemInfo()
-	} else {
-		go s.runTaskQueue()
 	}
 }
 
@@ -254,43 +257,56 @@ func (s *Session) signalTaskAvailable() {
 	}
 }
 
-func (s *Session) runTaskQueue() {
-	s.mu.Lock()
-	s.inProgress = true
-	s.mu.Unlock()
-	s.sendSystemInfo()
-	defer func() {
-		s.mu.Lock()
-		s.inProgress = false
-		s.mu.Unlock()
-		s.sendSystemInfo()
-	}()
+func (s *Session) taskRunner() {
+	for {
+		task := s.waitForNextTask()
+		s.setInProgress(true)
+		s.runTask(task)
+		s.setInProgress(s.hasQueuedTasks())
+	}
+}
 
+func (s *Session) waitForNextTask() Task {
 	for {
 		s.mu.Lock()
-		if len(s.taskQueue) == 0 {
+		if len(s.taskQueue) > 0 {
+			task := s.taskQueue[0]
+			s.taskQueue = s.taskQueue[1:]
 			s.mu.Unlock()
-			// Wait for new task or shutdown
-			select {
-			case <-s.taskAvailable:
-				continue
-			case <-time.After(100 * time.Millisecond):
-				return // Queue empty, exit
-			}
+			return task
 		}
-		task := s.taskQueue[0]
-		s.taskQueue = s.taskQueue[1:]
 		s.mu.Unlock()
+		<-s.taskAvailable
+	}
+}
 
-		s.runTask(task)
+func (s *Session) hasQueuedTasks() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.taskQueue) > 0
+}
+
+func (s *Session) setInProgress(v bool) {
+	s.mu.Lock()
+	changed := s.inProgress != v
+	s.inProgress = v
+	s.mu.Unlock()
+	if changed {
+		s.sendSystemInfo()
 	}
 }
 
 func (s *Session) runTask(task Task) {
 	s.sendSystemInfo()
 	ctx, cancel := context.WithCancel(context.Background())
+	s.mu.Lock()
 	s.cancelCurrent = cancel
-	defer func() { s.cancelCurrent = nil }()
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.cancelCurrent = nil
+		s.mu.Unlock()
+	}()
 
 	switch t := task.(type) {
 	case UserPrompt:
@@ -355,12 +371,9 @@ func (s *Session) autoSummarize(ctx context.Context) {
 	s.summarize(ctx)
 }
 
-var promptCount uint64
-
 func (s *Session) processPrompt(ctx context.Context, prompt string, history []fantasy.Message) (fantasy.Message, fantasy.Usage, error) {
 	call := fantasy.AgentStreamCall{Prompt: prompt}
-	promptId := promptCount
-	promptCount++
+	promptId := atomic.AddUint64(&s.nextPromptID, 1) - 1
 
 	var stepCount int = 0
 
@@ -616,9 +629,19 @@ func (s *Session) writeToolCall(toolName, input, id string) {
 }
 
 func (s *Session) sendSystemInfo() {
+	s.sendSystemInfoInternal(nil)
+}
+
+// sendSystemInfoWithModel sends system info including full model config (for model switching)
+func (s *Session) sendSystemInfoWithModel(model *ModelConfig) {
+	s.sendSystemInfoInternal(model)
+}
+
+func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 	if s.Output == nil {
 		return
 	}
+
 	var models []ModelInfo
 	var activeID string
 	var activeModelName string
@@ -628,68 +651,32 @@ func (s *Session) sendSystemInfo() {
 	if s.ModelManager != nil {
 		models = s.ModelManager.GetModels()
 		activeID = s.ModelManager.GetActiveID()
-		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
+		if activeModelConfig != nil {
+			activeModelName = activeModelConfig.Name
+		} else if activeModel := s.ModelManager.GetActive(); activeModel != nil {
 			activeModelName = activeModel.Name
 		}
 		modelConfigPath = s.ModelManager.GetFilePath()
 		hasModels = s.ModelManager.HasModels()
 	}
+
 	s.mu.Lock()
 	queueCount := len(s.taskQueue)
 	inProgress := s.inProgress
+	contextTokens := s.ContextTokens
+	contextLimit := s.ContextLimit
+	totalTokens := s.TotalSpent.TotalTokens
 	s.mu.Unlock()
 
 	info := SystemInfo{
-		ContextTokens:   s.ContextTokens,
-		ContextLimit:    s.ContextLimit,
-		TotalTokens:     s.TotalSpent.TotalTokens,
-		QueueCount:      queueCount,
-		InProgress:      inProgress,
-		Models:          models,
-		ActiveModelID:   activeID,
-		ActiveModelName: activeModelName,
-		HasModels:       hasModels,
-		ModelConfigPath: modelConfigPath,
-	}
-	data, _ := json.Marshal(info)
-	stream.WriteTLV(s.Output, stream.TagSystem, string(data))
-	s.Output.Flush()
-}
-
-// sendSystemInfoWithModel sends system info including full model config (for model switching)
-func (s *Session) sendSystemInfoWithModel(model *ModelConfig) {
-	if s.Output == nil {
-		return
-	}
-	var models []ModelInfo
-	var activeID string
-	var activeModelName string
-	var modelConfigPath string
-	var hasModels bool
-
-	if s.ModelManager != nil {
-		models = s.ModelManager.GetModels()
-		activeID = s.ModelManager.GetActiveID()
-		if model != nil {
-			activeModelName = model.Name
-		}
-		modelConfigPath = s.ModelManager.GetFilePath()
-		hasModels = s.ModelManager.HasModels()
-	}
-	s.mu.Lock()
-	queueCount := len(s.taskQueue)
-	inProgress := s.inProgress
-	s.mu.Unlock()
-
-	info := SystemInfo{
-		ContextTokens:     s.ContextTokens,
-		ContextLimit:      s.ContextLimit,
-		TotalTokens:       s.TotalSpent.TotalTokens,
+		ContextTokens:     contextTokens,
+		ContextLimit:      contextLimit,
+		TotalTokens:       totalTokens,
 		QueueCount:        queueCount,
 		InProgress:        inProgress,
 		Models:            models,
 		ActiveModelID:     activeID,
-		ActiveModelConfig: model,
+		ActiveModelConfig: activeModelConfig,
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
