@@ -1,0 +1,160 @@
+package agent
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"charm.land/fantasy"
+)
+
+// ============================================================================
+// Command Handling
+// ============================================================================
+
+func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		s.writeError("empty command")
+		return
+	}
+
+	switch parts[0] {
+	case "summarize":
+		s.summarize(ctx)
+	case "cancel":
+		s.cancelTask()
+	case "save":
+		s.saveSession(parts[1:])
+	case "model_get_all":
+		s.handleModelGetAll()
+	case "model_set":
+		s.handleModelSet(parts[1:])
+	case "model_load":
+		s.handleModelLoad()
+	default:
+		s.writeError(fmt.Sprintf("unknown cmd <%s>", cmd))
+	}
+}
+
+func (s *Session) cancelTask() {
+	s.mu.Lock()
+	inProgress := s.inProgress
+	cancelCurrent := s.cancelCurrent
+	s.mu.Unlock()
+	if inProgress && cancelCurrent != nil {
+		cancelCurrent()
+		return
+	}
+	s.writeError("nothing to cancel")
+}
+
+// summarize replaces the conversation history with a concise summary
+func (s *Session) summarize(ctx context.Context) {
+	prompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
+	msg, usage, err := s.processPrompt(ctx, prompt, s.Messages)
+	if err != nil {
+		s.writeError(err.Error())
+		return
+	}
+	s.Messages = []fantasy.Message{msg}
+	s.mu.Lock()
+	if usage.OutputTokens > 0 {
+		s.ContextTokens = usage.OutputTokens
+	}
+	s.mu.Unlock()
+	s.sendSystemInfo()
+}
+
+func (s *Session) saveSession(args []string) {
+	var path string
+	switch len(args) {
+	case 0:
+		if s.SessionFile == "" {
+			s.writeError("no session file set and no filename provided")
+			return
+		}
+		path = s.SessionFile
+	case 1:
+		path = expandPath(args[0])
+	default:
+		s.writeError("usage: :save [filename]")
+		return
+	}
+
+	if err := s.saveSessionToFile(path); err != nil {
+		s.writeError(fmt.Sprintf("failed to save session: %v", err))
+	} else {
+		s.writeNotify(fmt.Sprintf("Session saved to %s", path))
+	}
+}
+
+// ============================================================================
+// Model Commands
+// ============================================================================
+
+func (s *Session) handleModelGetAll() {
+	if s.ModelManager == nil {
+		s.writeError("model manager not initialized")
+		return
+	}
+	// sendSystemInfo now includes model list and active ID
+	s.sendSystemInfo()
+}
+
+func (s *Session) handleModelSet(args []string) {
+	if s.ModelManager == nil {
+		s.writeError("model manager not initialized")
+		return
+	}
+
+	if len(args) == 0 {
+		s.writeError("usage: :model_set <id>")
+		return
+	}
+
+	modelID := args[0]
+	model := s.ModelManager.GetModel(modelID)
+	if model == nil {
+		s.writeError(fmt.Sprintf("model not found: %s", modelID))
+		return
+	}
+
+	// Update active ID
+	if err := s.ModelManager.SetActive(modelID); err != nil {
+		s.writeError(err.Error())
+		return
+	}
+
+	// Save active model name to runtime manager for persistence
+	if s.RuntimeManager != nil {
+		_ = s.RuntimeManager.SetActiveModel(model.Name)
+	}
+
+	// Send system info with full model config (terminal needs API key to switch)
+	s.sendSystemInfoWithModel(model)
+}
+
+func (s *Session) handleModelLoad() {
+	if s.ModelManager == nil {
+		s.writeError("model manager not initialized")
+		return
+	}
+
+	path := s.ModelManager.GetFilePath()
+	if path == "" {
+		s.writeError("no model file path configured")
+		return
+	}
+
+	if err := s.ModelManager.LoadFromFile(path); err != nil {
+		s.writeError(fmt.Sprintf("failed to load models: %v", err))
+		return
+	}
+
+	// Restore active model from runtime config
+	s.initModelManager()
+
+	// Send system info with model list to adaptor via TagSystem
+	s.sendSystemInfo()
+}

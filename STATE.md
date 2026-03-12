@@ -199,6 +199,8 @@ For this project, simplicity is more important than efficiency.
   - RuntimeManager in `internal/agent/runtime_manager.go` handles load/save
   - File format is YAML-like for consistency with models.conf
   - **Fixed**: Tick handler now always runs (not just during streaming) to process model switches
+  - Clarified RuntimeManager locking and file-save behavior
+  - Removed unused internal fields for simpler state
 
 - ✅ **Model Management Commands**
   - `:model_get_all` - Get all available models (returns via TagSystem with models field)
@@ -258,6 +260,9 @@ For this project, simplicity is more important than efficiency.
   - Replaced spawn-per-submit task runner and 100ms idle timeout with a single long-lived task runner goroutine
   - Protected shared session state more consistently (cancel func under mutex; per-session prompt IDs via atomic counter)
   - Centralized TagSystem emission into one helper (optional ActiveModelConfig)
+  - Added session shutdown signaling to prevent goroutine leaks when input closes
+  - Locked usage/context updates to avoid inconsistent TagSystem snapshots
+  - Split monolithic `session.go` into focused files (tasks, prompt streaming, commands, output/system info, persistence, markdown)
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)

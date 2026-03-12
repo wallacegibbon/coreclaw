@@ -1,5 +1,11 @@
 package agent
 
+// RuntimeManager owns the small, writable runtime.conf file that stores
+// state which can change while the program is running (currently only
+// the active model name). Unlike ModelManager, it is allowed to write
+// its file and is used by the session layer to remember the last active
+// model across process restarts.
+
 import (
 	"os"
 	"path/filepath"
@@ -14,19 +20,16 @@ type RuntimeConfig struct {
 
 // RuntimeManager manages runtime configuration
 type RuntimeManager struct {
-	config  RuntimeConfig
-	mu      sync.RWMutex
-	path    string
-	modPath string // path to models.conf for default runtime.conf location
+	config RuntimeConfig
+	mu     sync.RWMutex
+	path   string
 }
 
 // NewRuntimeManager creates a new runtime manager
 // If runtimePath is empty, it defaults to the same directory as modelConfigPath with filename "runtime.conf"
 // If modelConfigPath is also empty, it uses the default ~/.alayacore/runtime.conf
 func NewRuntimeManager(runtimePath, modelConfigPath string) *RuntimeManager {
-	rm := &RuntimeManager{
-		modPath: modelConfigPath,
-	}
+	rm := &RuntimeManager{}
 
 	if runtimePath != "" {
 		rm.path = runtimePath
@@ -79,9 +82,8 @@ func (rm *RuntimeManager) Load() error {
 
 // Save writes the runtime config to file
 func (rm *RuntimeManager) Save() error {
-	rm.mu.RLock()
-	defer rm.mu.RUnlock()
-
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
 	return rm.saveLocked()
 }
 

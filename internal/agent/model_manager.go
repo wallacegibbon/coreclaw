@@ -1,5 +1,11 @@
 package agent
 
+// ModelManager is responsible for loading model definitions from a
+// YAML-like config file (models.conf) and managing them in memory.
+// It never writes to the config file – all persistence is manual via
+// a text editor. The session layer uses ModelManager only through its
+// query/update methods and receives safe JSON-ready views via ModelInfo.
+
 import (
 	"fmt"
 	"os"
@@ -259,9 +265,9 @@ func (mm *ModelManager) GetModel(id string) *ModelConfig {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 
-	for _, m := range mm.models {
-		if m.ID == id {
-			return &m
+	for i := range mm.models {
+		if mm.models[i].ID == id {
+			return &mm.models[i]
 		}
 	}
 	return nil
