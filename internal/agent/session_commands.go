@@ -52,28 +52,31 @@ func (s *Session) cancelTask() {
 // summarize replaces the conversation history with a concise summary
 func (s *Session) summarize(ctx context.Context) {
 	prompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
-	result, err := s.processPromptWithResult(ctx, prompt, s.Messages)
+
+	// Remember message count before summarize to find the summary message
+	beforeCount := len(s.Messages)
+
+	outputTokens, err := s.processPrompt(ctx, prompt, s.Messages)
 	if err != nil {
 		s.writeError(err.Error())
 		return
 	}
 
-	// Extract the last assistant message (the summary)
+	// Find the last assistant message (the summary) from newly added messages
 	var lastAssistantMsg fantasy.Message
-	for _, step := range result.Steps {
-		for _, msg := range step.Messages {
-			if msg.Role == fantasy.MessageRoleAssistant {
-				lastAssistantMsg = msg
-			}
+	for i := beforeCount; i < len(s.Messages); i++ {
+		if s.Messages[i].Role == fantasy.MessageRoleAssistant {
+			lastAssistantMsg = s.Messages[i]
 		}
 	}
 
 	s.Messages = []fantasy.Message{lastAssistantMsg}
-	s.mu.Lock()
-	if result.TotalUsage.OutputTokens > 0 {
-		s.ContextTokens = result.TotalUsage.OutputTokens
+	// Update context tokens to reflect the new, smaller context (the summary)
+	if outputTokens > 0 {
+		s.mu.Lock()
+		s.ContextTokens = outputTokens
+		s.mu.Unlock()
 	}
-	s.mu.Unlock()
 	s.sendSystemInfo()
 }
 

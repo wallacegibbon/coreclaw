@@ -25,15 +25,10 @@ func (s *Session) saveSessionToFile(path string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	msgs := s.Messages
-	if len(msgs) > 0 && msgs[len(msgs)-1].Role == fantasy.MessageRoleUser {
-		msgs = msgs[:len(msgs)-1]
-	}
-
 	data := SessionData{
 		BaseURL:       s.BaseURL,
 		ModelName:     s.ModelName,
-		Messages:      msgs,
+		Messages:      s.Messages,
 		TotalSpent:    s.TotalSpent,
 		ContextTokens: s.ContextTokens,
 		UpdatedAt:     time.Now(),
@@ -47,6 +42,66 @@ func (s *Session) saveSessionToFile(path string) error {
 		return fmt.Errorf("failed to write session file: %w", err)
 	}
 	return nil
+}
+
+// ============================================================================
+// Clean Incomplete Tool Calls
+// ============================================================================
+
+// cleanIncompleteToolCalls removes incomplete tool calls from the end of messages.
+// Incomplete tool calls can only exist at the end (previous messages were successfully processed).
+// ToolResult always comes after ToolCall, so if last message is Assistant with ToolCall,
+// those calls have no results (incomplete).
+func cleanIncompleteToolCalls(messages []fantasy.Message) []fantasy.Message {
+	for len(messages) > 0 {
+		last := messages[len(messages)-1]
+
+		// Check if message contains ToolResult (complete tool cycle)
+		// Note: Anthropic puts ToolResult in user message, OpenAI uses tool role
+		if hasToolResult(last) {
+			break
+		}
+
+		// User message without tool result - stop
+		if last.Role == fantasy.MessageRoleUser {
+			break
+		}
+
+		// Assistant message - filter out ToolCalls (no results since this is last)
+		if last.Role == fantasy.MessageRoleAssistant {
+			var filteredParts []fantasy.MessagePart
+			for _, part := range last.Content {
+				// Keep text, reasoning - drop ToolCalls
+				if _, ok := part.(fantasy.ToolCallPart); !ok {
+					filteredParts = append(filteredParts, part)
+				}
+			}
+
+			// Has content after filtering - update and stop
+			if len(filteredParts) > 0 {
+				messages[len(messages)-1].Content = filteredParts
+				break
+			}
+
+			// No content - remove and continue
+			messages = messages[:len(messages)-1]
+			continue
+		}
+
+		break
+	}
+
+	return messages
+}
+
+// hasToolResult checks if a message contains any ToolResultPart
+func hasToolResult(msg fantasy.Message) bool {
+	for _, part := range msg.Content {
+		if _, ok := part.(fantasy.ToolResultPart); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // ============================================================================

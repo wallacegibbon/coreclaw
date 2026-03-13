@@ -23,16 +23,15 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	s.Messages = append(s.Messages, fantasy.NewUserMessage(prompt))
 	history := s.Messages[:len(s.Messages)-1]
 
-	result, err := s.processPromptWithResult(ctx, prompt, history)
+	_, err := s.processPrompt(ctx, prompt, history)
+
+	// Clean incomplete tool calls to prevent API errors on next request
+	// (messages are appended incrementally in OnStepFinish)
+	s.Messages = cleanIncompleteToolCalls(s.Messages)
+
 	if err != nil {
 		s.writeError(err.Error())
 		return
-	}
-	// Append all messages from the agent result (assistant + tool messages)
-	for _, step := range result.Steps {
-		if len(step.Messages) > 0 {
-			s.Messages = append(s.Messages, step.Messages...)
-		}
 	}
 }
 
@@ -50,12 +49,14 @@ func (s *Session) autoSummarize(ctx context.Context) {
 	s.summarize(ctx)
 }
 
-// processPromptWithResult processes a prompt and returns the full agent result
-func (s *Session) processPromptWithResult(ctx context.Context, prompt string, history []fantasy.Message) (*fantasy.AgentResult, error) {
+// processPrompt processes a prompt, appending messages to s.Messages via callbacks.
+// Returns the output tokens from the response.
+func (s *Session) processPrompt(ctx context.Context, prompt string, history []fantasy.Message) (int64, error) {
 	call := fantasy.AgentStreamCall{Prompt: prompt}
 	promptId := atomic.AddUint64(&s.nextPromptID, 1) - 1
 
 	var stepCount int
+	var outputTokens int64
 
 	if len(history) > 0 {
 		call.Messages = history
@@ -72,6 +73,12 @@ func (s *Session) processPromptWithResult(ctx context.Context, prompt string, hi
 	}
 	call.OnStepFinish = func(stepResult fantasy.StepResult) error {
 		s.trackUsage(stepResult.Usage)
+		// Append messages incrementally so they're preserved on cancellation
+		// (fantasy returns nil result on error, losing all steps)
+		if len(stepResult.Messages) > 0 {
+			s.Messages = append(s.Messages, stepResult.Messages...)
+		}
+		outputTokens += stepResult.Usage.OutputTokens
 		return nil
 	}
 
@@ -93,13 +100,10 @@ func (s *Session) processPromptWithResult(ctx context.Context, prompt string, hi
 		return nil
 	}
 
-	result, err := s.Agent.Stream(ctx, call)
-	if err != nil {
-		return nil, err
-	}
+	_, err := s.Agent.Stream(ctx, call)
 	s.Output.Flush()
 
-	return result, nil
+	return outputTokens, err
 }
 
 func (s *Session) trackUsage(usage fantasy.Usage) {

@@ -605,3 +605,96 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 		t.Error("Tool result should NOT be displayed to user, it should only exist in message history")
 	}
 }
+
+func TestCleanIncompleteToolCalls(t *testing.T) {
+	tests := []struct {
+		name     string
+		messages []fantasy.Message
+		wantLen  int // expected number of messages after cleaning
+	}{
+		{
+			name: "complete tool call cycle",
+			messages: []fantasy.Message{
+				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
+				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
+					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+				}},
+				{Role: fantasy.MessageRoleTool, Content: []fantasy.MessagePart{
+					fantasy.ToolResultPart{ToolCallID: "call-1", Output: fantasy.ToolResultOutputContentText{Text: "result"}},
+				}},
+				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Done"}}},
+			},
+			wantLen: 4, // all kept
+		},
+		{
+			name: "complete tool call - Anthropic style (tool result in user message)",
+			messages: []fantasy.Message{
+				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
+				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
+					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+				}},
+				// Anthropic puts tool result in user message
+				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{
+					fantasy.ToolResultPart{ToolCallID: "call-1", Output: fantasy.ToolResultOutputContentText{Text: "result"}},
+				}},
+				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Done"}}},
+			},
+			wantLen: 4, // all kept
+		},
+		{
+			name: "incomplete tool call - no result",
+			messages: []fantasy.Message{
+				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
+				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
+					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+				}},
+				// No tool result message - this happens when API errors mid-cycle
+			},
+			wantLen: 1, // user kept, assistant removed (empty after filtering tool call)
+		},
+		{
+			name: "incomplete tool call - assistant has text and tool call",
+			messages: []fantasy.Message{
+				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
+				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
+					fantasy.TextPart{Text: "Let me help"},
+					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+				}},
+				// Tool call has no result
+			},
+			wantLen: 2, // user kept, assistant kept with only text part
+		},
+		{
+			name: "incomplete tool call - Anthropic style (user message with tool result is missing)",
+			messages: []fantasy.Message{
+				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
+				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
+					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+				}},
+				// No user message with tool result - incomplete
+			},
+			wantLen: 1, // only user message kept, assistant removed
+		},
+		{
+			name: "trailing user message preserved",
+			messages: []fantasy.Message{
+				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "First"}}},
+				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Response"}}},
+				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Second (no response)"}}},
+			},
+			wantLen: 3, // all kept, including trailing user message
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanIncompleteToolCalls(tt.messages)
+			if len(got) != tt.wantLen {
+				t.Errorf("cleanIncompleteToolCalls() returned %d messages, want %d", len(got), tt.wantLen)
+				for i, msg := range got {
+					t.Logf("  msg[%d]: role=%s, parts=%d", i, msg.Role, len(msg.Content))
+				}
+			}
+		})
+	}
+}
