@@ -23,13 +23,16 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	s.Messages = append(s.Messages, fantasy.NewUserMessage(prompt))
 	history := s.Messages[:len(s.Messages)-1]
 
-	msg, _, err := s.processPrompt(ctx, prompt, history)
+	result, err := s.processPromptWithResult(ctx, prompt, history)
 	if err != nil {
 		s.writeError(err.Error())
 		return
 	}
-	if msg.Role != "" {
-		s.Messages = append(s.Messages, msg)
+	// Append all messages from the agent result (assistant + tool messages)
+	for _, step := range result.Steps {
+		if len(step.Messages) > 0 {
+			s.Messages = append(s.Messages, step.Messages...)
+		}
 	}
 }
 
@@ -47,7 +50,8 @@ func (s *Session) autoSummarize(ctx context.Context) {
 	s.summarize(ctx)
 }
 
-func (s *Session) processPrompt(ctx context.Context, prompt string, history []fantasy.Message) (fantasy.Message, fantasy.Usage, error) {
+// processPromptWithResult processes a prompt and returns the full agent result
+func (s *Session) processPromptWithResult(ctx context.Context, prompt string, history []fantasy.Message) (*fantasy.AgentResult, error) {
 	call := fantasy.AgentStreamCall{Prompt: prompt}
 	promptId := atomic.AddUint64(&s.nextPromptID, 1) - 1
 
@@ -91,23 +95,11 @@ func (s *Session) processPrompt(ctx context.Context, prompt string, history []fa
 
 	result, err := s.Agent.Stream(ctx, call)
 	if err != nil {
-		return fantasy.Message{}, fantasy.Usage{}, err
+		return nil, err
 	}
 	s.Output.Flush()
 
-	return s.extractAssistantMessage(result), result.TotalUsage, nil
-}
-
-func (s *Session) extractAssistantMessage(result *fantasy.AgentResult) fantasy.Message {
-	if result == nil || len(result.Steps) == 0 {
-		return fantasy.Message{}
-	}
-	for _, msg := range result.Steps[len(result.Steps)-1].Messages {
-		if msg.Role == fantasy.MessageRoleAssistant {
-			return msg
-		}
-	}
-	return fantasy.Message{}
+	return result, nil
 }
 
 func (s *Session) trackUsage(usage fantasy.Usage) {
