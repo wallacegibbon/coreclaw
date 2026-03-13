@@ -90,6 +90,11 @@ func (s *Session) displayAssistantMessage(msg fantasy.Message) {
 		case fantasy.ReasoningPart:
 			stream.WriteTLV(s.Output, stream.TagReasoning, p.Text)
 			s.Output.Flush()
+		case fantasy.ToolCallPart:
+			if info := formatToolCall(p.ToolName, p.Input); info != "" {
+				stream.WriteTLV(s.Output, stream.TagTool, info)
+				s.Output.Flush()
+			}
 		}
 	}
 }

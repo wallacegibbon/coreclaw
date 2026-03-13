@@ -525,3 +525,83 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		t.Error("model_set should succeed after task completes, but got error")
 	}
 }
+
+func TestDisplayMessagesWithToolCalls(t *testing.T) {
+	// Create a mock output to capture displayed messages
+	mockOutput := &mockOutput{}
+
+	// Create a session with tool calls (as they would be loaded from file)
+	session := &Session{
+		Output: mockOutput,
+		Messages: []fantasy.Message{
+			{
+				Role:    fantasy.MessageRoleUser,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "List files"}},
+			},
+			{
+				Role:    fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "I'll list files for you."}},
+			},
+			{
+				Role: fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{
+					fantasy.ToolCallPart{
+						ToolCallID: "call_123",
+						ToolName:   "posix_shell",
+						Input:      `{"command": "ls -la"}`,
+					},
+				},
+			},
+			{
+				Role: fantasy.MessageRoleTool,
+				Content: []fantasy.MessagePart{
+					fantasy.ToolResultPart{
+						ToolCallID: "call_123",
+						Output:     fantasy.ToolResultOutputContentText{Text: "file1.txt\nfile2.txt"},
+					},
+				},
+			},
+			{
+				Role:    fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Found 2 files!"}},
+			},
+		},
+		taskQueue: make([]Task, 0),
+	}
+
+	// Display messages
+	session.displayMessages()
+
+	// Verify that output was written
+	if mockOutput.writeCount == 0 {
+		t.Error("displayMessages did not write any output")
+	}
+
+	// Parse the output data to check what was displayed
+	outputStr := string(mockOutput.data)
+
+	// User message should be displayed
+	if !strings.Contains(outputStr, "List files") {
+		t.Error("User message should be displayed")
+	}
+
+	// Assistant messages should be displayed
+	if !strings.Contains(outputStr, "I'll list files for you") {
+		t.Error("First assistant message should be displayed")
+	}
+	if !strings.Contains(outputStr, "Found 2 files!") {
+		t.Error("Second assistant message should be displayed")
+	}
+
+	// Tool call should be displayed
+	if !strings.Contains(outputStr, "posix_shell:") {
+		t.Error("Tool call should be displayed")
+	}
+
+	// Tool result should NOT be displayed (it's in message history but not shown to user)
+	// This is the key behavior - tool results are context-only
+	// We can verify this by checking that the actual file names are NOT in the displayed output
+	if strings.Contains(outputStr, "file1.txt") || strings.Contains(outputStr, "file2.txt") {
+		t.Error("Tool result should NOT be displayed to user, it should only exist in message history")
+	}
+}
