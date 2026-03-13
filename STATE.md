@@ -299,25 +299,13 @@ For this project, simplicity is more important than efficiency.
    - Simplified `summarize()` to directly use `processPromptWithResult`
    - Users can now naturally continue tasks with any prompt (e.g., "continue", "go on")
 
-- ✅ **Async session loading with loading screen**
-  - Terminal initializes immediately with a loading message
-  - Session loads in background goroutine while UI is responsive
-  - Shows "Loading session..." message during initialization
-  - Large session files no longer block terminal startup
-  - Handles errors gracefully (no models configured, etc.) and quits if needed
-  - Added `isLoading` and `loadingMessage` fields to Terminal struct
-  - Added `sessionLoadedMsg` message type for async completion
-  - Added `NewLoadingTerminal()` constructor for loading state
-  - Added `renderLoadingView()` for loading screen rendering
-  - Added `handleSessionLoaded()` to process completion message
-  - Window resize events processed before session loads
-   - Complete history maintained for better context preservation and session persistence
-
-- ✅ **Fixed display content not showing after session load**
-  - Clear welcome screen explicitly when session finishes loading
-  - Always call `updateContent()` regardless of window count
-  - Initialize cursor when switching focus to display if not set
-  - Both `updateDisplayHeight()` and `SetCursorToLastWindow()` called before final content update
+- ✅ **Synchronous session loading**
+  - Session loads synchronously before the terminal UI starts
+  - Eliminates race conditions by ensuring session is fully loaded before initialization
+  - Terminal waits for session to complete before displaying anything
+  - Simplified code by removing async loading logic (isLoading, NewLoadingTerminal, sessionLoadedMsg, handleSessionLoaded)
+  - Better reliability at the cost of slightly slower startup for large session files
+  - Complete history maintained for better context preservation and session persistence
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)

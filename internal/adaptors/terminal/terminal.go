@@ -35,9 +35,6 @@ type Terminal struct {
 	sessionFile         string
 	styles              *Styles
 	hasFocus            bool // tracks whether the terminal has application focus
-
-	// Loading state for async session initialization
-	isLoading bool
 }
 
 // NewTerminal creates a new Terminal model
@@ -63,47 +60,8 @@ func NewTerminal(session *agentpkg.Session, out *outputWriter, inputStream *stre
 	return m
 }
 
-// NewLoadingTerminal creates a Terminal in loading state for async session initialization.
-// The terminal starts with a loading message in a window and transitions to normal state when the
-// sessionLoadedMsg is received.
-func NewLoadingTerminal(inputStream *stream.ChanInput, out *outputWriter, sessionFile string, appCfg *app.Config) *Terminal {
-	styles := DefaultStyles()
-
-	m := &Terminal{
-		session:       nil, // Will be set when session loads
-		out:           out,
-		streamInput:   inputStream,
-		appConfig:     appCfg,
-		display:       NewDisplayModel(out.windowBuffer, styles),
-		input:         NewInputModel(styles),
-		status:        NewStatusModel(styles),
-		modelSelector: NewModelSelector(styles),
-		windowWidth:   DefaultWidth,
-		styles:        styles,
-		focusedWindow: "input",
-		sessionFile:   sessionFile,
-		hasFocus:      true,
-		isLoading:     true,
-	}
-
-	// Add loading window to display
-	loadingStyle := styles.System.Render("Loading session...")
-	out.windowBuffer.AppendOrUpdate(loadingWindowID, stream.TagNotify, loadingStyle)
-	m.display.SetCursorToLastWindow()
-
-	return m
-}
-
 // Init initializes the Terminal
 func (m *Terminal) Init() tea.Cmd {
-	// If we're in loading state, return tick immediately
-	// The session loading command is handled separately
-	if m.isLoading {
-		return tea.Tick(TickInterval, func(t time.Time) tea.Msg {
-			return tickMsg{}
-		})
-	}
-
 	// Start the periodic tick loop immediately so we can process
 	// session updates (e.g. model switches) even before the user
 	// submits the first prompt.
@@ -116,25 +74,8 @@ func (m *Terminal) Init() tea.Cmd {
 
 type tickMsg struct{}
 
-const loadingWindowID = "__loading__"
-
-// sessionLoadedMsg is sent when async session loading completes
-type sessionLoadedMsg struct {
-	session       *agentpkg.Session
-	sessionFile   string
-	activeModel   *agentpkg.ModelConfig
-	models        []agentpkg.ModelInfo
-	activeModelID string
-	err           error
-}
-
 // Update routes messages; KeyMsg first for responsive input (see PERFORMANCE_ANALYSIS.md).
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Handle session loaded message first (for async initialization)
-	if sl, ok := msg.(sessionLoadedMsg); ok {
-		return m.handleSessionLoaded(sl)
-	}
-
 	// Process user-facing messages FIRST to avoid blocking keyboard input.
 	// Display updates run after so keypress returns immediately.
 	switch msg := msg.(type) {
@@ -235,57 +176,6 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.modelSelector.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 	return m, nil
-}
-
-// handleSessionLoaded handles the async session loading completion
-func (m *Terminal) handleSessionLoaded(msg sessionLoadedMsg) (tea.Model, tea.Cmd) {
-	if msg.err != nil {
-		// Loading failed - show error and quit
-		m.isLoading = false
-		// Update loading window with error message
-		errorStyle := m.styles.Error.Render(fmt.Sprintf("Error loading session: %v", msg.err))
-		m.out.windowBuffer.AppendOrUpdate(loadingWindowID, stream.TagError, errorStyle)
-		m.display.updateContent()
-		return m, tea.Quit
-	}
-
-	// Session loaded successfully
-	m.session = msg.session
-	m.sessionFile = msg.sessionFile
-	m.isLoading = false
-
-	// Remove loading window by replacing with empty content
-	m.out.windowBuffer.AppendOrUpdate(loadingWindowID, stream.TagNotify, "")
-
-	// Initialize model selector from loaded models
-	if len(msg.models) > 0 {
-		m.modelSelector.LoadModels(msg.models, msg.activeModelID)
-	}
-
-	// Update display dimensions (may have changed during loading)
-	m.out.SetWindowWidth(m.windowWidth)
-	m.display.SetWidth(m.windowWidth)
-	m.status.SetWidth(m.windowWidth)
-
-	// Update status from session
-	m.status.SetStatus(m.out.status)
-
-	// Set cursor to last window if there are windows
-	if m.out.windowBuffer.GetWindowCount() > 0 {
-		m.display.SetCursorToLastWindow()
-	}
-
-	// Update display height (this also calls updateContent)
-	m.updateDisplayHeight()
-
-	// Apply active model if needed (this may trigger more output)
-	if msg.activeModel != nil && m.appConfig.Model == nil {
-		m.applyModelSwitch(msg.activeModel)
-	}
-
-	return m, tea.Tick(TickInterval, func(t time.Time) tea.Msg {
-		return tickMsg{}
-	})
 }
 
 // handleKeyMsg handles keyboard input

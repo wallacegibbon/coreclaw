@@ -40,22 +40,7 @@ func (a *TerminalAdaptor) Start() {
 	inputStream := stream.NewChanInput(10)
 	terminalOutput := NewTerminalOutput()
 
-	// Create terminal in loading state first
-	t := NewLoadingTerminal(inputStream, terminalOutput, a.sessionFile, a.Config)
-
-	// Create the program
-	p := tea.NewProgram(t, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
-
-	// Start async session loading with a reference to the program for quitting on error
-	go a.loadSessionAsync(t, inputStream, terminalOutput, p)
-
-	// Run the program (this blocks until quit)
-	p.Run()
-}
-
-// loadSessionAsync loads the session in the background and sends a message when done.
-// If there's an error (e.g., no models configured), it quits the program.
-func (a *TerminalAdaptor) loadSessionAsync(t *Terminal, inputStream *stream.ChanInput, terminalOutput *outputWriter, p *tea.Program) {
+	// Load session synchronously before starting the UI
 	session, sessionFile := agentpkg.LoadOrNewSession(
 		a.Config.Model,
 		a.Config.AgentTools,
@@ -73,9 +58,7 @@ func (a *TerminalAdaptor) loadSessionAsync(t *Terminal, inputStream *stream.Chan
 
 	// Check if we have any models available.
 	if !terminalOutput.HasModels() {
-		// Send error message to terminal and quit
-		p.Send(sessionLoadedMsg{err: fmt.Errorf("no models configured")})
-		// Also print to stderr for visibility
+		// Print error to stderr and exit
 		modelPath := terminalOutput.GetModelConfigPath()
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Error: No models configured.")
@@ -98,22 +81,13 @@ api_key: "your-api-key"
 model_name: "gpt-oss:20b"
 context_limit: 32768`)
 		fmt.Fprintln(os.Stderr, "")
-		p.Quit()
-		return
+		os.Exit(1)
 	}
 
-	// Get active model for later use
-	var activeModel *agentpkg.ModelConfig
-	if a.Config.Model == nil {
-		activeModel = terminalOutput.GetActiveModel()
-	}
+	// Create terminal with loaded session
+	t := NewTerminal(session, terminalOutput, inputStream, sessionFile, a.Config)
 
-	// Send session loaded message to the terminal
-	p.Send(sessionLoadedMsg{
-		session:       session,
-		sessionFile:   sessionFile,
-		activeModel:   activeModel,
-		models:        terminalOutput.GetModels(),
-		activeModelID: terminalOutput.GetActiveModelID(),
-	})
+	// Create and run the program
+	p := tea.NewProgram(t, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
+	p.Run()
 }
