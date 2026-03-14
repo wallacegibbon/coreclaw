@@ -48,60 +48,69 @@ func (s *Session) saveSessionToFile(path string) error {
 // Clean Incomplete Tool Calls
 // ============================================================================
 
-// cleanIncompleteToolCalls removes incomplete tool calls from the end of messages.
-// Incomplete tool calls can only exist at the end (previous messages were successfully processed).
-// ToolResult always comes after ToolCall, so if last message is Assistant with ToolCall,
-// those calls have no results (incomplete).
+// cleanIncompleteToolCalls removes incomplete tool calls from messages.
+// Uses two-phase approach:
+// 1. Forward pass to identify all unmatched tool calls (tool_call without corresponding tool_result)
+// 2. Reverse pass to remove/filter messages containing unmatched tool calls
 func cleanIncompleteToolCalls(messages []fantasy.Message) []fantasy.Message {
-	for len(messages) > 0 {
-		last := messages[len(messages)-1]
-
-		// Check if message contains ToolResult (complete tool cycle)
-		// Note: Anthropic puts ToolResult in user message, OpenAI uses tool role
-		if hasToolResult(last) {
-			break
-		}
-
-		// User message without tool result - stop
-		if last.Role == fantasy.MessageRoleUser {
-			break
-		}
-
-		// Assistant message - filter out ToolCalls (no results since this is last)
-		if last.Role == fantasy.MessageRoleAssistant {
-			var filteredParts []fantasy.MessagePart
-			for _, part := range last.Content {
-				// Keep text, reasoning - drop ToolCalls
-				if _, ok := part.(fantasy.ToolCallPart); !ok {
-					filteredParts = append(filteredParts, part)
-				}
+	// Phase 1: Forward pass to find all unmatched tool calls
+	unmatchedCalls := make(map[string]bool)
+	for _, msg := range messages {
+		for _, part := range msg.Content {
+			switch p := part.(type) {
+			case fantasy.ToolCallPart:
+				unmatchedCalls[p.ToolCallID] = true
+			case fantasy.ToolResultPart:
+				delete(unmatchedCalls, p.ToolCallID)
 			}
+		}
+	}
 
-			// Has content after filtering - update and stop
-			if len(filteredParts) > 0 {
-				messages[len(messages)-1].Content = filteredParts
+	// Early exit if no unmatched calls
+	if len(unmatchedCalls) == 0 {
+		return messages
+	}
+
+	// Phase 2: Reverse pass to remove/filter messages with unmatched tool calls
+	// Process from end, stopping at first complete message or user message
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+
+		// Check if message has any unmatched tool calls
+		hasUnmatchedCall := false
+		for _, part := range msg.Content {
+			if tc, ok := part.(fantasy.ToolCallPart); ok && unmatchedCalls[tc.ToolCallID] {
+				hasUnmatchedCall = true
 				break
 			}
-
-			// No content - remove and continue
-			messages = messages[:len(messages)-1]
-			continue
 		}
 
-		break
+		if hasUnmatchedCall {
+			// Filter out unmatched tool calls
+			filteredParts := make([]fantasy.MessagePart, 0, len(msg.Content))
+			for _, part := range msg.Content {
+				if tc, ok := part.(fantasy.ToolCallPart); ok && unmatchedCalls[tc.ToolCallID] {
+					continue // Skip unmatched tool call
+				}
+				filteredParts = append(filteredParts, part)
+			}
+
+			if len(filteredParts) > 0 {
+				// Has other content (text, reasoning, matched calls) - keep and stop
+				messages[i].Content = filteredParts
+				return messages[:i+1]
+			} else {
+				// Only had unmatched tool calls - remove and continue
+				messages = messages[:i]
+				continue
+			}
+		}
+
+		// No unmatched tool calls - message is complete, stop here
+		return messages[:i+1]
 	}
 
 	return messages
-}
-
-// hasToolResult checks if a message contains any ToolResultPart
-func hasToolResult(msg fantasy.Message) bool {
-	for _, part := range msg.Content {
-		if _, ok := part.(fantasy.ToolResultPart); ok {
-			return true
-		}
-	}
-	return false
 }
 
 // ============================================================================
