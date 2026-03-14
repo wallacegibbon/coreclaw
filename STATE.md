@@ -403,5 +403,12 @@ main.go        - alayacore entry point
 # WebSocket endpoint: ws://localhost:8080/ws
 ```
 
+- ✅ **Fixed session parsing with embedded NUL characters**
+  - Problem: When `tool_result` output contained embedded NUL characters (e.g., from previous session data), the parser incorrectly split messages at those NUL characters
+  - This caused incomplete `tool_call` messages to be created, leading to API errors: "Field required: input.messages.X.tool_calls.X.function"
+  - Solution: Added `splitByMessageSeparators()` function that only recognizes NUL followed by known message type markers (`msg:user`, `msg:assistant`, `tool_call`, `tool_result`, etc.) as valid separators
+  - Embedded NUL characters in content are now preserved correctly
+  - Added tests: `TestParseMessagesWithEmbeddedNUL`, `TestSplitByMessageSeparators`, `TestLoadSessionWithEmbeddedNUL`
+
 ## Next Steps
 - Add more sophisticated skills built on posix_shell tool

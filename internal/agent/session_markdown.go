@@ -135,8 +135,11 @@ func parseMessages(body string) ([]fantasy.Message, error) {
 	var messages []fantasy.Message
 	var currentMsg *fantasy.Message
 
-	// Split by NUL character
-	parts := strings.Split(body, msgSep)
+	// Use a more robust parsing approach:
+	// Only recognize NUL followed by known message types as separators.
+	// This prevents embedded NUL characters in tool output from being
+	// incorrectly parsed as message boundaries.
+	parts := splitByMessageSeparators(body)
 
 	for _, part := range parts {
 		if part == "" {
@@ -278,4 +281,57 @@ func indentString(s, indent string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// splitByMessageSeparators splits the body by NUL character but only when
+// followed by known message type markers. This prevents embedded NUL characters
+// in tool output from being incorrectly parsed as message boundaries.
+func splitByMessageSeparators(body string) []string {
+	var parts []string
+	var current strings.Builder
+
+	// Known message type markers that can follow NUL
+	markers := []string{
+		"msg:user",
+		"msg:assistant",
+		"msg:tool",
+		"msg:reasoning",
+		"tool_call",
+		"tool_result",
+	}
+
+	i := 0
+	for i < len(body) {
+		// Check if current position is NUL followed by a known marker
+		if body[i] == 0x00 {
+			found := false
+			for _, marker := range markers {
+				if i+1+len(marker) <= len(body) && body[i+1:i+1+len(marker)] == marker {
+					// Found a valid separator - save current part
+					if current.Len() > 0 {
+						parts = append(parts, current.String())
+						current.Reset()
+					}
+					i++ // Skip the NUL character
+					found = true
+					break
+				}
+			}
+			if !found {
+				// NUL not followed by a known marker - keep it in the content
+				current.WriteByte(body[i])
+				i++
+			}
+		} else {
+			current.WriteByte(body[i])
+			i++
+		}
+	}
+
+	// Add the last part
+	if current.Len() > 0 {
+		parts = append(parts, current.String())
+	}
+
+	return parts
 }
