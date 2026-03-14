@@ -193,7 +193,7 @@ func (w *outputWriter) triggerUpdateForTag(tag string) {
 	// Text content tags
 	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagTextUser,
 		stream.TagFunctionShow,
-	// System tags
+		// System tags
 		stream.TagSystemError, stream.TagSystemNotify, stream.TagSystemData:
 		w.updateMu.Lock()
 		defer w.updateMu.Unlock()
