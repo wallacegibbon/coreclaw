@@ -233,11 +233,11 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		t.Errorf("ContextTokens mismatch: got %d, want %d", loaded.ContextTokens, session.ContextTokens)
 	}
 
-	// Verify messages - note: reasoning becomes separate message in file format
-	// Original: 3 messages (user, assistant, assistant+reasoning)
-	// Stored: 4 messages (user, assistant text, assistant text, assistant reasoning)
-	if len(loaded.Messages) != 4 {
-		t.Fatalf("Message count mismatch: got %d, want 4", len(loaded.Messages))
+	// Verify messages - TLV format preserves message structure
+	// Original: 3 messages (user, assistant, assistant with text+reasoning)
+	// Stored and loaded: 3 messages (same structure)
+	if len(loaded.Messages) != 3 {
+		t.Fatalf("Message count mismatch: got %d, want 3", len(loaded.Messages))
 	}
 
 	// Check first user message
@@ -256,20 +256,18 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		t.Errorf("Second message role mismatch: got %s", loaded.Messages[1].Role)
 	}
 
-	// Check third message (assistant text "Let me help you.")
+	// Check third message (assistant with text + reasoning)
 	if loaded.Messages[2].Role != fantasy.MessageRoleAssistant {
 		t.Errorf("Third message role mismatch: got %s", loaded.Messages[2].Role)
 	}
+	if len(loaded.Messages[2].Content) != 2 {
+		t.Fatalf("Third message should have 2 parts (text + reasoning), got %d", len(loaded.Messages[2].Content))
+	}
 	if tp, ok := loaded.Messages[2].Content[0].(fantasy.TextPart); !ok || tp.Text != "Let me help you." {
-		t.Errorf("Third message content mismatch: got %v", loaded.Messages[2].Content[0])
+		t.Errorf("Third message text part mismatch: got %v", loaded.Messages[2].Content[0])
 	}
-
-	// Check fourth message (reasoning)
-	if loaded.Messages[3].Role != fantasy.MessageRoleAssistant {
-		t.Errorf("Fourth message role mismatch: got %s", loaded.Messages[3].Role)
-	}
-	if _, ok := loaded.Messages[3].Content[0].(fantasy.ReasoningPart); !ok {
-		t.Errorf("Fourth message should be ReasoningPart")
+	if _, ok := loaded.Messages[2].Content[1].(fantasy.ReasoningPart); !ok {
+		t.Errorf("Third message second part should be ReasoningPart")
 	}
 }
 
@@ -704,9 +702,9 @@ func TestParseMessagesWithEmbeddedNUL(t *testing.T) {
 	// This should NOT be parsed as message separators
 	body := "\x00msg:user\nHello\n\x00tool_call\nid: call1\nname: test\ninput:\n  {}\n\x00tool_result\nid: call1\noutput:\n  This has \x00 embedded NUL\n\x00msg:assistant\nDone\n"
 
-	msgs, err := parseMessages(body)
+	msgs, err := parseMessagesLegacy(body)
 	if err != nil {
-		t.Fatalf("parseMessages failed: %v", err)
+		t.Fatalf("parseMessagesLegacy failed: %v", err)
 	}
 
 	// Should parse correctly:
@@ -829,5 +827,89 @@ context_tokens: 50
 	}
 	if !strings.Contains(output.Text, "\x00") {
 		t.Errorf("tool_result output should contain embedded NUL, got: %q", output.Text)
+	}
+}
+
+// TestTLVFormatRecursionProtection tests that the TLV format correctly handles
+// session file content embedded in tool results (the recursion problem).
+func TestTLVFormatRecursionProtection(t *testing.T) {
+	tmpDir := t.TempDir()
+	sessionPath := filepath.Join(tmpDir, "recursion-test.md")
+
+	// Create a session that contains what looks like session markers in tool output
+	session := &Session{
+		Messages: []fantasy.Message{
+			{
+				Role:    fantasy.MessageRoleUser,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Read the session file"}},
+			},
+			{
+				Role: fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{
+					fantasy.ToolCallPart{
+						ToolCallID: "call1",
+						ToolName:   "read_file",
+						Input:      `{"path": "old-session.md"}`,
+					},
+				},
+			},
+			{
+				Role: fantasy.MessageRoleTool,
+				Content: []fantasy.MessagePart{
+					fantasy.ToolResultPart{
+						ToolCallID: "call1",
+						// This output contains text that looks like old session format markers!
+						Output: fantasy.ToolResultOutputContentText{Text: "---\nbase_url: https://api.test.com\n---\n\x00msg:user\nFake user message\n\x00msg:assistant\nFake assistant\n"},
+					},
+				},
+			},
+			{
+				Role:    fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Here's the file content..."}},
+			},
+		},
+		BaseURL:    "https://api.test.com/v1",
+		ModelName:  "test-model",
+		TotalSpent: fantasy.Usage{TotalTokens: 100},
+		Input:      &stream.NopInput{},
+		Output:     &stream.NopOutput{},
+		taskQueue:  make([]Task, 0),
+	}
+
+	// Save
+	if err := session.saveSessionToFile(sessionPath); err != nil {
+		t.Fatalf("saveSessionToFile failed: %v", err)
+	}
+
+	// Load
+	loaded, err := LoadSession(sessionPath)
+	if err != nil {
+		t.Fatalf("LoadSession failed: %v", err)
+	}
+
+	// Verify we still have 4 messages (not more due to false parsing)
+	if len(loaded.Messages) != 4 {
+		t.Errorf("expected 4 messages, got %d - recursion protection failed!", len(loaded.Messages))
+		for i, msg := range loaded.Messages {
+			t.Logf("msg[%d]: role=%s, parts=%d", i, msg.Role, len(msg.Content))
+		}
+		return
+	}
+
+	// Verify the tool result still contains the fake markers
+	tr, ok := loaded.Messages[2].Content[0].(fantasy.ToolResultPart)
+	if !ok {
+		t.Fatalf("expected ToolResultPart, got %T", loaded.Messages[2].Content[0])
+	}
+	output, ok := tr.Output.(fantasy.ToolResultOutputContentText)
+	if !ok {
+		t.Fatalf("expected ToolResultOutputContentText, got %T", tr.Output)
+	}
+	// The output should contain the fake markers (not stripped or misparsed)
+	if !strings.Contains(output.Text, "msg:user") {
+		t.Errorf("tool result should contain 'msg:user', got: %q", output.Text)
+	}
+	if !strings.Contains(output.Text, "Fake user message") {
+		t.Errorf("tool result should contain 'Fake user message', got: %q", output.Text)
 	}
 }

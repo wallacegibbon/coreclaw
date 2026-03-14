@@ -1,8 +1,10 @@
 package agent
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"charm.land/fantasy"
@@ -10,14 +12,25 @@ import (
 )
 
 // ============================================================================
-// Markdown Session Format
+// Session File Format (TLV-encoded)
 // ============================================================================
 
+// Session file uses TLV (Tag-Length-Value) encoding to avoid recursion issues
+// when session files contain tool results that might include session-like content.
+// The format is: 1-byte tag + 4-byte length (big-endian) + content
 const (
-	msgSep = "\x00" // NUL character as message separator
+	TagSessionUser       byte = 'U' // User text
+	TagSessionAssistant  byte = 'A' // Assistant text
+	TagSessionReasoning  byte = 'R' // Reasoning/thinking content
+	TagSessionToolCall   byte = 'C' // Tool call from assistant
+	TagSessionToolResult byte = 'T' // Tool result
 )
 
-// formatSessionMarkdown converts SessionData to markdown format with NUL separators.
+// Deprecated: old NUL-based separator (kept for backward compat during migration)
+const msgSep = "\x00"
+
+// formatSessionMarkdown converts SessionData to markdown format with TLV encoding.
+// Format: YAML frontmatter + binary TLV-encoded messages
 func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 	var buf strings.Builder
 
@@ -39,54 +52,78 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 	buf.Write(metaBytes)
 	buf.WriteString("---\n")
 
-	// Write messages - each message is a separate NUL-separated entry
+	// Build binary section
+	var binaryBuf strings.Builder
 	for _, msg := range data.Messages {
 		for _, part := range msg.Content {
 			switch p := part.(type) {
 			case fantasy.TextPart:
-				buf.WriteString(msgSep)
-				buf.WriteString("msg:")
-				buf.WriteString(string(msg.Role))
-				buf.WriteByte('\n')
-				buf.WriteString(p.Text)
-				if !strings.HasSuffix(p.Text, "\n") {
-					buf.WriteByte('\n')
+				tag := TagSessionUser
+				if msg.Role == fantasy.MessageRoleAssistant {
+					tag = TagSessionAssistant
 				}
+				writeTLV(&binaryBuf, tag, p.Text)
+
 			case fantasy.ReasoningPart:
-				buf.WriteString(msgSep)
-				buf.WriteString("msg:reasoning\n")
-				buf.WriteString(p.Text)
-				if !strings.HasSuffix(p.Text, "\n") {
-					buf.WriteByte('\n')
-				}
+				writeTLV(&binaryBuf, TagSessionReasoning, p.Text)
+
 			case fantasy.ToolCallPart:
-				buf.WriteString(msgSep)
-				buf.WriteString("tool_call\n")
-				fmt.Fprintf(&buf, "id: %s\n", p.ToolCallID)
-				fmt.Fprintf(&buf, "name: %s\n", p.ToolName)
-				buf.WriteString("input:\n")
-				buf.WriteString(indentString(p.Input, "  "))
-				if !strings.HasSuffix(p.Input, "\n") {
-					buf.WriteByte('\n')
+				// Encode tool call as JSON
+				tc := toolCallData{
+					ID:    p.ToolCallID,
+					Name:  p.ToolName,
+					Input: p.Input,
 				}
+				jsonData, err := json.Marshal(tc)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal tool call: %w", err)
+				}
+				writeTLV(&binaryBuf, TagSessionToolCall, string(jsonData))
+
 			case fantasy.ToolResultPart:
-				buf.WriteString(msgSep)
-				buf.WriteString("tool_result\n")
-				fmt.Fprintf(&buf, "id: %s\n", p.ToolCallID)
-				buf.WriteString("output:\n")
-				outputStr := formatToolResultOutput(p.Output)
-				buf.WriteString(indentString(outputStr, "  "))
-				if !strings.HasSuffix(outputStr, "\n") {
-					buf.WriteByte('\n')
+				// Encode tool result as JSON
+				tr := toolResultData{
+					ID:     p.ToolCallID,
+					Output: formatToolResultOutput(p.Output),
 				}
+				jsonData, err := json.Marshal(tr)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal tool result: %w", err)
+				}
+				writeTLV(&binaryBuf, TagSessionToolResult, string(jsonData))
 			}
 		}
 	}
 
+	buf.Write([]byte(binaryBuf.String()))
 	return []byte(buf.String()), nil
 }
 
-// parseSessionMarkdown parses markdown format with NUL separators to SessionData.
+// writeTLV writes a TLV-encoded entry with separator: \n\n + 1-byte tag + 4-byte length + content
+func writeTLV(buf *strings.Builder, tag byte, content string) {
+	data := []byte(content)
+	length := int32(len(data))
+
+	buf.WriteString("\n\n") // Separator for readability
+	buf.WriteByte(tag)
+	binary.Write(buf, binary.BigEndian, length)
+	buf.Write(data)
+}
+
+// toolCallData for JSON serialization
+type toolCallData struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Input string `json:"input"`
+}
+
+// toolResultData for JSON serialization
+type toolResultData struct {
+	ID     string `json:"id"`
+	Output string `json:"output"`
+}
+
+// parseSessionMarkdown parses markdown format with TLV or legacy NUL separators.
 func parseSessionMarkdown(data []byte) (*SessionData, error) {
 	content := string(data)
 
@@ -101,7 +138,7 @@ func parseSessionMarkdown(data []byte) (*SessionData, error) {
 	}
 
 	frontmatter := content[4 : endIdx+4]
-	body := content[endIdx+8:]
+	body := content[endIdx+9:] // Skip "---\n" (4) + content + "\n---\n" (5)
 
 	// Parse metadata
 	var meta SessionMeta
@@ -118,11 +155,15 @@ func parseSessionMarkdown(data []byte) (*SessionData, error) {
 		UpdatedAt:     meta.UpdatedAt,
 	}
 
-	// Parse messages
-	if body != "" {
-		msgs, err := parseMessages(body)
+	// Parse messages - try TLV first, fall back to legacy format
+	if len(body) > 0 {
+		msgs, err := parseMessagesTLV(body)
 		if err != nil {
-			return nil, err
+			// Fall back to legacy NUL-based format
+			msgs, err = parseMessagesLegacy(body)
+			if err != nil {
+				return nil, err
+			}
 		}
 		sd.Messages = msgs
 	}
@@ -130,8 +171,131 @@ func parseSessionMarkdown(data []byte) (*SessionData, error) {
 	return sd, nil
 }
 
-// parseMessages parses NUL-separated message content.
-func parseMessages(body string) ([]fantasy.Message, error) {
+// parseMessagesTLV parses TLV-encoded message content.
+func parseMessagesTLV(body string) ([]fantasy.Message, error) {
+	var messages []fantasy.Message
+	var currentMsg *fantasy.Message
+
+	reader := strings.NewReader(body)
+
+	for {
+		// Skip newlines and whitespace before tag (for readability)
+		for {
+			b, err := reader.ReadByte()
+			if err == io.EOF {
+				// End of input
+				if currentMsg != nil {
+					messages = append(messages, *currentMsg)
+				}
+				return messages, nil
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to read: %w", err)
+			}
+			if b != '\n' && b != '\r' && b != ' ' && b != '\t' {
+				// Found a non-whitespace byte - this is our tag
+				reader.UnreadByte()
+				break
+			}
+		}
+
+		// Read tag
+		tag, err := reader.ReadByte()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to read tag: %w", err)
+		}
+
+		// Read length (4 bytes big-endian)
+		var length int32
+		if err := binary.Read(reader, binary.BigEndian, &length); err != nil {
+			return nil, fmt.Errorf("failed to read length: %w", err)
+		}
+
+		// Sanity check
+		if length < 0 || length > 10*1024*1024 { // Max 10MB per message
+			return nil, fmt.Errorf("invalid length: %d", length)
+		}
+
+		// Read content
+		content := make([]byte, length)
+		if _, err := io.ReadFull(reader, content); err != nil {
+			return nil, fmt.Errorf("failed to read content: %w", err)
+		}
+
+		// Parse based on tag
+		var msgPart fantasy.MessagePart
+		var msgRole fantasy.MessageRole
+		newMessage := false
+
+		switch tag {
+		case TagSessionUser:
+			newMessage = true
+			msgRole = fantasy.MessageRoleUser
+			msgPart = fantasy.TextPart{Text: string(content)}
+
+		case TagSessionAssistant:
+			newMessage = true
+			msgRole = fantasy.MessageRoleAssistant
+			msgPart = fantasy.TextPart{Text: string(content)}
+
+		case TagSessionReasoning:
+			msgRole = fantasy.MessageRoleAssistant
+			msgPart = fantasy.ReasoningPart{Text: string(content)}
+
+		case TagSessionToolCall:
+			msgRole = fantasy.MessageRoleAssistant
+			var tc toolCallData
+			if err := json.Unmarshal(content, &tc); err != nil {
+				return nil, fmt.Errorf("failed to parse tool call: %w", err)
+			}
+			msgPart = fantasy.ToolCallPart{
+				ToolCallID: tc.ID,
+				ToolName:   tc.Name,
+				Input:      tc.Input,
+			}
+
+		case TagSessionToolResult:
+			msgRole = fantasy.MessageRoleTool
+			var tr toolResultData
+			if err := json.Unmarshal(content, &tr); err != nil {
+				return nil, fmt.Errorf("failed to parse tool result: %w", err)
+			}
+			msgPart = fantasy.ToolResultPart{
+				ToolCallID: tr.ID,
+				Output:     fantasy.ToolResultOutputContentText{Text: tr.Output},
+			}
+
+		default:
+			return nil, fmt.Errorf("unknown tag: %d (%c)", tag, tag)
+		}
+
+		// Create new message or append to current
+		roleMismatch := currentMsg != nil && currentMsg.Role != msgRole
+		if newMessage || currentMsg == nil || roleMismatch {
+			if currentMsg != nil {
+				messages = append(messages, *currentMsg)
+			}
+			currentMsg = &fantasy.Message{
+				Role:    msgRole,
+				Content: []fantasy.MessagePart{msgPart},
+			}
+		} else {
+			currentMsg.Content = append(currentMsg.Content, msgPart)
+		}
+	}
+
+	if currentMsg != nil {
+		messages = append(messages, *currentMsg)
+	}
+
+	return messages, nil
+}
+
+// parseMessagesLegacy parses the old NUL-separated format for backward compatibility.
+func parseMessagesLegacy(body string) ([]fantasy.Message, error) {
 	var messages []fantasy.Message
 	var currentMsg *fantasy.Message
 
