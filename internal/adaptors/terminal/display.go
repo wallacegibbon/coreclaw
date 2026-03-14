@@ -115,11 +115,18 @@ func (m *DisplayModel) updateContent() {
 	}
 	m.lastContent = newContent
 
+	// Preserve current scroll position before setting new content
+	// (SetContent may reset YOffset)
+	currentYOffset := m.viewport.YOffset()
+
 	m.viewport.SetContent(newContent)
 
-	// Sync viewport scroll position (for non-virtual rendering compatibility)
+	// Restore scroll position or sync to bottom based on follow mode
 	if m.shouldFollow() {
 		m.viewport.GotoBottom()
+	} else {
+		// Restore the preserved scroll position
+		m.viewport.SetYOffset(currentYOffset)
 	}
 }
 
@@ -275,6 +282,12 @@ func (m *DisplayModel) ToggleWindowWrap() bool {
 		return false
 	}
 	return m.windowBuffer.ToggleWrap(m.windowCursor)
+}
+
+// MarkUserScrolled marks that the user has manually scrolled away from the bottom.
+// This prevents auto-follow until the user returns to the last window.
+func (m *DisplayModel) MarkUserScrolled() {
+	m.userMovedCursorAway = true
 }
 
 // MoveWindowCursorToTop moves the window cursor to the window at the top of the visible screen.

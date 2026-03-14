@@ -320,9 +320,11 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		}
 		return nil, true
 	case "J":
+		m.display.MarkUserScrolled()
 		m.display.ScrollDown(1)
 		return nil, true
 	case "K":
+		m.display.MarkUserScrolled()
 		m.display.ScrollUp(1)
 		return nil, true
 	case "H":

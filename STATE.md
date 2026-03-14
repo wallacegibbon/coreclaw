@@ -416,5 +416,12 @@ main.go        - alayacore entry point
   - Embedded NUL characters in content are now preserved correctly
   - Added tests: `TestParseMessagesWithEmbeddedNUL`, `TestSplitByMessageSeparators`, `TestLoadSessionWithEmbeddedNUL`
 
+- ✅ **Fixed scroll position loss when switching focus (TAB or app switch)**
+  - Problem: When user scrolls the display with J/K keys and then switches focus (via TAB to input, or switching apps), the scroll position is reset to bottom
+  - Root cause: 'J'/'K' scrolling didn't set `userMovedCursorAway = true`, so `shouldFollow()` returned true in `updateContent()`, causing `GotoBottom()` to be called
+  - Solution: Added `MarkUserScrolled()` method to DisplayModel and call it when 'J'/'K' is pressed
+  - This ensures `shouldFollow()` returns false, preserving the scroll position across focus switches
+  - Located in `internal/adaptors/terminal/display.go` (new method) and `internal/adaptors/terminal/terminal.go` (key handling)
+
 ## Next Steps
 - Add more sophisticated skills built on posix_shell tool
