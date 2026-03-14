@@ -87,7 +87,7 @@ func readMessages(conn *websocket.Conn, input *stream.ChanInput) {
 		}
 
 		// Filter out :quit and :q commands from web client.
-		if tag, value, ok := parseTLV(message); ok && tag == stream.TagUserText {
+		if tag, value, ok := parseTLV(message); ok && tag == stream.TagTextUser {
 			if value == ":quit" || value == ":q" {
 				continue
 			}

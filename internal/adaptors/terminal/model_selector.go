@@ -422,7 +422,7 @@ func (ms *ModelSelector) SetModels(models []ModelConfig) {
 	ms.updateFilteredModels()
 }
 
-// LoadModels loads models from a list of ModelInfo (from TagSystem)
+// LoadModels loads models from a list of ModelInfo (from TagSystemData)
 // Returns a command to trigger view refresh
 func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID string) tea.Cmd {
 	// Optimization: only reload if model count changed (simple change detection)

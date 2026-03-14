@@ -85,12 +85,12 @@ func (s *Session) processPrompt(ctx context.Context, prompt string, history []fa
 	// The `id` in the callback is not reliable, it does not work for some providers.
 	// Here we only need to distinguish the delta type, so we give numbers directly.
 	call.OnTextDelta = func(_, text string) error {
-		stream.WriteTLV(s.Output, stream.TagAssistantText, assembleId("t")+text)
+		stream.WriteTLV(s.Output, stream.TagTextAssistant, assembleId("t")+text)
 		s.Output.Flush()
 		return nil
 	}
 	call.OnReasoningDelta = func(_, text string) error {
-		stream.WriteTLV(s.Output, stream.TagReasoning, assembleId("r")+text)
+		stream.WriteTLV(s.Output, stream.TagTextReasoning, assembleId("r")+text)
 		s.Output.Flush()
 		return nil
 	}

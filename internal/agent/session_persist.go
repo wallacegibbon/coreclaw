@@ -80,14 +80,14 @@ func (s *Session) displayAssistantMessage(msg fantasy.Message) {
 	for _, part := range msg.Content {
 		switch p := part.(type) {
 		case fantasy.TextPart:
-			stream.WriteTLV(s.Output, stream.TagAssistantText, p.Text)
+			stream.WriteTLV(s.Output, stream.TagTextAssistant, p.Text)
 			s.Output.Flush()
 		case fantasy.ReasoningPart:
-			stream.WriteTLV(s.Output, stream.TagReasoning, p.Text)
+			stream.WriteTLV(s.Output, stream.TagTextReasoning, p.Text)
 			s.Output.Flush()
 		case fantasy.ToolCallPart:
 			if info := formatToolCall(p.ToolName, p.Input); info != "" {
-				stream.WriteTLV(s.Output, stream.TagToolShow, info)
+				stream.WriteTLV(s.Output, stream.TagFunctionShow, info)
 				s.Output.Flush()
 			}
 		}
@@ -98,7 +98,7 @@ func (s *Session) displayToolMessage(msg fantasy.Message) {
 	for _, part := range msg.Content {
 		if tc, ok := part.(fantasy.ToolCallPart); ok {
 			if info := formatToolCall(tc.ToolName, tc.Input); info != "" {
-				stream.WriteTLV(s.Output, stream.TagToolShow, info)
+				stream.WriteTLV(s.Output, stream.TagFunctionShow, info)
 				s.Output.Flush()
 			}
 		}

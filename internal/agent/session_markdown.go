@@ -53,14 +53,14 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 		for _, part := range msg.Content {
 			switch p := part.(type) {
 			case fantasy.TextPart:
-				tag := stream.TagUserText
+				tag := stream.TagTextUser
 				if msg.Role == fantasy.MessageRoleAssistant {
-					tag = stream.TagAssistantText
+					tag = stream.TagTextAssistant
 				}
 				writeTLV(&binaryBuf, tag, p.Text)
 
 			case fantasy.ReasoningPart:
-				writeTLV(&binaryBuf, stream.TagReasoning, p.Text)
+				writeTLV(&binaryBuf, stream.TagTextReasoning, p.Text)
 
 			case fantasy.ToolCallPart:
 				// Encode tool call as JSON
@@ -73,7 +73,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal tool call: %w", err)
 				}
-				writeTLV(&binaryBuf, stream.TagToolCall, string(jsonData))
+				writeTLV(&binaryBuf, stream.TagFunctionCall, string(jsonData))
 
 			case fantasy.ToolResultPart:
 				// Encode tool result as JSON
@@ -85,7 +85,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal tool result: %w", err)
 				}
-				writeTLV(&binaryBuf, stream.TagToolResult, string(jsonData))
+				writeTLV(&binaryBuf, stream.TagFunctionResult, string(jsonData))
 			}
 		}
 	}
@@ -228,21 +228,21 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 		newMessage := false
 
 		switch tag {
-		case stream.TagUserText:
+		case stream.TagTextUser:
 			newMessage = true
 			msgRole = fantasy.MessageRoleUser
 			msgPart = fantasy.TextPart{Text: string(content)}
 
-		case stream.TagAssistantText:
+		case stream.TagTextAssistant:
 			newMessage = true
 			msgRole = fantasy.MessageRoleAssistant
 			msgPart = fantasy.TextPart{Text: string(content)}
 
-		case stream.TagReasoning:
+		case stream.TagTextReasoning:
 			msgRole = fantasy.MessageRoleAssistant
 			msgPart = fantasy.ReasoningPart{Text: string(content)}
 
-		case stream.TagToolCall:
+		case stream.TagFunctionCall:
 			msgRole = fantasy.MessageRoleAssistant
 			var tc toolCallData
 			if err := json.Unmarshal(content, &tc); err != nil {
@@ -254,7 +254,7 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 				Input:      tc.Input,
 			}
 
-		case stream.TagToolResult:
+		case stream.TagFunctionResult:
 			msgRole = fantasy.MessageRoleTool
 			var tr toolResultData
 			if err := json.Unmarshal(content, &tr); err != nil {

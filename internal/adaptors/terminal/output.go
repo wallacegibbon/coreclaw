@@ -106,8 +106,8 @@ func (w *outputWriter) AppendError(format string, args ...any) {
 // WriteNotify writes a notification message to the display
 func (w *outputWriter) WriteNotify(msg string) {
 	id := w.generateWindowID()
-	w.windowBuffer.AppendOrUpdate(id, stream.TagNotify, w.styles.System.Render(msg))
-	w.triggerUpdateForTag(stream.TagNotify)
+	w.windowBuffer.AppendOrUpdate(id, stream.TagSystemNotify, w.styles.System.Render(msg))
+	w.triggerUpdateForTag(stream.TagSystemNotify)
 }
 
 // processBuffer parses TLV-encoded data from the buffer
@@ -135,7 +135,7 @@ func (w *outputWriter) writeColored(tag string, value string) {
 	}
 
 	switch tag {
-	case stream.TagAssistantText, stream.TagReasoning, stream.TagToolShow:
+	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagFunctionShow:
 		// Delta messages with stream ID prefix
 		id, content, ok := w.parseStreamID(value)
 		if !ok {
@@ -145,11 +145,11 @@ func (w *outputWriter) writeColored(tag string, value string) {
 		}
 		var styled string
 		switch tag {
-		case stream.TagAssistantText:
+		case stream.TagTextAssistant:
 			styled = output(w.styles.Text, content)
-		case stream.TagReasoning:
+		case stream.TagTextReasoning:
 			styled = output(w.styles.Reasoning, content)
-		case stream.TagToolShow:
+		case stream.TagFunctionShow:
 			// Check if this is an edit_file with raw diff data
 			if diffPath, diffLines := w.parseRawDiff(content); diffLines != nil {
 				w.windowBuffer.AppendDiff(id, diffPath, diffLines)
@@ -164,16 +164,16 @@ func (w *outputWriter) writeColored(tag string, value string) {
 		styled := output(w.styles.Error, value)
 		w.windowBuffer.AppendOrUpdate(id, tag, styled)
 
-	case stream.TagNotify:
+	case stream.TagSystemNotify:
 		id := w.generateWindowID()
 		styled := output(w.styles.System, value)
 		w.windowBuffer.AppendOrUpdate(id, tag, styled)
 
-	case stream.TagSystem:
+	case stream.TagSystemData:
 		w.handleSystemTag(value)
 		return
 
-	case stream.TagUserText:
+	case stream.TagTextUser:
 		id := w.generateWindowID()
 		styled := strings.TrimRight(w.styles.Prompt.Render("> ")+w.styles.UserInput.Render(value), " ")
 		w.windowBuffer.AppendOrUpdate(id, tag, styled)
@@ -188,8 +188,8 @@ func (w *outputWriter) writeColored(tag string, value string) {
 // Uses throttling to batch rapid updates together
 func (w *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	case stream.TagAssistantText, stream.TagToolShow, stream.TagReasoning, stream.TagError,
-		stream.TagNotify, stream.TagSystem, stream.TagUserText:
+	case stream.TagTextAssistant, stream.TagFunctionShow, stream.TagTextReasoning, stream.TagError,
+		stream.TagSystemNotify, stream.TagSystemData, stream.TagTextUser:
 		w.updateMu.Lock()
 		defer w.updateMu.Unlock()
 

@@ -110,7 +110,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if activeModel := m.out.GetActiveModel(); activeModel != nil {
 				m.applyModelSwitch(activeModel)
 			}
-			// Update model selector if models changed (via TagSystem, not direct access)
+			// Update model selector if models changed (via TagSystemData, not direct access)
 			cmd = m.modelSelector.LoadModels(m.out.GetModels(), m.out.GetActiveModelID())
 		default:
 			m.status.SetStatus(m.out.status)
@@ -141,7 +141,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Model configs are stored in models.conf (or a custom path), so we
 		// just check for the default filename suffix here.
 		if strings.HasSuffix(msg.Path, "models.conf") {
-			m.streamInput.EmitTLV(stream.TagUserText, ":model_load")
+			m.streamInput.EmitTLV(stream.TagTextUser, ":model_load")
 		}
 		return m, nil
 	case tea.BlurMsg:
@@ -204,7 +204,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// Check if user wants to reload models
 		if m.modelSelector.ConsumeReloadModels() {
-			m.streamInput.EmitTLV(stream.TagUserText, ":model_load")
+			m.streamInput.EmitTLV(stream.TagTextUser, ":model_load")
 		}
 		// Restore focus when model selector closes
 		if !m.modelSelector.IsOpen() {
@@ -419,7 +419,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 		return m.submitCommand(command, true)
 	}
 
-	m.streamInput.EmitTLV(stream.TagUserText, prompt)
+	m.streamInput.EmitTLV(stream.TagTextUser, prompt)
 	m.input.SetValue("")
 
 	return tea.Tick(SubmitTickDelay, func(t time.Time) tea.Msg {
@@ -428,7 +428,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 }
 
 func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
-	m.streamInput.EmitTLV(stream.TagUserText, ":"+command)
+	m.streamInput.EmitTLV(stream.TagTextUser, ":"+command)
 	if clearInput {
 		m.input.SetValue("")
 	}
@@ -446,13 +446,13 @@ func (m *Terminal) switchToSelectedModel() {
 
 	// Send model_set command to session instead of switching directly
 	if selectedModel.ID != "" {
-		m.streamInput.EmitTLV(stream.TagUserText, ":model_set "+selectedModel.ID)
+		m.streamInput.EmitTLV(stream.TagTextUser, ":model_set "+selectedModel.ID)
 	}
 }
 
 // openModelConfigFile opens the model config file with $EDITOR using shared Editor
 func (m *Terminal) openModelConfigFile() tea.Cmd {
-	// Get model config path from TagSystem data (not direct session access)
+	// Get model config path from TagSystemData data (not direct session access)
 	path := m.out.GetModelConfigPath()
 	if path == "" {
 		return func() tea.Msg {
@@ -467,8 +467,8 @@ func (m *Terminal) openModelConfigFile() tea.Cmd {
 // This is the only place where the adaptor calls session.SwitchModel() directly.
 // This is necessary because provider/model creation requires proxy and debug settings
 // that are only available to the adaptor, not the session. The flow is:
-// 1. Terminal sends :model_set <id> via TLV (TagUserText)
-// 2. Session handles command and sends TagSystem with ActiveModelConfig (includes API key)
+// 1. Terminal sends :model_set <id> via TLV (TagTextUser)
+// 2. Session handles command and sends TagSystemData with ActiveModelConfig (includes API key)
 // 3. Adaptor creates provider/model objects and calls SwitchModel
 // 4. Session state is updated with new model
 func (m *Terminal) applyModelSwitch(model *agentpkg.ModelConfig) {

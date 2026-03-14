@@ -384,17 +384,17 @@ func TestCtrlUDoesNothingInInput(t *testing.T) {
 func TestWindowBufferDeltaRouting(t *testing.T) {
 	out := NewTerminalOutput()
 	// Write assistant text delta with stream ID
-	err := stream.WriteTLV(out, stream.TagAssistantText, "[:stream1:]Hello")
+	err := stream.WriteTLV(out, stream.TagTextAssistant, "[:stream1:]Hello")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write another delta with same stream ID
-	err = stream.WriteTLV(out, stream.TagAssistantText, "[:stream1:] world")
+	err = stream.WriteTLV(out, stream.TagTextAssistant, "[:stream1:] world")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write different stream ID
-	err = stream.WriteTLV(out, stream.TagAssistantText, "[:stream2:]Another")
+	err = stream.WriteTLV(out, stream.TagTextAssistant, "[:stream2:]Another")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -435,7 +435,7 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 func TestWindowBufferRendering(t *testing.T) {
 	wb := NewWindowBuffer(30)
 	// Add a window with some content
-	wb.AppendOrUpdate("test1", stream.TagAssistantText, "Hello world")
+	wb.AppendOrUpdate("test1", stream.TagTextAssistant, "Hello world")
 	// Get rendered output
 	rendered := wb.GetAll(-1)
 	// Check that border characters appear (rounded border)
@@ -449,7 +449,7 @@ func TestWindowBufferRendering(t *testing.T) {
 	}
 	// Check width constraint: count lines? Not needed.
 	// Add another window and ensure ordering
-	wb.AppendOrUpdate("test2", stream.TagReasoning, "Reasoning content")
+	wb.AppendOrUpdate("test2", stream.TagTextReasoning, "Reasoning content")
 	rendered2 := wb.GetAll(-1)
 	// Should have two windows separated by newline
 	// Count border top lines? Simpler: ensure both contents appear
@@ -471,8 +471,8 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
-	// Write another non-delta (TagNotify)
-	err = stream.WriteTLV(out, stream.TagNotify, "Notification")
+	// Write another non-delta (TagSystemNotify)
+	err = stream.WriteTLV(out, stream.TagSystemNotify, "Notification")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -489,15 +489,15 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 	if windows[0].Tag != stream.TagError {
 		t.Errorf("Expected TagError, got %s", windows[0].Tag)
 	}
-	if windows[1].Tag != stream.TagNotify {
-		t.Errorf("Expected TagNotify, got %s", windows[1].Tag)
+	if windows[1].Tag != stream.TagSystemNotify {
+		t.Errorf("Expected TagSystemNotify, got %s", windows[1].Tag)
 	}
 }
 
 func TestWindowBufferEdgeCases(t *testing.T) {
 	out := NewTerminalOutput()
 	// Delta message with malformed stream ID (missing closing bracket)
-	err := stream.WriteTLV(out, stream.TagAssistantText, "[:stream1Hello")
+	err := stream.WriteTLV(out, stream.TagTextAssistant, "[:stream1Hello")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Errorf("Expected generated window ID, got %s", windows[0].ID)
 	}
 	// Mixed delta and non-delta messages
-	err = stream.WriteTLV(out, stream.TagAssistantText, "[:stream2:]Delta")
+	err = stream.WriteTLV(out, stream.TagTextAssistant, "[:stream2:]Delta")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -525,10 +525,10 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Errorf("Expected 3 windows, got %d", len(windows))
 	}
 	// Check ordering: first malformed, second delta, third error
-	if windows[0].Tag != stream.TagAssistantText {
+	if windows[0].Tag != stream.TagTextAssistant {
 		t.Errorf("First window tag mismatch")
 	}
-	if windows[1].Tag != stream.TagAssistantText {
+	if windows[1].Tag != stream.TagTextAssistant {
 		t.Errorf("Second window tag mismatch")
 	}
 	if windows[2].Tag != stream.TagError {
@@ -540,7 +540,7 @@ func TestWindowBufferWidth(t *testing.T) {
 	// Test that window width matches expected total width
 	const totalWidth = 50
 	wb := NewWindowBuffer(totalWidth)
-	wb.AppendOrUpdate("test", stream.TagAssistantText, "Hello")
+	wb.AppendOrUpdate("test", stream.TagTextAssistant, "Hello")
 	rendered := wb.GetAll(-1)
 	// Find first line (top border)
 	lines := strings.Split(rendered, "\n")
@@ -577,7 +577,7 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 			// Window buffer width should be same as input total width
 			wb := NewWindowBuffer(inputTotalWidth)
 			// Create a window
-			wb.AppendOrUpdate("test", stream.TagAssistantText, "Content")
+			wb.AppendOrUpdate("test", stream.TagTextAssistant, "Content")
 			rendered := wb.GetAll(-1)
 			// Extract top border line
 			lines := strings.Split(rendered, "\n")

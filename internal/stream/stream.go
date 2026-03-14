@@ -12,15 +12,15 @@ import (
 
 // Message tags for TLV protocol (2-byte tags).
 const (
-	TagUserText      = "TU" // User text input
-	TagAssistantText = "TA" // Assistant text output
-	TagReasoning     = "TR" // Reasoning/thinking content
-	TagToolShow      = "FS" // Tool call output for display (adaptors)
-	TagToolCall      = "FC" // Tool call for session saving/loading
-	TagToolResult    = "FR" // Tool result for session saving/loading
-	TagError         = "ER" // Error messages
-	TagNotify        = "SN" // Notification messages (simple string)
-	TagSystem        = "SD" // System messages (complex data, queue status, model info, etc.)
+	TagTextUser       = "TU" // User text input
+	TagTextAssistant  = "TA" // Assistant text output
+	TagTextReasoning  = "TR" // Reasoning/thinking content
+	TagFunctionShow   = "FS" // Function call output for display (adaptors)
+	TagFunctionCall   = "FC" // Function call for session saving/loading
+	TagFunctionResult = "FR" // Function result for session saving/loading
+	TagError          = "ER" // Error messages
+	TagSystemNotify   = "SN" // System notification messages (simple string)
+	TagSystemData     = "SD" // System data messages (complex data, queue status, model info, etc.)
 )
 
 // ChanInput implements Input using a channel of raw TLV-encoded messages.

@@ -11,11 +11,11 @@ import (
 // ============================================================================
 
 func (s *Session) signalPromptStart(prompt string) {
-	s.writeGapped(stream.TagUserText, prompt)
+	s.writeGapped(stream.TagTextUser, prompt)
 }
 
 func (s *Session) signalCommandStart(cmd string) {
-	s.writeGapped(stream.TagUserText, ":"+cmd)
+	s.writeGapped(stream.TagTextUser, ":"+cmd)
 }
 
 func (s *Session) writeError(msg string) {
@@ -23,7 +23,7 @@ func (s *Session) writeError(msg string) {
 }
 
 func (s *Session) writeNotify(msg string) {
-	s.writeGapped(stream.TagNotify, msg)
+	s.writeGapped(stream.TagSystemNotify, msg)
 }
 
 func (s *Session) writeGapped(tag string, msg string) {
@@ -36,7 +36,7 @@ func (s *Session) writeGapped(tag string, msg string) {
 
 func (s *Session) writeToolCall(toolName, input, id string) {
 	if value := formatToolCall(toolName, input); value != "" {
-		stream.WriteTLV(s.Output, stream.TagToolShow, "[:"+id+":]"+value)
+		stream.WriteTLV(s.Output, stream.TagFunctionShow, "[:"+id+":]"+value)
 	}
 }
 
@@ -94,6 +94,6 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ModelConfigPath:   modelConfigPath,
 	}
 	data, _ := json.Marshal(info)
-	stream.WriteTLV(s.Output, stream.TagSystem, string(data))
+	stream.WriteTLV(s.Output, stream.TagSystemData, string(data))
 	s.Output.Flush()
 }

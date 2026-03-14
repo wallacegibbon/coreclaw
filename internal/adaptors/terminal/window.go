@@ -121,7 +121,7 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 		Tag:     tag,
 		Content: content,
 		Style:   wb.borderStyle,
-		Wrapped: tag == stream.TagReasoning,
+		Wrapped: tag == stream.TagTextReasoning,
 	}
 	wb.Windows = append(wb.Windows, window)
 	wb.idIndex[id] = len(wb.Windows) - 1
@@ -143,7 +143,7 @@ func (wb *WindowBuffer) AppendDiff(id string, path string, lines []DiffLinePair)
 	// Create window with diff
 	window := &Window{
 		ID:    id,
-		Tag:   stream.TagToolShow,
+		Tag:   stream.TagFunctionShow,
 		Style: wb.borderStyle,
 		Diff:  diff,
 	}

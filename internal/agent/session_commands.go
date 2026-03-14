@@ -172,7 +172,7 @@ func (s *Session) handleModelLoad() {
 	// Restore active model from runtime config
 	s.initModelManager()
 
-	// Send system info with model list to adaptor via TagSystem.
+	// Send system info with model list to adaptor via TagSystemData.
 	// If an active model is known, also apply its context limit and
 	// include full config so the adaptor can recreate the provider.
 	if active := s.ModelManager.GetActive(); active != nil {
