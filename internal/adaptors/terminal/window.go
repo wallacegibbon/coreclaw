@@ -388,7 +388,11 @@ func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int) s
 		paddedOld := oldPart + strings.Repeat(" ", max(0, sideWidth-lipgloss.Width(oldPart)))
 
 		var left, right string
-		if oldEmpty {
+		if isSame {
+			// Dimmed style for unchanged content (including both empty)
+			left = wb.styles.DiffSame.Render("= " + paddedOld)
+			right = wb.styles.DiffSame.Render("= " + newPart)
+		} else if oldEmpty {
 			// Old side is empty (new has more lines) - use spaces, no sign
 			left = "  " + paddedOld
 			right = wb.styles.DiffAdd.Render("+ " + newPart)
@@ -396,10 +400,6 @@ func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int) s
 			// New side is empty (old has more lines) - use spaces, no sign
 			left = wb.styles.DiffRemove.Render("- " + paddedOld)
 			right = "  " + newPart
-		} else if isSame {
-			// Dimmed style for unchanged content
-			left = wb.styles.DiffSame.Render("= " + paddedOld)
-			right = wb.styles.DiffSame.Render("= " + newPart)
 		} else {
 			// Colored style for changed content
 			left = wb.styles.DiffRemove.Render("- " + paddedOld)
