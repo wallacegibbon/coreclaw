@@ -77,7 +77,7 @@ For this project, simplicity is more important than efficiency.
   - Test coverage for parsing, discovery, and activation
 - ✅ IOStream abstraction layer
   - Input/Output interfaces in internal/stream/stream.go
-  - TLV protocol (TagAssistantText='A', TagTool='T', TagReasoning='R', TagError='E', TagNotify='N', TagSystem='S', TagUserText='U', TagModel='M')
+  - TLV protocol (TagTextAssistant="TA", TagFunctionShow="FS", TagTextReasoning="TR", TagSystemError="SE", TagSystemNotify="SN", TagSystemData="SD", TagTextUser="TU")
   - Buffered reads/writes with Flush() method
   - ChanInput helper for channel-based input with configurable buffer
   - WriteTLV/ReadTLV functions for encoding/decoding (ReadTLV uses io.ReadFull to avoid partial frames)
@@ -104,13 +104,13 @@ For this project, simplicity is more important than efficiency.
   - Pulled from `config.Version` constant
   - Positioned on the last non-empty line of welcome text
 - ✅ TLV protocol for user-to-session communication
-  - Added TagUserText='U' for user text input from client to session
-  - Session reads TLV messages from input stream and unwraps TagUserText
+  - Added TagTextUser="TU" for user text input from client to session
+  - Session reads TLV messages from input stream and unwraps TagTextUser
 - ✅ Adaptor refactoring: TLV-only communication
   - Adaptors communicate with session through TLV messages only
   - Removed direct ModelManager access from terminal adaptor
-  - Model info (models list, active ID, config path) comes from TagSystem
-  - Model switching uses TLV flow: :model_set → TagSystem with ActiveModelConfig → adaptor creates provider
+  - Model info (models list, active ID, config path) comes from TagSystemData
+  - Model switching uses TLV flow: :model_set → TagSystemData with ActiveModelConfig → adaptor creates provider
   - Only exception: SwitchModel() called directly by adaptor for provider creation (requires proxy/debug settings)
 - ✅ Simplified auto-summarize mechanism
   - Removed `skipAutoSummarize` flag and `prependTasks` function
@@ -120,13 +120,13 @@ For this project, simplicity is more important than efficiency.
   - `autoSummarize()` delegates to shared `summarize()` function
   - `:cancel` command calls `handleCommandSync()` directly for immediate execution (not queued)
   - Other commands are queued like user prompts via `submitTask()`
-  - Session validates tags and emits TagError for invalid ones
+  - Session validates tags and emits TagSystemError for invalid ones
   - Session detects commands (starts with ":") and routes to handler
-  - Session checks command errors and emits TagError to user
+  - Session checks command errors and emits TagSystemError to user
   - ChanInput helper in stream.go with configurable buffer size
   - Terminal uses 10-buffer for human-paced input
   - WebSocket uses 100-buffer for network-paced input
-  - HTML client encodes user input as TagUserText TLV
+  - HTML client encodes user input as TagTextUser TLV
   - Removed adaptors.NewSession - adaptors create processor/session directly
 - ✅ Terminal display color persistence
   - Per-line styling for dimmed text (reasoning) to preserve color during scrolling
@@ -220,7 +220,7 @@ For this project, simplicity is more important than efficiency.
   - Removed unused internal fields for simpler state
 
 - ✅ **Model Management Commands**
-  - `:model_get_all` - Get all available models (returns via TagSystem with models field)
+  - `:model_get_all` - Get all available models (returns via TagSystemData with models field)
   - `:model_set <ID>` - Switch to a model by its ID (works even during task execution)
   - `:model_load [file]` - Load models from config file (default: path from --model-config or ~/.alayacore/models.conf)
   - ModelManager in `internal/agent/model_manager.go` manages models with runtime IDs
@@ -264,7 +264,7 @@ For this project, simplicity is more important than efficiency.
 
 - ✅ **Fixed nil model panic on startup**
   - When no CLI model is provided, session is created with nil model
-  - initAgent() now sends ActiveModelConfig via TagSystem if there's an active model from runtime.conf
+  - initAgent() now sends ActiveModelConfig via TagSystemData if there's an active model from runtime.conf
   - Terminal adaptor receives the config and calls SwitchModel() to set up the provider
   - Previously, sendSystemInfo() was called without ActiveModelConfig, causing GetActiveModel() to return nil
   - This resulted in SwitchModel() never being called, leaving the Agent with a nil model
@@ -278,9 +278,9 @@ For this project, simplicity is more important than efficiency.
 - ✅ **Simplified session task runner + state safety**
   - Replaced spawn-per-submit task runner and 100ms idle timeout with a single long-lived task runner goroutine
   - Protected shared session state more consistently (cancel func under mutex; per-session prompt IDs via atomic counter)
-  - Centralized TagSystem emission into one helper (optional ActiveModelConfig)
+  - Centralized TagSystemData emission into one helper (optional ActiveModelConfig)
   - Added session shutdown signaling to prevent goroutine leaks when input closes
-  - Locked usage/context updates to avoid inconsistent TagSystem snapshots
+  - Locked usage/context updates to avoid inconsistent TagSystemData snapshots
   - Split monolithic `session.go` into focused files (tasks, prompt streaming, commands, output/system info, persistence, markdown)
  - ✅ **Always-on terminal tick loop**
    - Terminal `Init` now starts the periodic tick loop immediately
@@ -316,10 +316,10 @@ For this project, simplicity is more important than efficiency.
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 - **Stream Protocol**: TLV (Tag-Length-Value) for structured output
-  - Session-to-user: TagAssistantText, TagTool, TagReasoning, TagError, TagSystem (JSON), TagNotify, TagUserText
-  - User-to-session: TagUserText
+  - Session-to-user: TagTextAssistant, TagFunctionShow, TagTextReasoning, TagSystemError, TagSystemData (JSON), TagSystemNotify, TagTextUser
+  - User-to-session: TagTextUser
   - Session validates and unwraps user TLV messages
-  - TagSystem contains JSON-encoded SystemInfo struct with token usage, queue, and model info:
+  - TagSystemData contains JSON-encoded SystemInfo struct with token usage, queue, and model info:
     - `{"context":1234,"total":5678,"queue":2,"models":[...],"active_model_id":"abc123"}`
     - When model changes, includes `active_model_config` with full config (including API key)
 
