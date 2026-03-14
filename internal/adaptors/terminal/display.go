@@ -87,6 +87,26 @@ func (m *DisplayModel) updateContent() {
 	if m.displayFocused {
 		cursorIndex = m.windowCursor
 	}
+
+	// For virtual rendering, we need to calculate the correct YOffset first
+	// This is a chicken-and-egg problem: GotoBottom needs content, but virtual rendering needs YOffset
+	// Solution: Get total lines first, calculate YOffset, then render
+	totalLines := m.windowBuffer.GetTotalLinesVirtual()
+	viewportHeight := m.viewport.Height()
+
+	// Calculate target YOffset
+	targetYOffset := m.viewport.YOffset()
+	if m.shouldFollow() && totalLines > viewportHeight {
+		targetYOffset = totalLines - viewportHeight
+		if targetYOffset < 0 {
+			targetYOffset = 0
+		}
+	}
+
+	// Set viewport position for virtual rendering
+	m.windowBuffer.SetViewportPosition(targetYOffset, viewportHeight)
+
+	// Now render with the correct position
 	newContent := m.windowBuffer.GetAll(cursorIndex)
 
 	// Skip update if content hasn't changed
@@ -96,6 +116,8 @@ func (m *DisplayModel) updateContent() {
 	m.lastContent = newContent
 
 	m.viewport.SetContent(newContent)
+
+	// Sync viewport scroll position (for non-virtual rendering compatibility)
 	if m.shouldFollow() {
 		m.viewport.GotoBottom()
 	}
