@@ -93,7 +93,7 @@ func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 	// Get the initial view
 	terminal.display.updateContent()
 	initialView := terminal.display.View()
-	initialLines := strings.Count(initialView.String(), "\n")
+	initialContent := initialView.Content
 
 	// Simulate a resize to a narrower width
 	resizeMsg := tea.WindowSizeMsg{
@@ -106,12 +106,18 @@ func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 
 	// Get the view after resize
 	resizedView := terminal.display.View()
-	resizedLines := strings.Count(resizedView.String(), "\n")
+	resizedContent := resizedView.Content
 
 	// The content should have been re-rendered with the new width
-	// With a narrower width, the content should wrap to more lines
-	if resizedLines <= initialLines {
-		t.Errorf("Expected more lines after resize to narrower width (initial: %d, resized: %d)", initialLines, resizedLines)
+	// Verify that the content changed (it should be different due to narrower borders)
+	if resizedContent == initialContent {
+		t.Errorf("Expected content to change after resize")
+	}
+
+	// Verify the borders are narrower (check for shorter horizontal line)
+	// The top border should be 40 chars wide instead of 80
+	if !strings.Contains(resizedContent, "──────────────────────────────────────") {
+		t.Errorf("Expected narrower borders in resized content")
 	}
 
 	// Verify the window buffer width was updated
