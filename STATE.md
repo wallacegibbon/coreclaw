@@ -243,6 +243,7 @@ For this project, simplicity is more important than efficiency.
   - Focus is restored to previously focused window when model selector closes
   - Provides better visual feedback and prevents accidental input
   - Fixed: Main input no longer gains focus when external editor closes while model selector is open
+  - Fixed: 'r' key now properly reloads model.conf and refreshes the model list display
 
 - ✅ **Model selector keyboard handling improvements**
   - Fixed command handling: `q`, `e`, `r` only work when list is focused, not when search input is focused

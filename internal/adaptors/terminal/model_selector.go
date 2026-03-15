@@ -129,20 +129,6 @@ func (ms *ModelSelector) SetModels(models []ModelConfig) {
 }
 
 func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID string) tea.Cmd {
-	// Optimization: skip reload if count matches and we already have models
-	if len(models) == ms.lastModelCount && len(ms.models) == len(models) && ms.lastModelCount > 0 {
-		if activeID != "" {
-			for i, m := range ms.models {
-				if m.ID == activeID && ms.activeModel == nil {
-					ms.activeModel = &ms.models[i]
-					ms.selectedIdx = i
-					break
-				}
-			}
-		}
-		return func() tea.Msg { return nil }
-	}
-
 	ms.lastModelCount = len(models)
 	ms.models = make([]ModelConfig, len(models))
 
