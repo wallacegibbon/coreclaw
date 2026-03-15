@@ -283,8 +283,11 @@ func (s *Session) initModelManager() {
 }
 
 // SwitchModel switches the session to use a new model
-func (s *Session) SwitchModel(model fantasy.LanguageModel) {
+func (s *Session) SwitchModel(model fantasy.LanguageModel, modelConfig *ModelConfig) {
 	s.initAgentFromModel(model)
+	if modelConfig != nil {
+		s.applyModelContextLimit(modelConfig)
+	}
 	s.sendSystemInfo()
 }
 

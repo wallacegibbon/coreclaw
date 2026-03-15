@@ -162,7 +162,7 @@ func (s *Session) handleModelSet(args []string) {
 	}
 
 	// Switch to the new model
-	s.SwitchModel(newModel)
+	s.SwitchModel(newModel, model)
 
 	// Send notification
 	s.writeNotify("Switched to model: " + model.Name + " (" + model.ModelName + ")")
@@ -210,7 +210,7 @@ func (s *Session) handleModelLoad() {
 		}
 
 		// Switch to the model
-		s.SwitchModel(newModel)
+		s.SwitchModel(newModel, active)
 		s.writeNotify("Loaded models and switched to: " + active.Name)
 		return
 	}
