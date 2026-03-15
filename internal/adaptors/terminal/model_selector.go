@@ -320,9 +320,9 @@ func (ms *ModelSelector) renderList() string {
 	sb.WriteString(ms.styles.System.Render("─── Commands ───"))
 	sb.WriteString("\n")
 	if ms.searchInputFocused {
-		sb.WriteString(ms.styles.System.Render("tab: switch focus  enter: select first"))
+		sb.WriteString(ms.styles.System.Render("tab: list  enter: select  ctrl+c: clear  esc: close"))
 	} else {
-		sb.WriteString(ms.styles.System.Render("tab: switch focus  e: edit  r: reload  enter: select  esc: close"))
+		sb.WriteString(ms.styles.System.Render("tab: search  j/k: navigate  e: edit  r: reload  enter: select  q/esc: close"))
 	}
 
 	return sb.String()
