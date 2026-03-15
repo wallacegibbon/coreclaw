@@ -51,7 +51,7 @@ func TestSaveAndLoadSession(t *testing.T) {
 		ContextTokens: sessionData.ContextTokens,
 		Input:         &stream.NopInput{},
 		Output:        &stream.NopOutput{},
-		taskQueue:     make([]Task, 0),
+		taskQueue:     make([]QueueItem, 0),
 	}
 
 	// Save session
@@ -144,7 +144,7 @@ func Test_displayMessages(t *testing.T) {
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hi there!"}},
 			},
 		},
-		taskQueue: make([]Task, 0),
+		taskQueue: make([]QueueItem, 0),
 	}
 
 	// Display messages should not panic
@@ -205,7 +205,7 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		ContextTokens: 200,
 		Input:         &stream.NopInput{},
 		Output:        &stream.NopOutput{},
-		taskQueue:     make([]Task, 0),
+		taskQueue:     make([]QueueItem, 0),
 	}
 
 	// Save
@@ -291,7 +291,7 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 		TotalSpent: fantasy.Usage{TotalTokens: 100},
 		Input:      &stream.NopInput{},
 		Output:     &stream.NopOutput{},
-		taskQueue:  make([]Task, 0),
+		taskQueue:  make([]QueueItem, 0),
 	}
 
 	if err := session.saveSessionToFile(sessionPath); err != nil {
@@ -342,7 +342,7 @@ func TestReasoningOnlyMessage(t *testing.T) {
 		ModelName: "gpt-4",
 		Input:     &stream.NopInput{},
 		Output:    &stream.NopOutput{},
-		taskQueue: make([]Task, 0),
+		taskQueue: make([]QueueItem, 0),
 	}
 
 	if err := session.saveSessionToFile(sessionPath); err != nil {
@@ -402,7 +402,7 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		ModelName: "gpt-4",
 		Input:     &stream.NopInput{},
 		Output:    &stream.NopOutput{},
-		taskQueue: make([]Task, 0),
+		taskQueue: make([]QueueItem, 0),
 	}
 
 	if err := session.saveSessionToFile(sessionPath); err != nil {
@@ -459,7 +459,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		ModelName:    "test-model",
 		Input:        &stream.NopInput{},
 		Output:       output,
-		taskQueue:    make([]Task, 0),
+		taskQueue:    make([]QueueItem, 0),
 		ModelManager: NewModelManager(""),
 	}
 
@@ -564,7 +564,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Found 2 files!"}},
 			},
 		},
-		taskQueue: make([]Task, 0),
+		taskQueue: make([]QueueItem, 0),
 	}
 
 	// Display messages
@@ -873,7 +873,7 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 		TotalSpent: fantasy.Usage{TotalTokens: 100},
 		Input:      &stream.NopInput{},
 		Output:     &stream.NopOutput{},
-		taskQueue:  make([]Task, 0),
+		taskQueue:  make([]QueueItem, 0),
 	}
 
 	// Save

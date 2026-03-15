@@ -19,6 +19,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,15 +28,39 @@ import (
 )
 
 // Task represents a unit of work for the session.
-type Task interface{ isTask() }
+type Task interface {
+	isTask()
+	GetQueueID() string
+}
 
-type UserPrompt string
+// QueueItem wraps a Task with metadata for queue management
+type QueueItem struct {
+	Task
+	QueueID   string
+	CreatedAt time.Time
+}
+
+type UserPrompt struct {
+	Text    string
+	queueID string
+}
 
 func (UserPrompt) isTask() {}
 
-type CommandPrompt struct{ Command string }
+func (u UserPrompt) GetQueueID() string {
+	return u.queueID
+}
+
+type CommandPrompt struct {
+	Command string
+	queueID string
+}
 
 func (CommandPrompt) isTask() {}
+
+func (c CommandPrompt) GetQueueID() string {
+	return c.queueID
+}
 
 // SystemInfo holds session state for clients.
 type SystemInfo struct {
@@ -69,12 +94,13 @@ type Session struct {
 	baseTools      []fantasy.AgentTool
 	systemPrompt   string
 
-	taskQueue     []Task
+	taskQueue     []QueueItem
 	taskAvailable chan struct{}
 	done          chan struct{}
 	inProgress    bool
 	cancelCurrent func()
 	nextPromptID  uint64
+	nextQueueID   uint64
 	mu            sync.Mutex
 }
 
@@ -127,7 +153,7 @@ func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, syst
 		RuntimeManager: NewRuntimeManager(runtimeConfigPath, modelConfigPath),
 		baseTools:      baseTools,
 		systemPrompt:   systemPrompt,
-		taskQueue:      make([]Task, 0),
+		taskQueue:      make([]QueueItem, 0),
 		taskAvailable:  make(chan struct{}, 1),
 		done:           make(chan struct{}),
 	}
@@ -153,7 +179,7 @@ func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTo
 		RuntimeManager: NewRuntimeManager(runtimeConfigPath, modelConfigPath),
 		baseTools:      baseTools,
 		systemPrompt:   systemPrompt,
-		taskQueue:      make([]Task, 0),
+		taskQueue:      make([]QueueItem, 0),
 		taskAvailable:  make(chan struct{}, 1),
 		done:           make(chan struct{}),
 	}
@@ -250,14 +276,15 @@ func (s *Session) readFromInput() {
 			continue
 		}
 		if len(value) > 0 && value[0] == ':' {
-			// :cancel is immediate, other commands are queued
-			if string(value[1:]) == "cancel" {
-				s.handleCommandSync(context.Background(), "cancel")
+			cmd := string(value[1:])
+			// These commands are immediate, not queued
+			if cmd == "cancel" || cmd == "taskqueue_get_all" || strings.HasPrefix(cmd, "taskqueue_del ") {
+				s.handleCommandSync(context.Background(), cmd)
 			} else {
-				s.submitTask(CommandPrompt{Command: value[1:]})
+				s.submitTask(CommandPrompt{Command: cmd})
 			}
 		} else {
-			s.submitTask(UserPrompt(value))
+			s.submitTask(UserPrompt{Text: value})
 		}
 	}
 }

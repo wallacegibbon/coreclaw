@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"charm.land/fantasy"
 )
@@ -19,7 +21,29 @@ func (s *Session) submitTask(task Task) {
 		s.writeNotify("Busy. Cannot queue, try again shortly.")
 		return
 	}
-	s.taskQueue = append(s.taskQueue, task)
+
+	// Generate unique ID for the task
+	s.nextQueueID++
+	queueID := fmt.Sprintf("Q%d", s.nextQueueID)
+
+	// Set queue ID on the task based on its type
+	switch t := task.(type) {
+	case UserPrompt:
+		t.queueID = queueID
+		task = t
+	case CommandPrompt:
+		t.queueID = queueID
+		task = t
+	}
+
+	// Create queue item
+	item := QueueItem{
+		Task:      task,
+		QueueID:   queueID,
+		CreatedAt: time.Now(),
+	}
+
+	s.taskQueue = append(s.taskQueue, item)
 	inProgress := s.inProgress
 	s.signalTaskAvailable()
 	s.mu.Unlock()
@@ -50,21 +74,21 @@ func (s *Session) taskRunner() {
 	}
 }
 
-func (s *Session) waitForNextTask() (Task, bool) {
+func (s *Session) waitForNextTask() (QueueItem, bool) {
 	for {
 		s.mu.Lock()
 		if len(s.taskQueue) > 0 {
-			task := s.taskQueue[0]
+			item := s.taskQueue[0]
 			s.taskQueue = s.taskQueue[1:]
 			s.mu.Unlock()
-			return task, true
+			return item, true
 		}
 		s.mu.Unlock()
 		select {
 		case <-s.taskAvailable:
 			// continue
 		case <-s.done:
-			return nil, false
+			return QueueItem{}, false
 		}
 	}
 }
@@ -85,7 +109,7 @@ func (s *Session) setInProgress(v bool) {
 	}
 }
 
-func (s *Session) runTask(task Task) {
+func (s *Session) runTask(item QueueItem) {
 	s.sendSystemInfo()
 	ctx, cancel := context.WithCancel(context.Background())
 	s.mu.Lock()
@@ -97,10 +121,11 @@ func (s *Session) runTask(task Task) {
 		s.mu.Unlock()
 	}()
 
+	task := item.Task
 	switch t := task.(type) {
 	case UserPrompt:
-		s.signalPromptStart(string(t))
-		s.handleUserPrompt(ctx, string(t))
+		s.signalPromptStart(t.Text)
+		s.handleUserPrompt(ctx, t.Text)
 	case CommandPrompt:
 		s.signalCommandStart(t.Command)
 		s.handleCommandSync(ctx, t.Command)
@@ -121,4 +146,30 @@ func (s *Session) appendCancelMessage() {
 			Content: []fantasy.MessagePart{fantasy.TextPart{Text: "The user canceled."}},
 		})
 	}
+}
+
+// GetQueueItems returns all queued items
+func (s *Session) GetQueueItems() []QueueItem {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := make([]QueueItem, len(s.taskQueue))
+	copy(items, s.taskQueue)
+	return items
+}
+
+// DeleteQueueItem removes a queue item by ID and sends a notification
+func (s *Session) DeleteQueueItem(queueID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i, item := range s.taskQueue {
+		if item.QueueID == queueID {
+			// Remove the item
+			s.taskQueue = append(s.taskQueue[:i], s.taskQueue[i+1:]...)
+			// Send notification
+			s.writeNotify(fmt.Sprintf("Queue item %s deleted", queueID))
+			return true
+		}
+	}
+	return false
 }

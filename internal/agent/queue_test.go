@@ -1,0 +1,152 @@
+package agent
+
+import (
+	"testing"
+	"time"
+
+	"github.com/alayacore/alayacore/internal/stream"
+)
+
+func TestQueueItemUniqueIDs(t *testing.T) {
+	// Create a minimal session
+	session := &Session{
+		taskQueue:     make([]QueueItem, 0),
+		taskAvailable: make(chan struct{}, 1),
+		done:          make(chan struct{}),
+		Input:         &stream.ChanInput{},
+		Output:        &MockOutput{},
+	}
+
+	// Submit multiple tasks and verify unique IDs
+	task1 := UserPrompt{Text: "test prompt 1"}
+	task2 := CommandPrompt{Command: "test command"}
+	task3 := UserPrompt{Text: "test prompt 2"}
+
+	session.submitTask(task1)
+	session.submitTask(task2)
+	session.submitTask(task3)
+
+	// Get queue items
+	items := session.GetQueueItems()
+
+	if len(items) != 3 {
+		t.Errorf("Expected 3 queue items, got %d", len(items))
+	}
+
+	// Verify unique IDs
+	ids := make(map[string]bool)
+	for _, item := range items {
+		if ids[item.QueueID] {
+			t.Errorf("Duplicate queue ID found: %s", item.QueueID)
+		}
+		ids[item.QueueID] = true
+	}
+
+	// Verify ID format (Q1, Q2, Q3)
+	expectedIDs := []string{"Q1", "Q2", "Q3"}
+	for i, item := range items {
+		if item.QueueID != expectedIDs[i] {
+			t.Errorf("Expected queue ID %s, got %s", expectedIDs[i], item.QueueID)
+		}
+	}
+}
+
+func TestDeleteQueueItem(t *testing.T) {
+	session := &Session{
+		taskQueue:     make([]QueueItem, 0),
+		taskAvailable: make(chan struct{}, 1),
+		done:          make(chan struct{}),
+		Input:         &stream.ChanInput{},
+		Output:        &MockOutput{},
+	}
+
+	// Submit tasks
+	session.submitTask(UserPrompt{Text: "prompt 1"})
+	session.submitTask(UserPrompt{Text: "prompt 2"})
+	session.submitTask(UserPrompt{Text: "prompt 3"})
+
+	// Delete middle item
+	deleted := session.DeleteQueueItem("Q2")
+	if !deleted {
+		t.Error("Failed to delete queue item Q2")
+	}
+
+	// Verify deletion
+	items := session.GetQueueItems()
+	if len(items) != 2 {
+		t.Errorf("Expected 2 items after deletion, got %d", len(items))
+	}
+
+	// Verify remaining items
+	if items[0].QueueID != "Q1" {
+		t.Errorf("Expected first item to be Q1, got %s", items[0].QueueID)
+	}
+	if items[1].QueueID != "Q3" {
+		t.Errorf("Expected second item to be Q3, got %s", items[1].QueueID)
+	}
+
+	// Try to delete non-existent item
+	deleted = session.DeleteQueueItem("Q999")
+	if deleted {
+		t.Error("Should not be able to delete non-existent item")
+	}
+}
+
+func TestQueueItemTypes(t *testing.T) {
+	session := &Session{
+		taskQueue:     make([]QueueItem, 0),
+		taskAvailable: make(chan struct{}, 1),
+		done:          make(chan struct{}),
+		Input:         &stream.ChanInput{},
+		Output:        &MockOutput{},
+	}
+
+	// Submit different task types
+	promptTask := UserPrompt{Text: "test prompt"}
+	commandTask := CommandPrompt{Command: "test command"}
+
+	session.submitTask(promptTask)
+	session.submitTask(commandTask)
+
+	items := session.GetQueueItems()
+
+	// Verify task types are preserved
+	if len(items) != 2 {
+		t.Fatalf("Expected 2 items, got %d", len(items))
+	}
+
+	// Check first item is UserPrompt
+	if _, ok := items[0].Task.(UserPrompt); !ok {
+		t.Error("First item should be UserPrompt")
+	}
+
+	// Check second item is CommandPrompt
+	if _, ok := items[1].Task.(CommandPrompt); !ok {
+		t.Error("Second item should be CommandPrompt")
+	}
+}
+
+func TestQueueTimestamps(t *testing.T) {
+	session := &Session{
+		taskQueue:     make([]QueueItem, 0),
+		taskAvailable: make(chan struct{}, 1),
+		done:          make(chan struct{}),
+		Input:         &stream.ChanInput{},
+		Output:        &MockOutput{},
+	}
+
+	before := time.Now()
+	session.submitTask(UserPrompt{Text: "test"})
+	after := time.Now()
+
+	items := session.GetQueueItems()
+
+	if len(items) != 1 {
+		t.Fatalf("Expected 1 item, got %d", len(items))
+	}
+
+	// Verify timestamp is within expected range
+	if items[0].CreatedAt.Before(before) || items[0].CreatedAt.After(after) {
+		t.Errorf("Timestamp %v is not between %v and %v", items[0].CreatedAt, before, after)
+	}
+}

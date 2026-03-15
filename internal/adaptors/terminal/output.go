@@ -35,6 +35,7 @@ type outputWriter struct {
 	hasModels          bool                  // Whether models are configured
 	modelConfigPath    string                // Path to model.conf
 	activeModelName    string                // Name of active model
+	pendingQueueItems  []QueueItem           // Queue items from taskqueue_get_all
 }
 
 func NewTerminalOutput() *outputWriter {
@@ -215,6 +216,19 @@ func (w *outputWriter) triggerUpdateForTag(tag string) {
 
 // handleSystemTag processes system information tags
 func (w *outputWriter) handleSystemTag(value string) {
+	// Try to parse as generic map first to check the type
+	var genericData map[string]interface{}
+	if err := json.Unmarshal([]byte(value), &genericData); err == nil {
+		// Check if this is a taskqueue_list message
+		if msgType, ok := genericData["type"].(string); ok && msgType == "taskqueue_list" {
+			// Handle task queue list - this will be picked up by the terminal
+			// We'll store it temporarily and the terminal will read it
+			w.handleTaskQueueList(value)
+			return
+		}
+	}
+
+	// Otherwise, try to parse as SystemInfo
 	var info agentpkg.SystemInfo
 	if err := json.Unmarshal([]byte(value), &info); err == nil {
 		w.inProgress = info.InProgress
@@ -240,6 +254,52 @@ func (w *outputWriter) handleSystemTag(value string) {
 		default:
 		}
 	}
+}
+
+// handleTaskQueueList handles task queue list messages
+func (w *outputWriter) handleTaskQueueList(value string) {
+	var data struct {
+		Type  string `json:"type"`
+		Items []struct {
+			QueueID   string `json:"queue_id"`
+			Type      string `json:"type"`
+			Content   string `json:"content"`
+			CreatedAt string `json:"created_at"`
+		} `json:"items"`
+	}
+
+	if err := json.Unmarshal([]byte(value), &data); err != nil {
+		return
+	}
+
+	// Convert to QueueItem slice
+	items := make([]QueueItem, len(data.Items))
+	for i, item := range data.Items {
+		createdAt, _ := time.Parse(time.RFC3339, item.CreatedAt)
+		items[i] = QueueItem{
+			QueueID:   item.QueueID,
+			Type:      item.Type,
+			Content:   item.Content,
+			CreatedAt: createdAt,
+		}
+	}
+
+	w.pendingQueueItems = items
+
+	// Signal update so tick handler picks up queue items
+	select {
+	case w.updateChan <- struct{}{}:
+	default:
+	}
+}
+
+// GetQueueItems returns and clears the pending queue items
+func (w *outputWriter) GetQueueItems() []QueueItem {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	items := w.pendingQueueItems
+	w.pendingQueueItems = nil
+	return items
 }
 
 // GetActiveModel returns and clears the pending model config from a model_set response

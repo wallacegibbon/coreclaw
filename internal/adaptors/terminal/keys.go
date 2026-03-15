@@ -17,30 +17,35 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleModelSelectorKeys(msg)
 	}
 
-	// 2. Confirmation dialogs block normal input
+	// 2. Queue manager takes precedence when open
+	if m.queueManager.IsOpen() {
+		return m.handleQueueManagerKeys(msg)
+	}
+
+	// 3. Confirmation dialogs block normal input
 	if cmd, handled := m.handleConfirmDialog(msg); handled {
 		return m, cmd
 	}
 
-	// 3. Tab toggles focus between display and input
+	// 4. Tab toggles focus between display and input
 	if msg.String() == "tab" {
 		m.toggleFocus()
 		return m, nil
 	}
 
-	// 4. Display-specific keys when display is focused
+	// 5. Display-specific keys when display is focused
 	if m.focusedWindow == "display" {
 		if cmd, handled := m.handleDisplayKeys(msg); handled {
 			return m, cmd
 		}
 	}
 
-	// 5. Global shortcuts (work from any context)
+	// 6. Global shortcuts (work from any context)
 	if cmd, handled := m.handleGlobalKeys(msg); handled {
 		return m, cmd
 	}
 
-	// 6. Default: pass to input
+	// 7. Default: pass to input
 	return m.handleInputKeys(msg)
 }
 
@@ -66,6 +71,30 @@ func (m *Terminal) handleModelSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	// Restore focus when model selector closes
 	if !m.modelSelector.IsOpen() {
 		m.restoreFocusAfterSelector()
+	}
+
+	return m, cmd
+}
+
+// handleQueueManagerKeys handles input when queue manager is open.
+func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle 'd' key for delete
+	if msg.String() == "d" {
+		selectedItem := m.queueManager.GetSelectedItem()
+		if selectedItem != nil {
+			// Send delete command to session
+			m.streamInput.EmitTLV(stream.TagTextUser, ":taskqueue_del "+selectedItem.QueueID)
+			// Request updated queue list
+			m.streamInput.EmitTLV(stream.TagTextUser, ":taskqueue_get_all")
+		}
+		return m, nil
+	}
+
+	cmd := m.queueManager.HandleKeyMsg(msg)
+
+	// Restore focus when queue manager closes
+	if !m.queueManager.IsOpen() {
+		m.restoreFocusAfterQueueManager()
 	}
 
 	return m, cmd
@@ -226,6 +255,10 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.openModelSelector()
 		return nil, true
 
+	case "ctrl+q":
+		m.openQueueManager()
+		return nil, true
+
 	case "enter":
 		return m.handleSubmit(), true
 	}
@@ -285,6 +318,26 @@ func (m *Terminal) openModelSelector() {
 
 // restoreFocusAfterSelector restores focus after model selector closes.
 func (m *Terminal) restoreFocusAfterSelector() {
+	if m.focusedWindow == "display" {
+		m.display.SetDisplayFocused(true)
+	} else {
+		m.input.Focus()
+	}
+	m.display.updateContent()
+}
+
+// openQueueManager opens the queue manager UI.
+func (m *Terminal) openQueueManager() {
+	// Request queue items from session
+	m.streamInput.EmitTLV(stream.TagTextUser, ":taskqueue_get_all")
+	m.queueManager.Open()
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+	m.display.updateContent()
+}
+
+// restoreFocusAfterQueueManager restores focus after queue manager closes.
+func (m *Terminal) restoreFocusAfterQueueManager() {
 	if m.focusedWindow == "display" {
 		m.display.SetDisplayFocused(true)
 	} else {

@@ -31,6 +31,7 @@ type Terminal struct {
 	input         InputModel
 	status        StatusModel
 	modelSelector *ModelSelector
+	queueManager  *QueueManager
 
 	// State
 	quitting            bool
@@ -65,6 +66,7 @@ func NewTerminal(
 		input:         NewInputModel(styles),
 		status:        NewStatusModel(styles),
 		modelSelector: NewModelSelector(styles),
+		queueManager:  NewQueueManager(styles),
 		windowWidth:   initialWidth,
 		windowHeight:  initialHeight,
 		styles:        styles,
@@ -78,6 +80,7 @@ func NewTerminal(
 	m.input.SetWidth(initialWidth)
 	m.status.SetWidth(initialWidth)
 	m.modelSelector.SetSize(initialWidth, initialHeight)
+	m.queueManager.SetSize(initialWidth, initialHeight)
 	m.updateDisplayHeight()
 
 	return m
@@ -145,6 +148,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.input.SetWidth(max(0, msg.Width))
 	m.status.SetWidth(max(0, msg.Width))
 	m.modelSelector.SetSize(msg.Width, msg.Height)
+	m.queueManager.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 
 	// Validate cursor position after resize (window heights may have changed)
@@ -179,6 +183,13 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 
 		// Update model selector if models changed
 		cmd = m.modelSelector.LoadModels(m.out.GetModels(), m.out.GetActiveModelID())
+
+		// Check for queue items update
+		if queueItems := m.out.GetQueueItems(); queueItems != nil {
+			m.queueManager.SetItems(queueItems)
+			// Update display to show new items
+			m.display.updateContent()
+		}
 
 	default:
 		m.status.SetStatus(m.out.status)
@@ -282,6 +293,15 @@ func (m *Terminal) View() tea.View {
 	// Render model selector overlay if open
 	if m.modelSelector.IsOpen() {
 		fullContent := m.modelSelector.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
+		v := tea.NewView(fullContent)
+		v.AltScreen = true
+		v.ReportFocus = true
+		return v
+	}
+
+	// Render queue manager overlay if open
+	if m.queueManager.IsOpen() {
+		fullContent := m.queueManager.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
 		v := tea.NewView(fullContent)
 		v.AltScreen = true
 		v.ReportFocus = true

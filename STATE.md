@@ -351,6 +351,23 @@ cmd/alayacore-web/       - alayacore-web entry point
 main.go        - alayacore entry point
 ```
 
+- ✅ **Task Queue Management Window**
+  - Unique IDs for all queued tasks (format: Q1, Q2, Q3, etc.)
+  - Queue manager window triggered by Ctrl+Q (similar to model selector)
+  - New commands: `:taskqueue_get_all` and `:taskqueue_del <QueueID>`
+  - Terminal adaptor can query and delete queued items via these commands
+  - Queue window key bindings:
+    - `q` or `esc`: close window
+    - `j`/`k` or up/down: navigate queued items
+    - `d`: delete selected item
+  - When queue item is deleted, TagSystemNotify message sent to adaptor
+  - Task types: `UserPrompt` and `CommandPrompt` with unique queue IDs
+  - QueueItem struct wraps tasks with metadata (QueueID, CreatedAt)
+  - Session stores queue as []QueueItem instead of []Task
+  - Queue items sent via TagSystemData with type "taskqueue_list"
+  - Queue manager overlay rendered using lipgloss compositor (centered)
+  - Shows queue ID, type (P=prompt, C=command), and truncated content
+
 ### Features
 - Execute posix_shell commands through the AI agent
 - Multi-step conversations with tool calls

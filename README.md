@@ -163,6 +163,7 @@ When running the Terminal version:
 | `Ctrl+S` | Save session to file |
 | `Ctrl+O` | Open external editor for multi-line input |
 | `Ctrl+L` | Open model selector UI |
+| `Ctrl+Q` | Open task queue manager UI |
 | `j` | Move window cursor down (when display focused) |
 | `k` | Move window cursor up (when display focused) |
 | `J` | Move screen down (when display focused) |
@@ -187,12 +188,32 @@ The terminal organizes concurrent streams into separate windows with synchronize
 
 A Window Cursor highlights one window with a bright border. Use `j`/`k` to navigate. The cursor stays visible during scrolling and defaults to the newest window. Press `Space` to toggle wrap mode on the active window, which shows only the last 3 lines of content with a `Wrapped - Space to expand` indicator.
 
+## Task Queue Manager
+
+When tasks (prompts or commands) are submitted while a previous task is still running, they are added to a queue. Press `Ctrl+Q` to open the task queue manager:
+
+| Key | Action |
+|-----|--------|
+| `q`, `esc` | Close queue manager |
+| `j`, `↓` | Move selection down |
+| `k`, `↑` | Move selection up |
+| `d` | Delete selected task |
+
+Each queued task displays:
+- Queue ID (Q1, Q2, etc.)
+- Type: `P` (prompt) or `C` (command)
+- Truncated content preview
+
+Queue manager shows real-time queue status and allows you to remove pending tasks before they execute.
+
 ## Session Commands
 
 - `:save [filename]` - Save session to file (uses `--session` path if no filename)
 - `:cancel` - Cancel current request (with confirmation)
 - `:summarize` - Summarize conversation to reduce token usage
 - `:quit`, `:q` - Exit with confirmation
+- `:taskqueue_get_all` - Get all queued tasks (internal use)
+- `:taskqueue_del <id>` - Delete a queued task by ID (internal use)
 
 ## Model Management Commands
 

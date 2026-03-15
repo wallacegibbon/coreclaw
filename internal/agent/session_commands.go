@@ -2,10 +2,13 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // ============================================================================
@@ -30,6 +33,10 @@ func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
 		s.handleModelSet(parts[1:])
 	case "model_load":
 		s.handleModelLoad()
+	case "taskqueue_get_all":
+		s.handleTaskQueueGetAll()
+	case "taskqueue_del":
+		s.handleTaskQueueDel(parts[1:])
 	default:
 		s.writeError(fmt.Sprintf("unknown cmd <%s>", cmd))
 	}
@@ -170,4 +177,64 @@ func (s *Session) handleModelLoad() {
 		return
 	}
 	s.sendSystemInfo()
+}
+
+// handleTaskQueueGetAll sends all queued items to the adaptor via TagSystemData
+func (s *Session) handleTaskQueueGetAll() {
+	items := s.GetQueueItems()
+
+	// Create a serializable representation
+	type QueueItemData struct {
+		QueueID   string `json:"queue_id"`
+		Type      string `json:"type"`
+		Content   string `json:"content"`
+		CreatedAt string `json:"created_at"`
+	}
+
+	data := make([]QueueItemData, len(items))
+	for i, item := range items {
+		var itemType, content string
+		switch t := item.Task.(type) {
+		case UserPrompt:
+			itemType = "prompt"
+			content = t.Text
+		case CommandPrompt:
+			itemType = "command"
+			content = t.Command
+		}
+		data[i] = QueueItemData{
+			QueueID:   item.QueueID,
+			Type:      itemType,
+			Content:   content,
+			CreatedAt: item.CreatedAt.Format(time.RFC3339),
+		}
+	}
+
+	// Send via TagSystemData
+	jsonData, err := json.Marshal(map[string]interface{}{
+		"type":  "taskqueue_list",
+		"items": data,
+	})
+	if err != nil {
+		s.writeError(fmt.Sprintf("failed to marshal queue items: %v", err))
+		return
+	}
+	stream.WriteTLV(s.Output, stream.TagSystemData, string(jsonData))
+	s.Output.Flush()
+}
+
+// handleTaskQueueDel deletes a queue item by ID
+func (s *Session) handleTaskQueueDel(args []string) {
+	if len(args) == 0 {
+		s.writeError("usage: :taskqueue_del <queue_id>")
+		return
+	}
+
+	queueID := args[0]
+	if s.DeleteQueueItem(queueID) {
+		// Send system notification about the deletion
+		s.sendSystemInfo()
+	} else {
+		s.writeError(fmt.Sprintf("queue item %s not found", queueID))
+	}
 }
