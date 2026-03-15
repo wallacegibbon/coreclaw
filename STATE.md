@@ -246,6 +246,7 @@ For this project, simplicity is more important than efficiency.
   - Fixed: 'r' key and external editor edits now properly refresh model list display
     - Removed count-based optimization in LoadModels() that caused timing issues
     - Fixed updateChan signaling to trigger on any model change, not just model switch
+    - Fixed filtered models update to always rebuild after LoadModels() (bypass search cache)
 
 - ✅ **Model selector keyboard handling improvements**
   - Fixed command handling: `q`, `e`, `r` only work when list is focused, not when search input is focused

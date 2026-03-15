@@ -151,6 +151,8 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID string
 		}
 	}
 
+	// Force filtered models update by resetting lastSearchValue
+	ms.lastSearchValue = "\x00"
 	ms.updateFilteredModels()
 	return func() tea.Msg { return nil }
 }
