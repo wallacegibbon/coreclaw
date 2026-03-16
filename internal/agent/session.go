@@ -23,10 +23,72 @@ import (
 	"time"
 
 	"charm.land/fantasy"
+	"charm.land/fantasy/providers/anthropic"
 	"github.com/alayacore/alayacore/internal/app"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/stream"
 )
+
+// anthropicProviderName is the provider name returned by fantasy for Anthropic
+const anthropicProviderName = "anthropic"
+
+// createPrepareStepForCacheControl creates a prepare step function that adds cache control
+// to enable prompt caching for Anthropic-compatible APIs.
+// Strategy: Apply cache_control to the system message to enable caching of the system prompt.
+// This is the primary cache point that persists across conversations.
+func createPrepareStepForCacheControl() fantasy.PrepareStepFunction {
+	return func(ctx context.Context, opts fantasy.PrepareStepFunctionOptions) (context.Context, fantasy.PrepareStepResult, error) {
+		if len(opts.Messages) == 0 {
+			return ctx, fantasy.PrepareStepResult{}, nil
+		}
+
+		// Find and modify the system message (should be first if present)
+		for i, msg := range opts.Messages {
+			if msg.Role == fantasy.MessageRoleSystem && len(msg.Content) > 0 {
+				// Add cache control to the last part of the system message
+				lastPartIdx := len(msg.Content) - 1
+				lastPart := msg.Content[lastPartIdx]
+
+				if textPart, ok := fantasy.AsMessagePart[fantasy.TextPart](lastPart); ok {
+					textPart.ProviderOptions = fantasy.ProviderOptions{
+						anthropicProviderName: &anthropic.ProviderCacheControlOptions{
+							CacheControl: anthropic.CacheControl{Type: "ephemeral"},
+						},
+					}
+					msg.Content[lastPartIdx] = textPart
+					opts.Messages[i] = msg
+				}
+				break // Only process the first system message
+			}
+		}
+
+		return ctx, fantasy.PrepareStepResult{Messages: opts.Messages}, nil
+	}
+}
+
+// getAgentOptions returns the base agent options and adds Anthropic-specific caching options if needed
+func (s *Session) getAgentOptions(model fantasy.LanguageModel) []fantasy.AgentOption {
+	opts := []fantasy.AgentOption{
+		fantasy.WithTools(s.baseTools...),
+		fantasy.WithSystemPrompt(s.systemPrompt),
+	}
+
+	// Add cache control for Anthropic-compatible APIs
+	if model.Provider() == anthropicProviderName {
+		opts = append(opts, fantasy.WithPrepareStep(createPrepareStepForCacheControl()))
+		// TODO: This WithHeaders call is required for prompt caching to work correctly.
+		// Without it, the cache is re-created on every request instead of being read.
+		// The actual header value doesn't matter (both "2023-06-01" and "2023-01-01" work).
+		// The HTTP header shown in debug logs remains "2023-06-01" regardless of this value.
+		// This may be a bug or undocumented behavior in fantasy SDK v0.11.0.
+		// When upgrading fantasy, try removing this code to see if it's still needed.
+		opts = append(opts, fantasy.WithHeaders(map[string]string{
+			"anthropic-version": "2023-06-01",
+		}))
+	}
+
+	return opts
+}
 
 // Task represents a unit of work for the session.
 type Task interface {
@@ -225,11 +287,10 @@ func (s *Session) ensureAgentInitialized() string {
 		return "Failed to create language model: " + err.Error()
 	}
 
+	opts := s.getAgentOptions(model)
+
 	s.mu.Lock()
-	s.Agent = fantasy.NewAgent(model,
-		fantasy.WithTools(s.baseTools...),
-		fantasy.WithSystemPrompt(s.systemPrompt),
-	)
+	s.Agent = fantasy.NewAgent(model, opts...)
 	s.mu.Unlock()
 
 	s.applyModelContextLimit(activeModel)
@@ -238,10 +299,8 @@ func (s *Session) ensureAgentInitialized() string {
 
 // initAgentFromModel creates an agent from a specific model (used by SwitchModel).
 func (s *Session) initAgentFromModel(model fantasy.LanguageModel) {
-	s.Agent = fantasy.NewAgent(model,
-		fantasy.WithTools(s.baseTools...),
-		fantasy.WithSystemPrompt(s.systemPrompt),
-	)
+	opts := s.getAgentOptions(model)
+	s.Agent = fantasy.NewAgent(model, opts...)
 }
 
 // applyModelContextLimit updates the session's ContextLimit from a model config
