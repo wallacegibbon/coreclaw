@@ -19,15 +19,17 @@ LDFLAGS=-ldflags "-X main.Version=$(VERSION)"
 
 all: test build
 
-## build: Build all binaries
+## build: Build main binary
 build:
 	$(GOBUILD) $(LDFLAGS) -o $(MAIN_BINARY) .
+
+## build-web: Build web binary (reference implementation)
+build-web:
 	$(GOBUILD) $(LDFLAGS) -o $(WEB_BINARY) ./cmd/alayacore-web/
 
 ## build-linux: Build for Linux
 build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(MAIN_BINARY)-linux .
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(WEB_BINARY)-linux ./cmd/alayacore-web/
 
 ## build-darwin: Build for macOS
 build-darwin:
@@ -64,9 +66,12 @@ clean:
 	rm -f $(MAIN_BINARY)-darwin-*
 	rm -f coverage.out coverage.html
 
-## install: Install binaries to GOPATH/bin
+## install: Install main binary to GOPATH/bin
 install:
 	$(GOCMD) install $(LDFLAGS) .
+
+## install-web: Install web binary to GOPATH/bin
+install-web:
 	$(GOCMD) install $(LDFLAGS) ./cmd/alayacore-web/
 
 ## mod: Download and tidy modules
