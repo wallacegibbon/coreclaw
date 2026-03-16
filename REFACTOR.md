@@ -111,10 +111,14 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
   - Created `internal/stream/doc.go`
   - Created `internal/errors/doc.go`
 
-- [ ] **Task 7.2**: Create `docs/architecture.md`
-  - Data flow diagram
-  - Component interaction diagram
+- [x] **Task 7.2**: Create `docs/architecture.md` ✅
+  - Architecture overview with ASCII diagrams
+  - Component descriptions
   - TLV protocol specification
+  - Data flow diagrams
+  - Configuration examples
+  - Key design decisions
+  - File organization
 
 ### Phase 8: Code Quality Improvements (Priority: Low)
 
@@ -153,7 +157,7 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | 6.2 | Add tool tests | ⏳ Pending (edit_file_test.go exists) |
 | 6.3 | Add stream tests | ✅ Done |
 | 7.1 | Add package documentation | ✅ Done |
-| 7.2 | Create architecture docs | ⏳ Pending |
+| 7.2 | Create architecture docs | ✅ Done |
 | 8.1 | Add golangci-lint config | ✅ Done |
 | 8.2 | Add pre-commit hooks | ⏳ Pending |
 

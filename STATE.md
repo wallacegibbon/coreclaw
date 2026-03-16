@@ -318,6 +318,13 @@ For this project, simplicity is more important than efficiency.
   - Tests for WindowBuffer operations (append, update, multiple windows)
   - Tests for viewport and virtual scrolling
 
+- ✅ **Architecture documentation (Phase 7.2 of REFACTOR.md)**
+  - Created `docs/architecture.md` with comprehensive architecture overview
+  - ASCII diagrams for layered architecture and data flow
+  - TLV protocol specification with all tags
+  - Component descriptions and file organization
+  - Key design decisions documented
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes
