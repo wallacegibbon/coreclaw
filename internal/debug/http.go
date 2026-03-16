@@ -64,7 +64,8 @@ func newDebugWriter() io.Writer {
 		logName := fmt.Sprintf("%s-%d.log", baseName, i)
 		logPath := filepath.Join(execDir, logName)
 		if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644); err == nil {
-			log.Printf("Debug log started: %s\n", filepath.Base(logPath))
+			// Write the start message directly to the file, not to stderr
+			fmt.Fprintf(f, "Debug log started: %s\n", filepath.Base(logPath))
 			return f
 		}
 	}
