@@ -18,7 +18,6 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -303,7 +302,7 @@ func (s *Session) readFromInput() {
 			return // Input closed
 		}
 		if tag != stream.TagTextUser {
-			s.writeError(fmt.Sprintf("Invalid input tag: %s (only %s is allowed)", tag, stream.TagTextUser))
+			s.writeErrorf("Invalid input tag: %s (only %s is allowed)", tag, stream.TagTextUser)
 			continue
 		}
 		if len(value) > 0 && value[0] == ':' {

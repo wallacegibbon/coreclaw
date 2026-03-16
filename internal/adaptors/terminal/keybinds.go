@@ -67,14 +67,14 @@ var confirmDialogKeyBindings = []KeyBinding{
 // Key string constants (as reported by tea.KeyMsg.String())
 const (
 	// Navigation keys
-	KeyTab     = "tab"
-	KeyEnter   = "enter"
-	KeyEsc     = "esc"
-	KeySpace   = "space"
-	KeyUp      = "up"
-	KeyDown    = "down"
-	KeyLeft    = "left"
-	KeyRight   = "right"
+	KeyTab   = "tab"
+	KeyEnter = "enter"
+	KeyEsc   = "esc"
+	KeySpace = "space"
+	KeyUp    = "up"
+	KeyDown  = "down"
+	KeyLeft  = "left"
+	KeyRight = "right"
 
 	// Letter keys
 	KeyA = "a"

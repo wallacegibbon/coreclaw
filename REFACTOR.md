@@ -37,13 +37,17 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
   - `session_output.go` now includes usage tracking and message cleanup (94→178 lines)
   - `session_prompt.go` is now focused on prompt processing logic
 
-- [ ] **Task 2.2**: Create `session_errors.go`
-  - Centralize error handling patterns
-  - `writeError()`, `writeErrorf()`, `writeNotify()`
+- [x] **Task 2.2**: Create `session_errors.go` ✅
+  - Added `writeErrorf()` and `writeNotifyf()` formatted helpers in `session_output.go`
+  - Updated all callers to use formatted helpers
+  - Removed unused `fmt` imports from `session.go`, `session_commands.go`, `session_prompt.go`
 
-- [ ] **Task 2.3**: Create `command_registry.go`
-  - Registry pattern for commands
-  - Declarative command registration
+- [x] **Task 2.3**: Create `command_registry.go` ✅
+  - Registry pattern for commands with declarative registration
+  - `Command` struct with name, description, usage, and handler
+  - `CommandRegistry` with Register, Get, and List methods
+  - `dispatchCommand` method for registry-based dispatch
+  - Updated `handleCommandSync` to use registry
 
 ### Phase 3: Constants and Styles Organization (Priority: Low)
 
@@ -113,10 +117,8 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | 1.2 | Extract key bindings | ✅ Done |
 | 1.3 | Reduce terminal.go | ✅ Done |
 | 2.1 | Extract streaming/output helpers | ✅ Done |
-| 2.2 | Create session_errors.go | ⏳ Pending |
-| 2.1 | Extract session_streaming.go | ⏳ Pending |
-| 2.2 | Create session_errors.go | ⏳ Pending |
-| 2.3 | Create command_registry.go | ⏳ Pending |
+| 2.2 | Add formatted error helpers | ✅ Done |
+| 2.3 | Create command_registry.go | ✅ Done |
 | 3.1 | Consolidate constants.go | ⏳ Pending |
 | 3.2 | Refactor styles.go | ⏳ Pending |
 | 4.1 | Create SessionInterface | ⏳ Pending |

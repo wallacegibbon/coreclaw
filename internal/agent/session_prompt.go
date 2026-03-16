@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"sync/atomic"
 
@@ -44,8 +43,8 @@ func (s *Session) shouldAutoSummarize() bool {
 // autoSummarize performs synchronous summarization to reduce context
 func (s *Session) autoSummarize(ctx context.Context) {
 	usage := float64(s.ContextTokens) * 100 / float64(s.ContextLimit)
-	s.writeNotify(fmt.Sprintf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
-		s.ContextTokens, s.ContextLimit, usage))
+	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
+		s.ContextTokens, s.ContextLimit, usage)
 	s.summarize(ctx)
 }
 

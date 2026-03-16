@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"charm.land/fantasy"
 	"github.com/alayacore/alayacore/internal/stream"
@@ -23,8 +24,18 @@ func (s *Session) writeError(msg string) {
 	s.writeGapped(stream.TagSystemError, msg)
 }
 
+// writeErrorf writes a formatted error message
+func (s *Session) writeErrorf(format string, args ...any) {
+	s.writeError(fmt.Sprintf(format, args...))
+}
+
 func (s *Session) writeNotify(msg string) {
 	s.writeGapped(stream.TagSystemNotify, msg)
+}
+
+// writeNotifyf writes a formatted notification message
+func (s *Session) writeNotifyf(format string, args ...any) {
+	s.writeNotify(fmt.Sprintf(format, args...))
 }
 
 func (s *Session) writeGapped(tag string, msg string) {

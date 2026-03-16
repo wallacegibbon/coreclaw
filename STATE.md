@@ -257,6 +257,19 @@ For this project, simplicity is more important than efficiency.
   - Moved focus functions from `keys.go` (352→281 lines) and `terminal.go` (324→293 lines)
   - Contains: toggleFocus, focusInput, focusDisplay, openModelSelector, openQueueManager, handleBlur, handleFocus, restoreFocusAfter*
 
+- ✅ **Session output refactoring (Phase 2.1-2.2 of REFACTOR.md)**
+  - Moved `trackUsage` and `cleanIncompleteToolCalls` from `session_prompt.go` (189→107 lines)
+  - `session_output.go` now includes usage tracking and message cleanup (94→186 lines)
+  - Added `writeErrorf()` and `writeNotifyf()` formatted helpers
+  - Updated all callers to use formatted helpers, removed unused `fmt` imports
+
+- ✅ **Command registry pattern (Phase 2.3 of REFACTOR.md)**
+  - Created `command_registry.go` with declarative command registration
+  - `Command` struct with name, description, usage, and handler
+  - `CommandRegistry` with Register, Get, and List methods
+  - `dispatchCommand` method for registry-based dispatch
+  - Updated `handleCommandSync` to use registry-based dispatch
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes

@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -23,24 +22,13 @@ func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
 		return
 	}
 
-	switch parts[0] {
-	case "summarize":
-		s.summarize(ctx)
-	case "cancel":
-		s.cancelTask()
-	case "save":
-		s.saveSession(parts[1:])
-	case "model_set":
-		s.handleModelSet(parts[1:])
-	case "model_load":
-		s.handleModelLoad()
-	case "taskqueue_get_all":
-		s.handleTaskQueueGetAll()
-	case "taskqueue_del":
-		s.handleTaskQueueDel(parts[1:])
-	default:
-		s.writeError(fmt.Sprintf("unknown cmd <%s>", cmd))
+	// Try registry-based dispatch first
+	if s.dispatchCommand(ctx, cmd) {
+		return
 	}
+
+	// Unknown command
+	s.writeErrorf("unknown cmd <%s>", parts[0])
 }
 
 func (s *Session) cancelTask() {
@@ -103,9 +91,9 @@ func (s *Session) saveSession(args []string) {
 	}
 
 	if err := s.saveSessionToFile(path); err != nil {
-		s.writeError(fmt.Sprintf("failed to save session: %v", err))
+		s.writeErrorf("failed to save session: %v", err)
 	} else {
-		s.writeNotify(fmt.Sprintf("Session saved to %s", path))
+		s.writeNotifyf("Session saved to %s", path)
 	}
 }
 
@@ -127,7 +115,7 @@ func (s *Session) handleModelSet(args []string) {
 	modelID := args[0]
 	model := s.ModelManager.GetModel(modelID)
 	if model == nil {
-		s.writeError(fmt.Sprintf("model not found: %s", modelID))
+		s.writeErrorf("model not found: %s", modelID)
 		return
 	}
 
@@ -165,7 +153,7 @@ func (s *Session) handleModelSet(args []string) {
 	s.SwitchModel(newModel, model)
 
 	// Send notification
-	s.writeNotify("Switched to model: " + model.Name + " (" + model.ModelName + ")")
+	s.writeNotifyf("Switched to model: %s (%s)", model.Name, model.ModelName)
 }
 
 func (s *Session) handleModelLoad() {
@@ -181,7 +169,7 @@ func (s *Session) handleModelLoad() {
 	}
 
 	if err := s.ModelManager.LoadFromFile(path); err != nil {
-		s.writeError(fmt.Sprintf("failed to load models: %v", err))
+		s.writeErrorf("failed to load models: %v", err)
 		return
 	}
 
@@ -211,7 +199,7 @@ func (s *Session) handleModelLoad() {
 
 		// Switch to the model
 		s.SwitchModel(newModel, active)
-		s.writeNotify("Loaded models and switched to: " + active.Name)
+		s.writeNotifyf("Loaded models and switched to: %s", active.Name)
 		return
 	}
 	s.sendSystemInfo()
@@ -254,7 +242,7 @@ func (s *Session) handleTaskQueueGetAll() {
 		"items": data,
 	})
 	if err != nil {
-		s.writeError(fmt.Sprintf("failed to marshal queue items: %v", err))
+		s.writeErrorf("failed to marshal queue items: %v", err)
 		return
 	}
 	stream.WriteTLV(s.Output, stream.TagSystemData, string(jsonData))
@@ -273,6 +261,6 @@ func (s *Session) handleTaskQueueDel(args []string) {
 		// Send system notification about the deletion
 		s.sendSystemInfo()
 	} else {
-		s.writeError(fmt.Sprintf("queue item %s not found", queueID))
+		s.writeErrorf("queue item %s not found", queueID)
 	}
 }
