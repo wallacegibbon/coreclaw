@@ -106,9 +106,9 @@ func (ms *ModelSelector) Close() {
 func (ms *ModelSelector) SetSize(width, height int) {
 	if width > 0 {
 		ms.width = width
-		ms.searchInput.SetWidth(max(0, width-8))
+		ms.searchInput.SetWidth(max(0, width-InputPaddingH))
 	}
-	ms.height = min(height-4, 30)
+	ms.height = min(height-LayoutGap, SelectorMaxHeight)
 }
 
 // --- Model Management ---
@@ -374,7 +374,7 @@ func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHe
 	x := max(0, (screenWidth-boxWidth)/2)
 
 	// Position above the input box (input box is ~3 lines, status bar is 1 line)
-	inputAreaHeight := 4 // input box (3 lines) + status bar (1 line)
+	inputAreaHeight := LayoutGap // input box (3 lines) + status bar (1 line)
 	y := max(0, screenHeight-boxHeight-inputAreaHeight)
 
 	c := lipgloss.NewCompositor(

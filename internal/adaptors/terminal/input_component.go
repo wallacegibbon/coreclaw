@@ -166,7 +166,7 @@ func (m InputModel) RenderWithBorder(confirmDialog bool, confirmText string) str
 // SetWidth sets the input width
 func (m *InputModel) SetWidth(width int) {
 	m.width = width
-	m.input.SetWidth(max(0, width-8))
+	m.input.SetWidth(max(0, width-InputPaddingH))
 }
 
 // CursorEnd moves cursor to end

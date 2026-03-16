@@ -51,13 +51,14 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 
 ### Phase 3: Constants and Styles Organization (Priority: Low)
 
-- [ ] **Task 3.1**: Consolidate `constants.go`
-  - Move all magic numbers and timing constants
-  - Move color palette definitions
+- [x] **Task 3.1**: Consolidate `constants.go` ✅
+  - Added `InputPaddingH` and `SelectorMaxHeight` constants
+  - Updated model_selector.go and input_component.go to use constants
+  - Added `ColorSurface1` to color palette
 
-- [ ] **Task 3.2**: Refactor `styles.go`
-  - Keep only style composition
-  - Remove color definitions (move to constants.go)
+- [x] **Task 3.2**: Refactor `styles.go` ✅
+  - Moved all color constants to `constants.go`
+  - `styles.go` now contains only style composition
 
 ### Phase 4: Interface Improvements (Priority: Medium)
 
@@ -119,8 +120,8 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | 2.1 | Extract streaming/output helpers | ✅ Done |
 | 2.2 | Add formatted error helpers | ✅ Done |
 | 2.3 | Create command_registry.go | ✅ Done |
-| 3.1 | Consolidate constants.go | ⏳ Pending |
-| 3.2 | Refactor styles.go | ⏳ Pending |
+| 3.1 | Consolidate constants.go | ✅ Done |
+| 3.2 | Refactor styles.go | ✅ Done |
 | 4.1 | Create SessionInterface | ⏳ Pending |
 | 4.2 | Create OutputWriter interface | ⏳ Pending |
 | 5.1 | Define domain errors | ⏳ Pending |

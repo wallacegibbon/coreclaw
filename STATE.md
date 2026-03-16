@@ -270,6 +270,16 @@ For this project, simplicity is more important than efficiency.
   - `dispatchCommand` method for registry-based dispatch
   - Updated `handleCommandSync` to use registry-based dispatch
 
+- ✅ **Constants consolidation (Phase 3.1 of REFACTOR.md)**
+  - Added `InputPaddingH` and `SelectorMaxHeight` layout constants
+  - Added `ColorSurface1` to Catppuccin color palette
+  - Updated model_selector.go and input_component.go to use constants
+  - Updated terminal_editor_test.go to use color constant
+
+- ✅ **Styles refactoring (Phase 3.2 of REFACTOR.md)**
+  - Moved all color constants from `styles.go` to `constants.go`
+  - `styles.go` now contains only style composition (Styles struct, DefaultStyles, RenderBorderedBox)
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes

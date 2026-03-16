@@ -225,7 +225,7 @@ func TestWordwrapPreservesANSI(t *testing.T) {
 	// Note: lipgloss.SetColorProfile is no longer needed in v2
 
 	// Create a styled line with ANSI escape sequences (dimmed reasoning style)
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color("#585b70")).Italic(true)
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSurface1)).Italic(true)
 	styledText := style.Render("This is a long line of reasoning text that should wrap when width is limited.")
 
 	// Test wrapping at various widths
