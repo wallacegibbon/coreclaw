@@ -245,6 +245,13 @@ For this project, simplicity is more important than efficiency.
   - `window_scroll.go` (158 lines) - Virtual scrolling and cursor management
   - All tests pass after refactoring
 
+- ✅ **Key binding refactoring (Phase 1.2 of REFACTOR.md)**
+  - Created `keybinds.go` (174 lines) with declarative key binding system
+  - Key constants for all key strings (single source of truth, avoids typos)
+  - KeyBinding struct with descriptions for future help text generation
+  - Grouped bindings by context: global, display, model-selector, queue-manager, confirm-dialog
+  - Updated `keys.go` (352 lines) to use key constants
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes

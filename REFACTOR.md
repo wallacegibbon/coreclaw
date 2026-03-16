@@ -18,9 +18,12 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
   - `window_diff.go` - Diff display functionality (140 lines)
   - `window_scroll.go` - Virtual scrolling and cursor management (158 lines)
 
-- [ ] **Task 1.2**: Extract key binding configuration
-  - Create `keybinds.go` with declarative key binding system
-  - Reduce repetitive patterns in `keys.go`
+- [x] **Task 1.2**: Extract key binding configuration ✅
+  - Created `keybinds.go` with declarative key binding system (174 lines)
+  - Key constants for all key strings (avoids typos)
+  - KeyBinding struct with descriptions for help generation
+  - Grouped bindings: global, display, model-selector, queue-manager, confirm-dialog
+  - Updated `keys.go` to use key constants
 
 - [ ] **Task 1.3**: Reduce `terminal.go` size
   - Extract `focus_manager.go` for focus state management
@@ -105,7 +108,7 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | Phase | Task | Status |
 |-------|------|--------|
 | 1.1 | Split window.go | ✅ Done |
-| 1.2 | Extract key bindings | ⏳ Pending |
+| 1.2 | Extract key bindings | ✅ Done |
 | 1.3 | Reduce terminal.go | ⏳ Pending |
 | 2.1 | Extract session_streaming.go | ⏳ Pending |
 | 2.2 | Create session_errors.go | ⏳ Pending |

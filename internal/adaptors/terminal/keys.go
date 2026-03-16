@@ -28,7 +28,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// 4. Tab toggles focus between display and input
-	if msg.String() == "tab" {
+	if msg.String() == KeyTab {
 		m.toggleFocus()
 		return m, nil
 	}
@@ -79,7 +79,7 @@ func (m *Terminal) handleModelSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 // handleQueueManagerKeys handles input when queue manager is open.
 func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle 'd' key for delete
-	if msg.String() == "d" {
+	if msg.String() == KeyD {
 		selectedItem := m.queueManager.GetSelectedItem()
 		if selectedItem != nil {
 			// Send delete command to session
@@ -116,12 +116,12 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 // handleQuitConfirm handles the quit confirmation dialog.
 func (m *Terminal) handleQuitConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
-	case "y", "Y":
+	case KeyY, "Y":
 		m.quitting = true
 		m.streamInput.Close()
 		m.out.Close()
 		return tea.Quit, true
-	case "n", "N", "esc", "ctrl+c":
+	case KeyN, "N", KeyEsc, KeyCtrlC:
 		m.confirmDialog = false
 		m.input.SetValue("")
 		return nil, true
@@ -132,13 +132,13 @@ func (m *Terminal) handleQuitConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
 // handleCancelConfirm handles the cancel confirmation dialog.
 func (m *Terminal) handleCancelConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
-	case "y", "Y":
+	case KeyY, "Y":
 		m.cancelConfirmDialog = false
 		if m.cancelFromCommand {
 			m.input.SetValue("")
 		}
 		return m.submitCommand("cancel", m.cancelFromCommand), true
-	case "n", "N", "esc", "ctrl+c":
+	case KeyN, "N", KeyEsc, KeyCtrlC:
 		m.cancelConfirmDialog = false
 		if m.cancelFromCommand {
 			m.input.SetValue("")
@@ -154,61 +154,61 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 	// Window cursor navigation
 	switch keyStr {
-	case "j":
+	case KeyJ:
 		if m.display.MoveWindowCursorDown() {
 			m.display.updateContent()
 			m.display.EnsureCursorVisible()
 		}
 		return nil, true
 
-	case "k":
+	case KeyK:
 		if m.display.MoveWindowCursorUp() {
 			m.display.updateContent()
 			m.display.EnsureCursorVisible()
 		}
 		return nil, true
 
-	case "J":
+	case KeyShiftJ:
 		m.display.MarkUserScrolled()
 		m.display.ScrollDown(1)
 		return nil, true
 
-	case "K":
+	case KeyShiftK:
 		m.display.MarkUserScrolled()
 		m.display.ScrollUp(1)
 		return nil, true
 
-	case "H":
+	case KeyShiftH:
 		if m.display.MoveWindowCursorToTop() {
 			m.display.updateContent()
 		}
 		return nil, true
 
-	case "L":
+	case KeyShiftL:
 		if m.display.MoveWindowCursorToBottom() {
 			m.display.updateContent()
 		}
 		return nil, true
 
-	case "M":
+	case KeyShiftM:
 		if m.display.MoveWindowCursorToCenter() {
 			m.display.updateContent()
 		}
 		return nil, true
 
-	case "G":
+	case KeyG:
 		m.display.GotoBottom()
 		m.display.SetCursorToLastWindow()
 		m.display.updateContent()
 		return nil, true
 
-	case "g":
+	case Keyg:
 		m.display.GotoTop()
 		m.display.SetWindowCursor(0)
 		m.display.updateContent()
 		return nil, true
 
-	case ":":
+	case KeyColon:
 		// Switch to input with ":" prefix for command mode
 		m.focusedWindow = "input"
 		m.input.Focus()
@@ -216,7 +216,7 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.input.CursorEnd()
 		return nil, true
 
-	case "space":
+	case KeySpace:
 		if m.display.ToggleWindowWrap() {
 			m.display.updateContent()
 		}
@@ -229,37 +229,37 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 // handleGlobalKeys handles global keyboard shortcuts.
 func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
-	case "ctrl+g":
+	case KeyCtrlG:
 		m.cancelConfirmDialog = true
 		m.cancelFromCommand = false
 		return nil, true
 
-	case "ctrl+c":
+	case KeyCtrlC:
 		if m.focusedWindow == "input" {
 			m.input.SetValue("")
 			m.input.editorContent = ""
 		}
 		return nil, true
 
-	case "ctrl+u":
+	case KeyCtrlU:
 		// Reserved for future use
 		return nil, true
 
-	case "ctrl+s":
+	case KeyCtrlS:
 		return m.submitCommand("save", false), true
 
-	case "ctrl+o":
+	case KeyCtrlO:
 		return m.input.OpenEditor(), true
 
-	case "ctrl+l":
+	case KeyCtrlL:
 		m.openModelSelector()
 		return nil, true
 
-	case "ctrl+q":
+	case KeyCtrlQ:
 		m.openQueueManager()
 		return nil, true
 
-	case "enter":
+	case KeyEnter:
 		return m.handleSubmit(), true
 	}
 
