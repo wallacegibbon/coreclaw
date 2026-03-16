@@ -91,8 +91,8 @@ func (ms *ModelSelector) Open() {
 	ms.state = ModelSelectorList
 	ms.searchInput.SetValue("")
 	ms.lastSearchValue = "\x00" // Force update
-	ms.searchInputFocused = true
-	ms.searchInput.Focus()
+	ms.searchInputFocused = false
+	ms.searchInput.Blur()
 	ms.updateSearchInputStyles()
 	ms.scrollIdx = 0
 	ms.updateFilteredModels()
@@ -299,41 +299,43 @@ func (ms *ModelSelector) renderList() string {
 	var sb strings.Builder
 
 	// Search input with border
-	borderColor := "#89d4fa"
+	searchBorderColor := "#89d4fa"
 	if !ms.searchInputFocused {
-		borderColor = "#45475a"
+		searchBorderColor = "#45475a"
 	}
-	searchBox := ms.styles.RenderBorderedBox(ms.searchInput.View(), ms.width, borderColor)
+	searchBox := ms.styles.RenderBorderedBox(ms.searchInput.View(), ms.width, searchBorderColor)
 
 	sb.WriteString(searchBox)
-	sb.WriteString("\n\n")
+	sb.WriteString("\n")
 
 	// Show current model if set
 	if ms.activeModel != nil {
 		sb.WriteString(ms.styles.System.Render("Current: "))
 		sb.WriteString(ms.styles.Text.Render(ms.activeModel.Name))
-		sb.WriteString("\n\n")
+		sb.WriteString("\n")
 	}
 
-	// Model list
-	sb.WriteString(ms.renderModelList(lipgloss.Width(searchBox)))
-	sb.WriteString("\n")
+	// Model list - bright border when list is focused
+	listBorderColor := "#89d4fa"
+	if ms.searchInputFocused {
+		listBorderColor = "#45475a"
+	}
+	sb.WriteString(ms.renderModelList(lipgloss.Width(searchBox), listBorderColor))
 
-	// Help text
-	sb.WriteString(ms.styles.System.Render("─── Commands ───"))
+	// Compact command help
 	sb.WriteString("\n")
 	if ms.searchInputFocused {
-		sb.WriteString(ms.styles.System.Render("tab: list  enter: select  ctrl+c: clear  esc: close"))
+		sb.WriteString(ms.styles.System.Render("tab: list │ enter: select │ esc: close"))
 	} else {
-		sb.WriteString(ms.styles.System.Render("tab: search  j/k: navigate  e: edit  r: reload  enter: select  q/esc: close"))
+		sb.WriteString(ms.styles.System.Render("tab: search │ j/k: nav │ e: edit │ enter: select │ q/esc: close"))
 	}
 
 	return sb.String()
 }
 
-func (ms *ModelSelector) renderModelList(width int) string {
+func (ms *ModelSelector) renderModelList(width int, borderColor string) string {
 	var content strings.Builder
-	listHeight := 15
+	listHeight := 8 // 8 content rows inside border
 
 	if len(ms.models) == 0 {
 		content.WriteString(ms.styles.System.Render("No models configured."))
@@ -346,14 +348,17 @@ func (ms *ModelSelector) renderModelList(width int) string {
 		for i := ms.scrollIdx; i < min(ms.scrollIdx+listHeight, len(ms.filteredModels)); i++ {
 			m := ms.filteredModels[i]
 			if i == ms.selectedIdx && !ms.searchInputFocused {
-				content.WriteString(fmt.Sprintf("> %s\n", ms.styles.Text.Render(m.Name)))
+				content.WriteString(fmt.Sprintf("> %s", ms.styles.Text.Render(m.Name)))
 			} else {
-				content.WriteString(fmt.Sprintf("  %s\n", ms.styles.System.Render(m.Name)))
+				content.WriteString(fmt.Sprintf("  %s", ms.styles.System.Render(m.Name)))
+			}
+			if i < min(ms.scrollIdx+listHeight, len(ms.filteredModels))-1 {
+				content.WriteString("\n")
 			}
 		}
 	}
 
-	return ms.styles.RenderBorderedBox(content.String(), width, "#45475a", listHeight+2)
+	return ms.styles.RenderBorderedBox(content.String(), width, borderColor, listHeight)
 }
 
 func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
@@ -365,8 +370,12 @@ func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHe
 	boxWidth := lipgloss.Width(box)
 	boxHeight := lipgloss.Height(box)
 
+	// Center horizontally
 	x := max(0, (screenWidth-boxWidth)/2)
-	y := max(0, (screenHeight-boxHeight)/2)
+
+	// Position above the input box (input box is ~3 lines, status bar is 1 line)
+	inputAreaHeight := 4 // input box (3 lines) + status bar (1 line)
+	y := max(0, screenHeight-boxHeight-inputAreaHeight)
 
 	c := lipgloss.NewCompositor(
 		lipgloss.NewLayer(baseContent),

@@ -157,7 +157,7 @@ func (m InputModel) RenderWithBorder(confirmDialog bool, confirmText string) str
 	m.input.SetStyles(styles)
 
 	if confirmDialog {
-		return m.styles.RenderBorderedBox(confirmText, m.width, borderColor)
+		return m.styles.RenderBorderedBox(m.styles.Confirm.Render(confirmText), m.width, borderColor)
 	}
 
 	return m.styles.RenderBorderedBox(m.input.View(), m.width, borderColor)

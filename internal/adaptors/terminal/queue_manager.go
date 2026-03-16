@@ -105,14 +105,14 @@ func (qm *QueueManager) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	case "j", "down":
 		if len(qm.items) > 0 && qm.selectedIdx < len(qm.items)-1 {
 			qm.selectedIdx++
-			qm.updateScroll()
+			qm.updateScrollForHeight(8)
 		}
 		return nil
 
 	case "k", "up":
 		if qm.selectedIdx > 0 {
 			qm.selectedIdx--
-			qm.updateScroll()
+			qm.updateScrollForHeight(8)
 		}
 		return nil
 
@@ -124,29 +124,15 @@ func (qm *QueueManager) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-func (qm *QueueManager) updateScroll() {
-	visibleHeight := qm.height - 6 // Account for header and footer
-	if visibleHeight < 1 {
-		visibleHeight = 1
-	}
-
-	// Scroll down if selection is below visible area
-	if qm.selectedIdx >= qm.scrollIdx+visibleHeight {
-		qm.scrollIdx = qm.selectedIdx - visibleHeight + 1
-	}
-
-	// Scroll up if selection is above visible area
-	if qm.selectedIdx < qm.scrollIdx {
-		qm.scrollIdx = qm.selectedIdx
-	}
-}
-
 // --- Rendering ---
 
 func (qm *QueueManager) View() string {
 	if qm.state == QueueManagerClosed {
 		return ""
 	}
+
+	listHeight := 8 // 8 content rows inside border
+	maxItems := 6   // Leave 2 rows for blank line + help footer
 
 	// Build content
 	var lines []string
@@ -155,12 +141,9 @@ func (qm *QueueManager) View() string {
 		emptyStyle := qm.styles.System
 		lines = append(lines, emptyStyle.Render("  No queued tasks"))
 	} else {
-		visibleHeight := qm.height - 6
-		if visibleHeight < 1 {
-			visibleHeight = 1
-		}
+		qm.updateScrollForHeight(maxItems)
 
-		endIdx := qm.scrollIdx + visibleHeight
+		endIdx := qm.scrollIdx + maxItems
 		if endIdx > len(qm.items) {
 			endIdx = len(qm.items)
 		}
@@ -171,14 +154,30 @@ func (qm *QueueManager) View() string {
 		}
 	}
 
-	// Footer with key hints
+	// Pad lines to ensure footer is always at the bottom
+	for len(lines) < maxItems {
+		lines = append(lines, "")
+	}
+
+	// Footer with key hints (always at the bottom)
 	lines = append(lines, "")
-	footer := qm.styles.System.Render("  q: close  j/k: navigate  d: delete")
-	lines = append(lines, footer)
+	lines = append(lines, qm.styles.System.Render("  j/k: navigate  d: delete  q: close"))
 
 	// Wrap in border with same style as input box
 	content := strings.Join(lines, "\n")
-	return qm.styles.RenderBorderedBox(content, qm.width, "#89d4fa")
+	return qm.styles.RenderBorderedBox(content, qm.width, "#89d4fa", listHeight)
+}
+
+func (qm *QueueManager) updateScrollForHeight(height int) {
+	// Scroll down if selection is below visible area
+	if qm.selectedIdx >= qm.scrollIdx+height {
+		qm.scrollIdx = qm.selectedIdx - height + 1
+	}
+
+	// Scroll up if selection is above visible area
+	if qm.selectedIdx < qm.scrollIdx {
+		qm.scrollIdx = qm.selectedIdx
+	}
 }
 
 func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
@@ -220,8 +219,12 @@ func (qm *QueueManager) RenderOverlay(baseContent string, screenWidth, screenHei
 	boxWidth := lipgloss.Width(box)
 	boxHeight := lipgloss.Height(box)
 
+	// Center horizontally
 	x := max(0, (screenWidth-boxWidth)/2)
-	y := max(0, (screenHeight-boxHeight)/2)
+
+	// Position above the input box (input box is ~3 lines, status bar is 1 line)
+	inputAreaHeight := 4 // input box (3 lines) + status bar (1 line)
+	y := max(0, screenHeight-boxHeight-inputAreaHeight)
 
 	c := lipgloss.NewCompositor(
 		lipgloss.NewLayer(baseContent),
