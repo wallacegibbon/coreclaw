@@ -313,6 +313,11 @@ For this project, simplicity is more important than efficiency.
   - Updated command_registry.go to use domain errors
   - All error messages now use SessionError type with operation context
 
+- ✅ **Window buffer tests (Phase 6.1 of REFACTOR.md)**
+  - Created `internal/adaptors/terminal/window_test.go`
+  - Tests for WindowBuffer operations (append, update, multiple windows)
+  - Tests for viewport and virtual scrolling
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes

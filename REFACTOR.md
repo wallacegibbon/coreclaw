@@ -88,8 +88,11 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 
 ### Phase 6: Test Coverage Improvements (Priority: High)
 
-- [ ] **Task 6.1**: Add terminal adaptor tests
-  - `terminal_test.go`, `window_test.go`, `keys_test.go`
+- [x] **Task 6.1**: Add terminal adaptor tests ✅
+  - Created `internal/adaptors/terminal/window_test.go`
+  - Tests for WindowBuffer operations (append, update, multiple windows)
+  - Tests for viewport and virtual scrolling
+  - Tests for diff content
 
 - [ ] **Task 6.2**: Add tool tests
   - `read_file_test.go`, `write_file_test.go`, `posix_shell_test.go`, `activate_skill_test.go`
@@ -146,7 +149,7 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | 4.2 | Create OutputWriter interface | ✅ Done |
 | 5.1 | Define domain errors | ✅ Done |
 | 5.2 | Use structured errors | ✅ Done |
-| 6.1 | Add terminal adaptor tests | ⏳ Pending |
+| 6.1 | Add terminal adaptor tests | ✅ Done |
 | 6.2 | Add tool tests | ⏳ Pending (edit_file_test.go exists) |
 | 6.3 | Add stream tests | ✅ Done |
 | 7.1 | Add package documentation | ✅ Done |
