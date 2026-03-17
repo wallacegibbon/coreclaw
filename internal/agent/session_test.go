@@ -73,9 +73,10 @@ func TestLoadOrNewSession(t *testing.T) {
 	var model fantasy.LanguageModel
 	baseTools := []fantasy.AgentTool{}
 	systemPrompt := "test system prompt"
+	extraSystemPrompt := ""
 
 	// Test creating a new session without specifying session file
-	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, &stream.NopInput{}, &stream.NopOutput{}, "", "", "", false, "")
+	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, extraSystemPrompt, &stream.NopInput{}, &stream.NopOutput{}, "", "", "", false, "")
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 	}

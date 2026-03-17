@@ -32,50 +32,90 @@ import (
 // anthropicProviderName is the provider name returned by fantasy for Anthropic
 const anthropicProviderName = "anthropic"
 
-// createPrepareStepForCacheControl creates a prepare step function that adds cache control
-// to enable prompt caching for Anthropic-compatible APIs.
-// Strategy: Apply cache_control to the system message to enable caching of the system prompt.
-// This is the primary cache point that persists across conversations.
-func createPrepareStepForCacheControl() fantasy.PrepareStepFunction {
+// insertExtraSystemPrompt inserts the extra system prompt as a second system message.
+func insertExtraSystemPrompt(messages []fantasy.Message, extraSystemPrompt string) []fantasy.Message {
+	if extraSystemPrompt == "" || len(messages) == 0 {
+		return messages
+	}
+
+	extraMsg := fantasy.NewSystemMessage(extraSystemPrompt)
+	// Find the position after the first system message
+	insertIdx := 0
+	for i, msg := range messages {
+		if msg.Role == fantasy.MessageRoleSystem {
+			insertIdx = i + 1
+			break
+		}
+	}
+	// Insert the extra system message
+	return append(messages[:insertIdx], append([]fantasy.Message{extraMsg}, messages[insertIdx:]...)...)
+}
+
+// addCacheControlToSystemMessages adds cache_control to the first 2 system messages.
+func addCacheControlToSystemMessages(messages []fantasy.Message) {
+	systemCount := 0
+	for i, msg := range messages {
+		if msg.Role == fantasy.MessageRoleSystem && len(msg.Content) > 0 {
+			systemCount++
+			if systemCount > 2 {
+				break
+			}
+			lastPartIdx := len(msg.Content) - 1
+			lastPart := msg.Content[lastPartIdx]
+			if textPart, ok := fantasy.AsMessagePart[fantasy.TextPart](lastPart); ok {
+				textPart.ProviderOptions = fantasy.ProviderOptions{
+					anthropicProviderName: &anthropic.ProviderCacheControlOptions{
+						CacheControl: anthropic.CacheControl{Type: "ephemeral"},
+					},
+				}
+				msg.Content[lastPartIdx] = textPart
+				messages[i] = msg
+			}
+		}
+	}
+}
+
+// createPrepareStep creates a prepare step function.
+// Note: We combine extra system prompt insertion and cache_control into a single prepare step
+// because fantasy's WithPrepareStep only supports ONE prepare step (later calls overwrite earlier ones).
+// Conceptually these are two independent features:
+//   - --system flag: inserts extra system prompt
+//   - prompt_cache: adds cache_control markers for Anthropic
+//
+// They are combined here due to the API limitation, not because they're related.
+func createPrepareStep(extraSystemPrompt string, needCacheMarkers bool) fantasy.PrepareStepFunction {
 	return func(ctx context.Context, opts fantasy.PrepareStepFunctionOptions) (context.Context, fantasy.PrepareStepResult, error) {
 		if len(opts.Messages) == 0 {
 			return ctx, fantasy.PrepareStepResult{}, nil
 		}
 
-		// Find and modify the system message (should be first if present)
-		for i, msg := range opts.Messages {
-			if msg.Role == fantasy.MessageRoleSystem && len(msg.Content) > 0 {
-				// Add cache control to the last part of the system message
-				lastPartIdx := len(msg.Content) - 1
-				lastPart := msg.Content[lastPartIdx]
+		// Step 1: Insert extra system prompt if provided
+		if extraSystemPrompt != "" {
+			opts.Messages = insertExtraSystemPrompt(opts.Messages, extraSystemPrompt)
+		}
 
-				if textPart, ok := fantasy.AsMessagePart[fantasy.TextPart](lastPart); ok {
-					textPart.ProviderOptions = fantasy.ProviderOptions{
-						anthropicProviderName: &anthropic.ProviderCacheControlOptions{
-							CacheControl: anthropic.CacheControl{Type: "ephemeral"},
-						},
-					}
-					msg.Content[lastPartIdx] = textPart
-					opts.Messages[i] = msg
-				}
-				break // Only process the first system message
-			}
+		// Step 2: Add cache_control for Anthropic if prompt_cache is enabled
+		if needCacheMarkers {
+			addCacheControlToSystemMessages(opts.Messages)
 		}
 
 		return ctx, fantasy.PrepareStepResult{Messages: opts.Messages}, nil
 	}
 }
 
-// getAgentOptions returns the base agent options and adds Anthropic-specific caching options if needed
-func (s *Session) getAgentOptions(model fantasy.LanguageModel) []fantasy.AgentOption {
+// getAgentOptions returns the base agent options
+func (s *Session) getAgentOptions(model fantasy.LanguageModel, modelConfig *ModelConfig) []fantasy.AgentOption {
 	opts := []fantasy.AgentOption{
 		fantasy.WithTools(s.baseTools...),
 		fantasy.WithSystemPrompt(s.systemPrompt),
 	}
 
-	// Add cache control for Anthropic-compatible APIs
-	if model.Provider() == anthropicProviderName {
-		opts = append(opts, fantasy.WithPrepareStep(createPrepareStepForCacheControl()))
+	// Check if we need a prepare step
+	hasExtraSystemPrompt := s.extraSystemPrompt != ""
+	needCacheMarkers := modelConfig != nil && modelConfig.PromptCache && model.Provider() == anthropicProviderName
+
+	if hasExtraSystemPrompt || needCacheMarkers {
+		opts = append(opts, fantasy.WithPrepareStep(createPrepareStep(s.extraSystemPrompt, needCacheMarkers)))
 	}
 
 	return opts
@@ -141,20 +181,21 @@ type SystemInfo struct {
 
 // Session manages conversation state and task execution.
 type Session struct {
-	Messages       []fantasy.Message
-	Agent          fantasy.Agent
-	SessionFile    string
-	TotalSpent     fantasy.Usage
-	ContextTokens  int64
-	ContextLimit   int64
-	Input          stream.Input
-	Output         stream.Output
-	ModelManager   *ModelManager
-	RuntimeManager *RuntimeManager
-	baseTools      []fantasy.AgentTool
-	systemPrompt   string
-	debugAPI       bool
-	proxyURL       string
+	Messages          []fantasy.Message
+	Agent             fantasy.Agent
+	SessionFile       string
+	TotalSpent        fantasy.Usage
+	ContextTokens     int64
+	ContextLimit      int64
+	Input             stream.Input
+	Output            stream.Output
+	ModelManager      *ModelManager
+	RuntimeManager    *RuntimeManager
+	baseTools         []fantasy.AgentTool
+	systemPrompt      string
+	extraSystemPrompt string // User-provided extra system prompt via --system flag
+	debugAPI          bool
+	proxyURL          string
 
 	taskQueue     []QueueItem
 	taskAvailable chan struct{}
@@ -178,31 +219,32 @@ type SessionData struct {
 }
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) (*Session, string) {
+func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, extraSystemPrompt string, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(model, baseTools, systemPrompt, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
+			return RestoreFromSession(model, baseTools, systemPrompt, extraSystemPrompt, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
 		}
 	}
-	return NewSession(model, baseTools, systemPrompt, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
+	return NewSession(model, baseTools, systemPrompt, extraSystemPrompt, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
+func NewSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, extraSystemPrompt string, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
 	s := &Session{
-		SessionFile:    sessionFile,
-		Input:          input,
-		Output:         output,
-		ModelManager:   NewModelManager(modelConfigPath),
-		RuntimeManager: NewRuntimeManager(runtimeConfigPath, modelConfigPath),
-		baseTools:      baseTools,
-		systemPrompt:   systemPrompt,
-		debugAPI:       debugAPI,
-		proxyURL:       proxyURL,
-		taskQueue:      make([]QueueItem, 0),
-		taskAvailable:  make(chan struct{}, 1),
-		done:           make(chan struct{}),
+		SessionFile:       sessionFile,
+		Input:             input,
+		Output:            output,
+		ModelManager:      NewModelManager(modelConfigPath),
+		RuntimeManager:    NewRuntimeManager(runtimeConfigPath, modelConfigPath),
+		baseTools:         baseTools,
+		systemPrompt:      systemPrompt,
+		extraSystemPrompt: extraSystemPrompt,
+		debugAPI:          debugAPI,
+		proxyURL:          proxyURL,
+		taskQueue:         make([]QueueItem, 0),
+		taskAvailable:     make(chan struct{}, 1),
+		done:              make(chan struct{}),
 	}
 	s.initModelManager()
 	s.sendSystemInfo()
@@ -212,21 +254,22 @@ func NewSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPr
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
+func RestoreFromSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, extraSystemPrompt string, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
 	s := &Session{
-		Messages:       data.Messages,
-		SessionFile:    sessionFile,
-		Input:          input,
-		Output:         output,
-		ModelManager:   NewModelManager(modelConfigPath),
-		RuntimeManager: NewRuntimeManager(runtimeConfigPath, modelConfigPath),
-		baseTools:      baseTools,
-		systemPrompt:   systemPrompt,
-		debugAPI:       debugAPI,
-		proxyURL:       proxyURL,
-		taskQueue:      make([]QueueItem, 0),
-		taskAvailable:  make(chan struct{}, 1),
-		done:           make(chan struct{}),
+		Messages:          data.Messages,
+		SessionFile:       sessionFile,
+		Input:             input,
+		Output:            output,
+		ModelManager:      NewModelManager(modelConfigPath),
+		RuntimeManager:    NewRuntimeManager(runtimeConfigPath, modelConfigPath),
+		baseTools:         baseTools,
+		systemPrompt:      systemPrompt,
+		extraSystemPrompt: extraSystemPrompt,
+		debugAPI:          debugAPI,
+		proxyURL:          proxyURL,
+		taskQueue:         make([]QueueItem, 0),
+		taskAvailable:     make(chan struct{}, 1),
+		done:              make(chan struct{}),
 	}
 	s.initModelManager()
 	s.sendSystemInfo()
@@ -278,7 +321,7 @@ func (s *Session) ensureAgentInitialized() string {
 		return "Failed to create language model: " + err.Error()
 	}
 
-	opts := s.getAgentOptions(model)
+	opts := s.getAgentOptions(model, activeModel)
 
 	s.mu.Lock()
 	s.Agent = fantasy.NewAgent(model, opts...)
@@ -289,8 +332,8 @@ func (s *Session) ensureAgentInitialized() string {
 }
 
 // initAgentFromModel creates an agent from a specific model (used by SwitchModel).
-func (s *Session) initAgentFromModel(model fantasy.LanguageModel) {
-	opts := s.getAgentOptions(model)
+func (s *Session) initAgentFromModel(model fantasy.LanguageModel, modelConfig *ModelConfig) {
+	opts := s.getAgentOptions(model, modelConfig)
 	s.Agent = fantasy.NewAgent(model, opts...)
 }
 
@@ -328,7 +371,7 @@ func (s *Session) initModelManager() {
 
 // SwitchModel switches the session to use a new model
 func (s *Session) SwitchModel(model fantasy.LanguageModel, modelConfig *ModelConfig) {
-	s.initAgentFromModel(model)
+	s.initAgentFromModel(model, modelConfig)
 	if modelConfig != nil {
 		s.applyModelContextLimit(modelConfig)
 	}

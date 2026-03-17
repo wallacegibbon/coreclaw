@@ -54,6 +54,7 @@ func (a *TerminalAdaptor) Start() {
 		a.Config.Model,
 		a.Config.AgentTools,
 		a.Config.SystemPrompt,
+		a.Config.ExtraSystemPrompt,
 		inputStream,
 		terminalOutput,
 		a.Config.Cfg.Session,

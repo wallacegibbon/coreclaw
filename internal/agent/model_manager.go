@@ -27,6 +27,7 @@ type ModelConfig struct {
 	APIKey       string `json:"api_key,omitempty"` // API key (omitted in JSON responses for security)
 	ModelName    string `json:"model_name"`        // Model identifier
 	ContextLimit int    `json:"context_limit"`     // Maximum context length (0 means unlimited)
+	PromptCache  bool   `json:"prompt_cache"`      // Enable prompt caching (adds cache_control for Anthropic)
 }
 
 // ModelInfo is the safe version for JSON responses (no API key)
@@ -37,6 +38,7 @@ type ModelInfo struct {
 	BaseURL      string `json:"base_url"`
 	ModelName    string `json:"model_name"`
 	ContextLimit int    `json:"context_limit"`
+	PromptCache  bool   `json:"prompt_cache"`
 	IsActive     bool   `json:"is_active"`
 }
 
@@ -196,6 +198,10 @@ func parseModelBlock(block string) ModelConfig {
 				if limit, err := strconv.Atoi(value); err == nil {
 					model.ContextLimit = limit
 				}
+			case "prompt_cache":
+				if strings.ToLower(value) == "true" || value == "1" {
+					model.PromptCache = true
+				}
 			}
 		}
 	}
@@ -244,6 +250,7 @@ func (mm *ModelManager) GetModels() []ModelInfo {
 			BaseURL:      m.BaseURL,
 			ModelName:    m.ModelName,
 			ContextLimit: m.ContextLimit,
+			PromptCache:  m.PromptCache,
 			IsActive:     m.ID == mm.activeID,
 		}
 	}

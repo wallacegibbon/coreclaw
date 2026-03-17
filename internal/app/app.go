@@ -35,6 +35,7 @@ FILE EDITING:
 - Match whitespace exactly - tabs, spaces, and newlines must be identical
 
 SHELL COMMANDS:
+- Use POSIX-compliant shell syntax only (no bash/zsh-specific features)
 - Prefer simple, standard commands over complex pipelines
 - Quote filenames with spaces or special characters
 - Check command output for errors before proceeding
@@ -42,20 +43,18 @@ SHELL COMMANDS:
 
 // Config holds the common app configuration
 type Config struct {
-	Cfg          *config.Settings
-	Model        fantasy.LanguageModel
-	SkillsMgr    *skills.Manager
-	AgentTools   []fantasy.AgentTool
-	SystemPrompt string
+	Cfg               *config.Settings
+	Model             fantasy.LanguageModel
+	SkillsMgr         *skills.Manager
+	AgentTools        []fantasy.AgentTool
+	SystemPrompt      string // Default system prompt (always present)
+	ExtraSystemPrompt string // User-provided extra system prompt via --system flag
 }
 
 // Setup initializes the common app components
 func Setup(cfg *config.Settings) (*Config, error) {
-	// Compute effective system prompt
+	// Build the default system prompt
 	systemPrompt := DefaultSystemPrompt
-	if cfg.SystemPrompt != "" {
-		systemPrompt = cfg.SystemPrompt
-	}
 
 	skillsManager, err := skills.NewManager(cfg.Skills)
 	if err != nil {
@@ -87,11 +86,12 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	editFileTool := tools.NewEditFileTool()
 
 	return &Config{
-		Cfg:          cfg,
-		Model:        nil, // Model will be loaded from config file
-		SkillsMgr:    skillsManager,
-		AgentTools:   []fantasy.AgentTool{readFileTool, editFileTool, writeFileTool, activateSkillTool, posixShellTool},
-		SystemPrompt: systemPrompt,
+		Cfg:               cfg,
+		Model:             nil, // Model will be loaded from config file
+		SkillsMgr:         skillsManager,
+		AgentTools:        []fantasy.AgentTool{readFileTool, editFileTool, writeFileTool, activateSkillTool, posixShellTool},
+		SystemPrompt:      systemPrompt,
+		ExtraSystemPrompt: cfg.SystemPrompt, // User-provided extra system prompt (supplemental, not replacement)
 	}, nil
 }
 
