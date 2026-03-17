@@ -32,14 +32,7 @@ FILE EDITING:
 - Always read a file before editing it to get exact text including whitespace
 - Use edit_file for surgical changes; use write_file only for new files or complete rewrites
 - Include 3-5 lines of context in old_string to make matches unique
-- Match whitespace exactly - tabs, spaces, and newlines must be identical
-
-SHELL COMMANDS:
-- Use POSIX-compliant shell syntax only (no bash/zsh-specific features)
-- Prefer simple, standard commands over complex pipelines
-- Quote filenames with spaces or special characters
-- Check command output for errors before proceeding
-- Clean up temporary files when done`
+- Match whitespace exactly - tabs, spaces, and newlines must be identical`
 
 // Config holds the common app configuration
 type Config struct {

@@ -23,7 +23,14 @@ type PosixShellInput struct {
 func NewPosixShellTool() fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		"posix_shell",
-		"Execute a shell command in the terminal",
+		`Execute a shell command.
+
+Rules:
+- Use POSIX-compliant shell syntax only (no bash/zsh-specific features)
+- Prefer simple, standard commands over complex pipelines
+- Quote filenames with spaces or special characters
+- Check command output for errors before proceeding
+- Clean up temporary files when done`,
 		func(ctx context.Context, input PosixShellInput, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			cmd := input.Command
 			if cmd == "" {
