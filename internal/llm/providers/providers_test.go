@@ -156,70 +156,6 @@ func TestOpenAIProvider(t *testing.T) {
 	}
 }
 
-func TestOpenAICompatProvider(t *testing.T) {
-	// Create mock server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Send SSE stream
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			t.Fatal("Cannot flush")
-		}
-
-		// Send chunks with reasoning
-		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"Thinking...\"}}]}\n\n")
-		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Answer\"},\"finish_reason\":\"stop\"}]}\n\n")
-		fmt.Fprint(w, "data: [DONE]\n\n")
-
-		flusher.Flush()
-	}))
-	defer server.Close()
-
-	// Create provider with reasoning support
-	provider, err := providers.NewOpenAICompat(
-		providers.WithOpenAICompatBaseURL(server.URL),
-		providers.WithOpenAICompatReasoning(true),
-	)
-	if err != nil {
-		t.Fatalf("Failed to create provider: %v", err)
-	}
-
-	// Stream messages
-	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hi"}}},
-	}
-
-	eventChan, err := provider.StreamMessages(context.Background(), messages, nil, "")
-	if err != nil {
-		t.Fatalf("Failed to stream: %v", err)
-	}
-
-	// Collect events
-	var textReceived string
-	var reasoningReceived string
-
-	for event := range eventChan {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
-			textReceived += e.Delta
-		case llm.ReasoningDeltaEvent:
-			reasoningReceived += e.Delta
-		case llm.StreamErrorEvent:
-			t.Fatalf("Stream error: %v", e.Error)
-		}
-	}
-
-	// Verify
-	if textReceived != "Answer" {
-		t.Errorf("Expected 'Answer', got '%s'", textReceived)
-	}
-	if reasoningReceived != "Thinking..." {
-		t.Errorf("Expected 'Thinking...', got '%s'", reasoningReceived)
-	}
-}
-
 func TestToolCallStreaming(t *testing.T) {
 	// Test that tool calls are properly streamed
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -713,66 +649,6 @@ func TestAnthropicWithTools(t *testing.T) {
 
 	for range eventChan {
 		// Drain the channel
-	}
-}
-
-func TestOpenAICompatWithReasoning(t *testing.T) {
-	// Test OpenAI-compatible provider with reasoning support
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
-
-		// Send reasoning content first (DeepSeek style)
-		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"Let me analyze...\"}}]}\n\n")
-		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\" thinking more...\"}}]}\n\n")
-		// Then regular content
-		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"The answer is 42.\"}}]}\n\n")
-		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\" Done.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":20}}\n\n")
-		fmt.Fprint(w, "data: [DONE]\n\n")
-
-		flusher.Flush()
-	}))
-	defer server.Close()
-
-	provider, err := providers.NewOpenAICompat(
-		providers.WithOpenAICompatBaseURL(server.URL),
-		providers.WithOpenAICompatReasoning(true),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "What is the answer?"}}},
-	}
-
-	eventChan, err := provider.StreamMessages(context.Background(), messages, nil, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var reasoningText string
-	var textReceived string
-
-	for event := range eventChan {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
-			textReceived += e.Delta
-		case llm.ReasoningDeltaEvent:
-			reasoningText += e.Delta
-		case llm.StreamErrorEvent:
-			t.Fatalf("Stream error: %v", e.Error)
-		}
-	}
-
-	if reasoningText != "Let me analyze... thinking more..." {
-		t.Errorf("Expected reasoning text 'Let me analyze... thinking more...', got '%s'", reasoningText)
-	}
-
-	if textReceived != "The answer is 42. Done." {
-		t.Errorf("Expected text 'The answer is 42. Done.', got '%s'", textReceived)
 	}
 }
 

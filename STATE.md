@@ -26,4 +26,4 @@
 
 - **OpenAI tool call arguments in requests**: When sending tool calls back in conversation history, arguments must be marshaled to a JSON string (not raw JSON). See `convertMessage()` in `openai.go`.
 
-- **OpenAI reasoning support**: OpenAI-compatible APIs (DeepSeek, Qwen, etc.) use `reasoning_content` field for thinking tokens. Both `openai.go` and `openaicompat.go` handle this.
+- **OpenAI reasoning support**: OpenAI-compatible APIs (DeepSeek, Qwen, etc.) use `reasoning_content` field for thinking tokens. Handled by `openai.go`.

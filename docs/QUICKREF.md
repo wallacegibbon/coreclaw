@@ -147,8 +147,7 @@ llm.ToolResultPart{
 | Provider Type | Use Case |
 |--------------|----------|
 | `anthropic` | Anthropic Claude API |
-| `openai` | OpenAI GPT API |
-| `openaicompat` | Ollama, LM Studio, DeepSeek, etc. |
+| `openai` | OpenAI GPT API, Ollama, LM Studio, DeepSeek, Qwen, and other OpenAI-compatible APIs |
 
 ## Common Patterns
 

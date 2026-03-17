@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/alayacore/alayacore/internal/config"
 	debugpkg "github.com/alayacore/alayacore/internal/debug"
@@ -122,17 +121,12 @@ func CreateProvider(providerType, apiKey, baseURL, model string, debugAPI bool, 
 		client = debugpkg.NewHTTPClient()
 	}
 
-	// Use openaicompat for non-OpenAI URLs (Ollama, LM Studio, DeepSeek, etc.)
-	// This enables reasoning/thinking content support
-	supportsReasoning := !strings.Contains(baseURL, "api.openai.com")
-
 	return factory.NewProvider(factory.ProviderConfig{
-		Type:              providerType,
-		APIKey:            apiKey,
-		BaseURL:           baseURL,
-		Model:             model,
-		HTTPClient:        client,
-		SupportsReasoning: supportsReasoning,
+		Type:       providerType,
+		APIKey:     apiKey,
+		BaseURL:    baseURL,
+		Model:      model,
+		HTTPClient: client,
 	})
 }
 

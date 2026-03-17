@@ -11,14 +11,11 @@ import (
 
 // ProviderConfig configures a provider
 type ProviderConfig struct {
-	Type       string // "anthropic", "openai", "openaicompat"
+	Type       string // "anthropic", "openai"
 	APIKey     string
 	BaseURL    string
 	Model      string
 	HTTPClient *http.Client
-
-	// Provider-specific options
-	SupportsReasoning bool // For OpenAI-compatible providers (DeepSeek, etc.)
 }
 
 // NewProvider creates a provider based on configuration
@@ -54,22 +51,6 @@ func NewProvider(config ProviderConfig) (llm.Provider, error) {
 		}
 		return providers.NewOpenAI(opts...)
 
-	case "openaicompat", "openai-compatible":
-		opts := []providers.OpenAICompatOption{
-			providers.WithOpenAICompatBaseURL(config.BaseURL),
-		}
-		if config.APIKey != "" {
-			opts = append(opts, providers.WithOpenAICompatAPIKey(config.APIKey))
-		}
-		if config.HTTPClient != nil {
-			opts = append(opts, providers.WithOpenAICompatHTTPClient(config.HTTPClient))
-		}
-		if config.Model != "" {
-			opts = append(opts, providers.WithOpenAICompatModel(config.Model))
-		}
-		opts = append(opts, providers.WithOpenAICompatReasoning(config.SupportsReasoning))
-		return providers.NewOpenAICompat(opts...)
-
 	default:
 		return nil, fmt.Errorf("unknown provider type: %s", config.Type)
 	}
@@ -80,9 +61,6 @@ func ProviderTypeFromURL(baseURL string) string {
 	if strings.Contains(baseURL, "api.anthropic.com") {
 		return "anthropic"
 	}
-	if strings.Contains(baseURL, "api.openai.com") {
-		return "openai"
-	}
-	// Everything else is treated as OpenAI-compatible
-	return "openaicompat"
+	// Everything else is treated as OpenAI-compatible (uses OpenAI provider)
+	return "openai"
 }

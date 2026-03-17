@@ -16,8 +16,7 @@ internal/llm/
 │   └── compat.go         # Compatibility helpers
 └── providers/
     ├── anthropic.go      # Anthropic Claude API
-    ├── openai.go         # OpenAI GPT API
-    └── openaicompat.go   # Ollama, LM Studio, DeepSeek, etc.
+    └── openai.go         # OpenAI GPT API (also works with Ollama, LM Studio, DeepSeek, Qwen, etc.)
 ```
 
 ## Features

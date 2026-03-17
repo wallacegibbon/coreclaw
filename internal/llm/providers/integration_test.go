@@ -104,7 +104,7 @@ func TestOpenAICompatibleRealAPI(t *testing.T) {
 	}
 
 	provider, err := factory.NewProvider(factory.ProviderConfig{
-		Type:    "openaicompat",
+		Type:    "openai",
 		APIKey:  apiKey,
 		BaseURL: baseURL,
 		Model:   model,
@@ -623,7 +623,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 	}
 
 	provider, err := factory.NewProvider(factory.ProviderConfig{
-		Type:    "openaicompat",
+		Type:    "openai",
 		APIKey:  apiKey,
 		BaseURL: baseURL,
 		Model:   model,
