@@ -1,12 +1,13 @@
 package agent
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
@@ -35,7 +36,7 @@ func TestSaveAndLoadSession(t *testing.T) {
 
 	// Create test session data
 	sessionData := &SessionData{
-		Messages: []fantasy.Message{},
+		Messages: []llm.Message{},
 	}
 
 	// Create a minimal session for testing
@@ -69,14 +70,13 @@ func TestSaveAndLoadSession(t *testing.T) {
 }
 
 func TestLoadOrNewSession(t *testing.T) {
-	// Use nil for model since we're just testing session creation
-	var model fantasy.LanguageModel
-	baseTools := []fantasy.AgentTool{}
+	// Use nil for provider since we're just testing session creation
+	baseTools := []llm.Tool{}
 	systemPrompt := "test system prompt"
 	extraSystemPrompt := ""
 
 	// Test creating a new session without specifying session file
-	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, extraSystemPrompt, &stream.NopInput{}, &stream.NopOutput{}, "", "", "", false, "")
+	session, sessionFile := LoadOrNewSession(baseTools, systemPrompt, extraSystemPrompt, &stream.NopInput{}, &stream.NopOutput{}, "", "", "", false, "")
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 	}
@@ -109,14 +109,14 @@ func Test_displayMessages(t *testing.T) {
 	// Create a session with some messages
 	session := &Session{
 		Output: mockOutput,
-		Messages: []fantasy.Message{
+		Messages: []llm.Message{
 			{
-				Role:    fantasy.MessageRoleUser,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello world"}},
+				Role:    llm.RoleUser,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello world"}},
 			},
 			{
-				Role:    fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hi there!"}},
+				Role:    llm.RoleAssistant,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hi there!"}},
 			},
 		},
 		taskQueue: make([]QueueItem, 0),
@@ -157,20 +157,20 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 
 	// Create session with messages
 	session := &Session{
-		Messages: []fantasy.Message{
+		Messages: []llm.Message{
 			{
-				Role:    fantasy.MessageRoleUser,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello, world!"}},
+				Role:    llm.RoleUser,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello, world!"}},
 			},
 			{
-				Role:    fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hi there!"}},
+				Role:    llm.RoleAssistant,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hi there!"}},
 			},
 			{
-				Role: fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{
-					fantasy.TextPart{Text: "Let me help you."},
-					fantasy.ReasoningPart{Text: "User needs help..."},
+				Role: llm.RoleAssistant,
+				Content: []llm.ContentPart{
+					llm.TextPart{Type: "text", Text: "Let me help you."},
+					llm.ReasoningPart{Type: "reasoning", Text: "User needs help..."},
 				},
 			},
 		},
@@ -198,32 +198,32 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	}
 
 	// Check first user message
-	if loaded.Messages[0].Role != fantasy.MessageRoleUser {
+	if loaded.Messages[0].Role != llm.RoleUser {
 		t.Errorf("First message role mismatch: got %s", loaded.Messages[0].Role)
 	}
 	if len(loaded.Messages[0].Content) != 1 {
 		t.Fatalf("First message content parts: got %d", len(loaded.Messages[0].Content))
 	}
-	if tp, ok := loaded.Messages[0].Content[0].(fantasy.TextPart); !ok || tp.Text != "Hello, world!" {
+	if tp, ok := loaded.Messages[0].Content[0].(llm.TextPart); !ok || tp.Text != "Hello, world!" {
 		t.Errorf("First message content mismatch: got %v", loaded.Messages[0].Content[0])
 	}
 
 	// Check second message (assistant text "Hi there!")
-	if loaded.Messages[1].Role != fantasy.MessageRoleAssistant {
+	if loaded.Messages[1].Role != llm.RoleAssistant {
 		t.Errorf("Second message role mismatch: got %s", loaded.Messages[1].Role)
 	}
 
 	// Check third message (assistant with text + reasoning)
-	if loaded.Messages[2].Role != fantasy.MessageRoleAssistant {
+	if loaded.Messages[2].Role != llm.RoleAssistant {
 		t.Errorf("Third message role mismatch: got %s", loaded.Messages[2].Role)
 	}
 	if len(loaded.Messages[2].Content) != 2 {
 		t.Fatalf("Third message should have 2 parts (text + reasoning), got %d", len(loaded.Messages[2].Content))
 	}
-	if tp, ok := loaded.Messages[2].Content[0].(fantasy.TextPart); !ok || tp.Text != "Let me help you." {
+	if tp, ok := loaded.Messages[2].Content[0].(llm.TextPart); !ok || tp.Text != "Let me help you." {
 		t.Errorf("Third message text part mismatch: got %v", loaded.Messages[2].Content[0])
 	}
-	if _, ok := loaded.Messages[2].Content[1].(fantasy.ReasoningPart); !ok {
+	if _, ok := loaded.Messages[2].Content[1].(llm.ReasoningPart); !ok {
 		t.Errorf("Third message second part should be ReasoningPart")
 	}
 }
@@ -233,14 +233,14 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 	sessionPath := filepath.Join(tmpDir, "readable.md")
 
 	session := &Session{
-		Messages: []fantasy.Message{
+		Messages: []llm.Message{
 			{
-				Role:    fantasy.MessageRoleUser,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello!\nHow are you?"}},
+				Role:    llm.RoleUser,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello!\nHow are you?"}},
 			},
 			{
-				Role:    fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "I'm doing well, thanks!"}},
+				Role:    llm.RoleAssistant,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "I'm doing well, thanks!"}},
 			},
 		},
 		Input:     &stream.NopInput{},
@@ -279,14 +279,14 @@ func TestReasoningOnlyMessage(t *testing.T) {
 
 	// Session with assistant message that only has reasoning (no text)
 	session := &Session{
-		Messages: []fantasy.Message{
+		Messages: []llm.Message{
 			{
-				Role:    fantasy.MessageRoleUser,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "What is lisp?"}},
+				Role:    llm.RoleUser,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "What is lisp?"}},
 			},
 			{
-				Role:    fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{fantasy.ReasoningPart{Text: "The user is asking about Lisp. I should explain it."}},
+				Role:    llm.RoleAssistant,
+				Content: []llm.ContentPart{llm.ReasoningPart{Type: "reasoning", Text: "The user is asking about Lisp. I should explain it."}},
 			},
 		},
 		Input:     &stream.NopInput{},
@@ -309,18 +309,18 @@ func TestReasoningOnlyMessage(t *testing.T) {
 	}
 
 	// Check first message
-	if loaded.Messages[0].Role != fantasy.MessageRoleUser {
+	if loaded.Messages[0].Role != llm.RoleUser {
 		t.Errorf("First message should be user, got %s", loaded.Messages[0].Role)
 	}
 
 	// Check second message (reasoning only)
-	if loaded.Messages[1].Role != fantasy.MessageRoleAssistant {
+	if loaded.Messages[1].Role != llm.RoleAssistant {
 		t.Errorf("Second message should be assistant, got %s", loaded.Messages[1].Role)
 	}
 	if len(loaded.Messages[1].Content) != 1 {
 		t.Fatalf("Second message should have 1 part, got %d", len(loaded.Messages[1].Content))
 	}
-	if rp, ok := loaded.Messages[1].Content[0].(fantasy.ReasoningPart); !ok {
+	if rp, ok := loaded.Messages[1].Content[0].(llm.ReasoningPart); !ok {
 		t.Errorf("Second message part should be ReasoningPart")
 	} else if !strings.Contains(rp.Text, "asking about Lisp") {
 		t.Errorf("Reasoning text mismatch: %s", rp.Text)
@@ -334,16 +334,16 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 	// Session with assistant message that has both reasoning and text
 	// Note: In the file format, these become separate messages
 	session := &Session{
-		Messages: []fantasy.Message{
+		Messages: []llm.Message{
 			{
-				Role:    fantasy.MessageRoleUser,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "What is lisp?"}},
+				Role:    llm.RoleUser,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "What is lisp?"}},
 			},
 			{
-				Role: fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{
-					fantasy.ReasoningPart{Text: "Let me explain Lisp."},
-					fantasy.TextPart{Text: "Lisp is a family of programming languages."},
+				Role: llm.RoleAssistant,
+				Content: []llm.ContentPart{
+					llm.ReasoningPart{Type: "reasoning", Text: "Let me explain Lisp."},
+					llm.TextPart{Type: "text", Text: "Lisp is a family of programming languages."},
 				},
 			},
 		},
@@ -368,29 +368,29 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 	}
 
 	// Check first message is user
-	if loaded.Messages[0].Role != fantasy.MessageRoleUser {
+	if loaded.Messages[0].Role != llm.RoleUser {
 		t.Errorf("First message should be user, got %s", loaded.Messages[0].Role)
 	}
 
 	// Check second message is reasoning (stored as assistant with ReasoningPart)
-	if loaded.Messages[1].Role != fantasy.MessageRoleAssistant {
+	if loaded.Messages[1].Role != llm.RoleAssistant {
 		t.Errorf("Second message should be assistant, got %s", loaded.Messages[1].Role)
 	}
 	if len(loaded.Messages[1].Content) != 1 {
 		t.Fatalf("Second message should have 1 part, got %d", len(loaded.Messages[1].Content))
 	}
-	if _, ok := loaded.Messages[1].Content[0].(fantasy.ReasoningPart); !ok {
+	if _, ok := loaded.Messages[1].Content[0].(llm.ReasoningPart); !ok {
 		t.Errorf("Second message part should be ReasoningPart, got %T", loaded.Messages[1].Content[0])
 	}
 
 	// Check third message is assistant text
-	if loaded.Messages[2].Role != fantasy.MessageRoleAssistant {
+	if loaded.Messages[2].Role != llm.RoleAssistant {
 		t.Errorf("Third message should be assistant, got %s", loaded.Messages[2].Role)
 	}
 	if len(loaded.Messages[2].Content) != 1 {
 		t.Fatalf("Third message should have 1 part, got %d", len(loaded.Messages[2].Content))
 	}
-	if _, ok := loaded.Messages[2].Content[0].(fantasy.TextPart); !ok {
+	if _, ok := loaded.Messages[2].Content[0].(llm.TextPart); !ok {
 		t.Errorf("Third message part should be TextPart, got %T", loaded.Messages[2].Content[0])
 	}
 }
@@ -401,7 +401,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 
 	// Create a session with a model manager
 	session := &Session{
-		Messages:     []fantasy.Message{},
+		Messages:     []llm.Message{},
 		Input:        &stream.NopInput{},
 		Output:       output,
 		taskQueue:    make([]QueueItem, 0),
@@ -476,37 +476,39 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 	// Create a session with tool calls (as they would be loaded from file)
 	session := &Session{
 		Output: mockOutput,
-		Messages: []fantasy.Message{
+		Messages: []llm.Message{
 			{
-				Role:    fantasy.MessageRoleUser,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "List files"}},
+				Role:    llm.RoleUser,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "List files"}},
 			},
 			{
-				Role:    fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "I'll list files for you."}},
+				Role:    llm.RoleAssistant,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "I'll list files for you."}},
 			},
 			{
-				Role: fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{
-					fantasy.ToolCallPart{
+				Role: llm.RoleAssistant,
+				Content: []llm.ContentPart{
+					llm.ToolCallPart{
+						Type:       "tool_use",
 						ToolCallID: "call_123",
 						ToolName:   "posix_shell",
-						Input:      `{"command": "ls -la"}`,
+						Input:      json.RawMessage(`{"command": "ls -la"}`),
 					},
 				},
 			},
 			{
-				Role: fantasy.MessageRoleTool,
-				Content: []fantasy.MessagePart{
-					fantasy.ToolResultPart{
+				Role: llm.RoleTool,
+				Content: []llm.ContentPart{
+					llm.ToolResultPart{
+						Type:       "tool_result",
 						ToolCallID: "call_123",
-						Output:     fantasy.ToolResultOutputContentText{Text: "file1.txt\nfile2.txt"},
+						Output:     llm.ToolResultOutputText{Type: "text", Text: "file1.txt\nfile2.txt"},
 					},
 				},
 			},
 			{
-				Role:    fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Found 2 files!"}},
+				Role:    llm.RoleAssistant,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Found 2 files!"}},
 			},
 		},
 		taskQueue: make([]QueueItem, 0),
@@ -552,44 +554,44 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 func TestCleanIncompleteToolCalls(t *testing.T) {
 	tests := []struct {
 		name     string
-		messages []fantasy.Message
+		messages []llm.Message
 		wantLen  int // expected number of messages after cleaning
 	}{
 		{
 			name: "complete tool call cycle",
-			messages: []fantasy.Message{
-				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
-				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
-					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+			messages: []llm.Message{
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
+					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
-				{Role: fantasy.MessageRoleTool, Content: []fantasy.MessagePart{
-					fantasy.ToolResultPart{ToolCallID: "call-1", Output: fantasy.ToolResultOutputContentText{Text: "result"}},
+				{Role: llm.RoleTool, Content: []llm.ContentPart{
+					llm.ToolResultPart{Type: "tool_result", ToolCallID: "call-1", Output: llm.ToolResultOutputText{Type: "text", Text: "result"}},
 				}},
-				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Done"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Done"}}},
 			},
 			wantLen: 4, // all kept
 		},
 		{
 			name: "complete tool call - Anthropic style (tool result in user message)",
-			messages: []fantasy.Message{
-				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
-				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
-					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+			messages: []llm.Message{
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
+					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				// Anthropic puts tool result in user message
-				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{
-					fantasy.ToolResultPart{ToolCallID: "call-1", Output: fantasy.ToolResultOutputContentText{Text: "result"}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{
+					llm.ToolResultPart{Type: "tool_result", ToolCallID: "call-1", Output: llm.ToolResultOutputText{Type: "text", Text: "result"}},
 				}},
-				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Done"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Done"}}},
 			},
 			wantLen: 4, // all kept
 		},
 		{
 			name: "incomplete tool call - no result",
-			messages: []fantasy.Message{
-				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
-				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
-					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+			messages: []llm.Message{
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
+					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				// No tool result message - this happens when API errors mid-cycle
 			},
@@ -597,11 +599,11 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 		},
 		{
 			name: "incomplete tool call - assistant has text and tool call",
-			messages: []fantasy.Message{
-				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
-				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
-					fantasy.TextPart{Text: "Let me help"},
-					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+			messages: []llm.Message{
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
+					llm.TextPart{Type: "text", Text: "Let me help"},
+					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				// Tool call has no result
 			},
@@ -609,10 +611,10 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 		},
 		{
 			name: "incomplete tool call - Anthropic style (user message with tool result is missing)",
-			messages: []fantasy.Message{
-				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello"}}},
-				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{
-					fantasy.ToolCallPart{ToolCallID: "call-1", ToolName: "test_tool", Input: "{}"},
+			messages: []llm.Message{
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
+					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				// No user message with tool result - incomplete
 			},
@@ -620,10 +622,10 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 		},
 		{
 			name: "trailing user message preserved",
-			messages: []fantasy.Message{
-				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "First"}}},
-				{Role: fantasy.MessageRoleAssistant, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Response"}}},
-				{Role: fantasy.MessageRoleUser, Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Second (no response)"}}},
+			messages: []llm.Message{
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "First"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Response"}}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Second (no response)"}}},
 			},
 			wantLen: 3, // all kept, including trailing user message
 		},
@@ -650,34 +652,36 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 
 	// Create a session that contains what looks like session markers in tool output
 	session := &Session{
-		Messages: []fantasy.Message{
+		Messages: []llm.Message{
 			{
-				Role:    fantasy.MessageRoleUser,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Read the session file"}},
+				Role:    llm.RoleUser,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Read the session file"}},
 			},
 			{
-				Role: fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{
-					fantasy.ToolCallPart{
+				Role: llm.RoleAssistant,
+				Content: []llm.ContentPart{
+					llm.ToolCallPart{
+						Type:       "tool_use",
 						ToolCallID: "call1",
 						ToolName:   "read_file",
-						Input:      `{"path": "old-session.md"}`,
+						Input:      json.RawMessage(`{"path": "old-session.md"}`),
 					},
 				},
 			},
 			{
-				Role: fantasy.MessageRoleTool,
-				Content: []fantasy.MessagePart{
-					fantasy.ToolResultPart{
+				Role: llm.RoleTool,
+				Content: []llm.ContentPart{
+					llm.ToolResultPart{
+						Type:       "tool_result",
 						ToolCallID: "call1",
 						// This output contains text that looks like old session format markers!
-						Output: fantasy.ToolResultOutputContentText{Text: "---\nbase_url: https://api.test.com\n---\n\x00msg:user\nFake user message\n\x00msg:assistant\nFake assistant\n"},
+						Output: llm.ToolResultOutputText{Type: "text", Text: "---\nbase_url: https://api.test.com\n---\n\x00msg:user\nFake user message\n\x00msg:assistant\nFake assistant\n"},
 					},
 				},
 			},
 			{
-				Role:    fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Here's the file content..."}},
+				Role:    llm.RoleAssistant,
+				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Here's the file content..."}},
 			},
 		},
 		Input:     &stream.NopInput{},
@@ -706,13 +710,13 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	}
 
 	// Verify the tool result still contains the fake markers
-	tr, ok := loaded.Messages[2].Content[0].(fantasy.ToolResultPart)
+	tr, ok := loaded.Messages[2].Content[0].(llm.ToolResultPart)
 	if !ok {
 		t.Fatalf("expected ToolResultPart, got %T", loaded.Messages[2].Content[0])
 	}
-	output, ok := tr.Output.(fantasy.ToolResultOutputContentText)
+	output, ok := tr.Output.(llm.ToolResultOutputText)
 	if !ok {
-		t.Fatalf("expected ToolResultOutputContentText, got %T", tr.Output)
+		t.Fatalf("expected ToolResultOutputText, got %T", tr.Output)
 	}
 	// The output should contain the fake markers (not stripped or misparsed)
 	if !strings.Contains(output.Text, "msg:user") {

@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
@@ -42,20 +42,20 @@ func (s *Session) displayMessages() {
 	}
 	for _, msg := range s.Messages {
 		switch msg.Role {
-		case fantasy.MessageRoleUser:
+		case llm.RoleUser:
 			s.displayUserMessage(msg)
-		case fantasy.MessageRoleAssistant:
+		case llm.RoleAssistant:
 			s.displayAssistantMessage(msg)
-		case fantasy.MessageRoleTool:
+		case llm.RoleTool:
 			s.displayToolMessage(msg)
 		}
 	}
 }
 
-func (s *Session) displayUserMessage(msg fantasy.Message) {
+func (s *Session) displayUserMessage(msg llm.Message) {
 	var text string
 	for _, part := range msg.Content {
-		if tp, ok := part.(fantasy.TextPart); ok {
+		if tp, ok := part.(llm.TextPart); ok {
 			text += tp.Text
 		}
 	}
@@ -64,17 +64,17 @@ func (s *Session) displayUserMessage(msg fantasy.Message) {
 	}
 }
 
-func (s *Session) displayAssistantMessage(msg fantasy.Message) {
+func (s *Session) displayAssistantMessage(msg llm.Message) {
 	for _, part := range msg.Content {
 		switch p := part.(type) {
-		case fantasy.TextPart:
+		case llm.TextPart:
 			stream.WriteTLV(s.Output, stream.TagTextAssistant, p.Text)
 			s.Output.Flush()
-		case fantasy.ReasoningPart:
+		case llm.ReasoningPart:
 			stream.WriteTLV(s.Output, stream.TagTextReasoning, p.Text)
 			s.Output.Flush()
-		case fantasy.ToolCallPart:
-			if info := formatToolCall(p.ToolName, p.Input); info != "" {
+		case llm.ToolCallPart:
+			if info := formatToolCall(p.ToolName, string(p.Input)); info != "" {
 				stream.WriteTLV(s.Output, stream.TagFunctionShow, info)
 				s.Output.Flush()
 			}
@@ -82,10 +82,10 @@ func (s *Session) displayAssistantMessage(msg fantasy.Message) {
 	}
 }
 
-func (s *Session) displayToolMessage(msg fantasy.Message) {
+func (s *Session) displayToolMessage(msg llm.Message) {
 	for _, part := range msg.Content {
-		if tc, ok := part.(fantasy.ToolCallPart); ok {
-			if info := formatToolCall(tc.ToolName, tc.Input); info != "" {
+		if tc, ok := part.(llm.ToolCallPart); ok {
+			if info := formatToolCall(tc.ToolName, string(tc.Input)); info != "" {
 				stream.WriteTLV(s.Output, stream.TagFunctionShow, info)
 				s.Output.Flush()
 			}

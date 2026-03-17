@@ -7,12 +7,10 @@ import (
 	"os"
 	"strings"
 
-	"charm.land/fantasy"
-	"charm.land/fantasy/providers/anthropic"
-	"charm.land/fantasy/providers/openai"
-	"charm.land/fantasy/providers/openaicompat"
 	"github.com/alayacore/alayacore/internal/config"
 	debugpkg "github.com/alayacore/alayacore/internal/debug"
+	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/llm/factory"
 	"github.com/alayacore/alayacore/internal/skills"
 	"github.com/alayacore/alayacore/internal/tools"
 )
@@ -37,9 +35,9 @@ FILE EDITING:
 // Config holds the common app configuration
 type Config struct {
 	Cfg               *config.Settings
-	Model             fantasy.LanguageModel
+	Provider          llm.Provider
 	SkillsMgr         *skills.Manager
-	AgentTools        []fantasy.AgentTool
+	AgentTools        []llm.Tool
 	SystemPrompt      string // Default system prompt (always present)
 	ExtraSystemPrompt string // User-provided extra system prompt via --system flag
 }
@@ -80,109 +78,112 @@ func Setup(cfg *config.Settings) (*Config, error) {
 
 	return &Config{
 		Cfg:               cfg,
-		Model:             nil, // Model will be loaded from config file
+		Provider:          nil, // Provider will be created when model is set
 		SkillsMgr:         skillsManager,
-		AgentTools:        []fantasy.AgentTool{readFileTool, editFileTool, writeFileTool, activateSkillTool, posixShellTool},
+		AgentTools:        []llm.Tool{readFileTool, editFileTool, writeFileTool, activateSkillTool, posixShellTool},
 		SystemPrompt:      systemPrompt,
 		ExtraSystemPrompt: cfg.SystemPrompt, // User-provided extra system prompt (supplemental, not replacement)
 	}, nil
 }
 
-// CreateAgent creates a new fantasy agent with the configured tools and system prompt
-func (c *Config) CreateAgent() fantasy.Agent {
-	return fantasy.NewAgent(c.Model, fantasy.WithTools(c.AgentTools...), fantasy.WithSystemPrompt(c.SystemPrompt))
+// CreateAgent creates a new agent with the configured tools and system prompt
+func (c *Config) CreateAgent() *llm.Agent {
+	return llm.NewAgent(llm.AgentConfig{
+		Provider:     c.Provider,
+		Tools:        c.AgentTools,
+		SystemPrompt: c.SystemPrompt,
+		MaxSteps:     10,
+	})
 }
 
 // AgentFactory returns a function that creates new agents (for WebSocket)
-func (c *Config) AgentFactory() func() fantasy.Agent {
-	return func() fantasy.Agent {
-		return fantasy.NewAgent(c.Model, fantasy.WithTools(c.AgentTools...), fantasy.WithSystemPrompt(c.SystemPrompt))
+func (c *Config) AgentFactory() func() *llm.Agent {
+	return func() *llm.Agent {
+		return llm.NewAgent(llm.AgentConfig{
+			Provider:     c.Provider,
+			Tools:        c.AgentTools,
+			SystemPrompt: c.SystemPrompt,
+			MaxSteps:     10,
+		})
 	}
 }
 
 // CreateProvider creates a provider based on type
-func CreateProvider(provider, apiKey, baseURL string, debugAPI bool, proxyURL string) (interface {
-	LanguageModel(context.Context, string) (fantasy.LanguageModel, error)
-}, error) {
-	switch provider {
-	case "anthropic":
-		return CreateAnthropicProvider(apiKey, baseURL, debugAPI, proxyURL)
-	default:
-		return CreateOpenAIProvider(apiKey, baseURL, debugAPI, proxyURL)
-	}
-}
-
-// CreateAnthropicProvider creates an Anthropic provider
-func CreateAnthropicProvider(apiKey, baseURL string, debugAPI bool, proxyURL string) (interface {
-	LanguageModel(context.Context, string) (fantasy.LanguageModel, error)
-}, error) {
-	var opts []anthropic.Option
-	opts = append(opts, anthropic.WithAPIKey(apiKey))
-	if baseURL != "" {
-		opts = append(opts, anthropic.WithBaseURL(baseURL))
-	}
+func CreateProvider(providerType, apiKey, baseURL, model string, debugAPI bool, proxyURL string) (llm.Provider, error) {
+	// Create HTTP client with optional proxy and debug
+	var client *http.Client
 	if proxyURL != "" {
-		var client *http.Client
-		var err error
 		if debugAPI {
-			client, err = debugpkg.NewHTTPClientWithProxyAndDebug(proxyURL)
+			client, _ = debugpkg.NewHTTPClientWithProxyAndDebug(proxyURL)
 		} else {
-			client, err = debugpkg.NewHTTPClientWithProxy(proxyURL)
+			client, _ = debugpkg.NewHTTPClientWithProxy(proxyURL)
 		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to create HTTP client with proxy: %w", err)
-		}
-		opts = append(opts, anthropic.WithHTTPClient(client))
 	} else if debugAPI {
-		opts = append(opts, anthropic.WithHTTPClient(debugpkg.NewHTTPClient()))
+		client = debugpkg.NewHTTPClient()
 	}
-	return anthropic.New(opts...)
-}
 
-// CreateOpenAIProvider creates an OpenAI-compatible provider
-func CreateOpenAIProvider(apiKey, baseURL string, debugAPI bool, proxyURL string) (interface {
-	LanguageModel(context.Context, string) (fantasy.LanguageModel, error)
-}, error) {
 	// Use openaicompat for non-OpenAI URLs (Ollama, LM Studio, DeepSeek, etc.)
 	// This enables reasoning/thinking content support
-	if !strings.Contains(baseURL, "api.openai.com") {
-		var opts []openaicompat.Option
-		opts = append(opts, openaicompat.WithAPIKey(apiKey), openaicompat.WithBaseURL(baseURL))
-		if proxyURL != "" {
-			var client *http.Client
-			var err error
-			if debugAPI {
-				client, err = debugpkg.NewHTTPClientWithProxyAndDebug(proxyURL)
-			} else {
-				client, err = debugpkg.NewHTTPClientWithProxy(proxyURL)
-			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to create HTTP client with proxy: %w", err)
-			}
-			opts = append(opts, openaicompat.WithHTTPClient(client))
-		} else if debugAPI {
-			opts = append(opts, openaicompat.WithHTTPClient(debugpkg.NewHTTPClient()))
-		}
-		return openaicompat.New(opts...)
-	}
+	supportsReasoning := !strings.Contains(baseURL, "api.openai.com")
 
-	// Use native OpenAI provider for api.openai.com
-	var opts []openai.Option
-	opts = append(opts, openai.WithAPIKey(apiKey), openai.WithBaseURL(baseURL))
-	if proxyURL != "" {
-		var client *http.Client
-		var err error
-		if debugAPI {
-			client, err = debugpkg.NewHTTPClientWithProxyAndDebug(proxyURL)
-		} else {
-			client, err = debugpkg.NewHTTPClientWithProxy(proxyURL)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to create HTTP client with proxy: %w", err)
-		}
-		opts = append(opts, openai.WithHTTPClient(client))
-	} else if debugAPI {
-		opts = append(opts, openai.WithHTTPClient(debugpkg.NewHTTPClient()))
+	return factory.NewProvider(factory.ProviderConfig{
+		Type:              providerType,
+		APIKey:            apiKey,
+		BaseURL:           baseURL,
+		Model:             model,
+		HTTPClient:        client,
+		SupportsReasoning: supportsReasoning,
+	})
+}
+
+// ProviderConfig holds model configuration for provider creation
+type ProviderConfig struct {
+	ProtocolType string
+	APIKey       string
+	BaseURL      string
+	ModelName    string
+}
+
+// CreateProviderFromConfig creates a provider from a config struct
+func CreateProviderFromConfig(cfg *ProviderConfig, debugAPI bool, proxyURL string) (llm.Provider, error) {
+	return CreateProvider(cfg.ProtocolType, cfg.APIKey, cfg.BaseURL, cfg.ModelName, debugAPI, proxyURL)
+}
+
+// CreateAnthropicProvider creates an Anthropic provider (deprecated: use CreateProvider)
+func CreateAnthropicProvider(apiKey, baseURL, model string, debugAPI bool, proxyURL string) (llm.Provider, error) {
+	return CreateProvider("anthropic", apiKey, baseURL, model, debugAPI, proxyURL)
+}
+
+// CreateOpenAIProvider creates an OpenAI-compatible provider (deprecated: use CreateProvider)
+func CreateOpenAIProvider(apiKey, baseURL, model string, debugAPI bool, proxyURL string) (llm.Provider, error) {
+	return CreateProvider("openai", apiKey, baseURL, model, debugAPI, proxyURL)
+}
+
+// ModelConfig is an alias for the agent package's ModelConfig
+// This is kept for compatibility with external packages
+type ModelConfig = interface {
+	GetProtocolType() string
+	GetAPIKey() string
+	GetBaseURL() string
+	GetModelName() string
+}
+
+// Context-related interfaces for compatibility
+type contextKey string
+
+const (
+	configContextKey contextKey = "config"
+)
+
+// WithConfig adds config to context
+func WithConfig(ctx context.Context, cfg *Config) context.Context {
+	return context.WithValue(ctx, configContextKey, cfg)
+}
+
+// ConfigFromContext retrieves config from context
+func ConfigFromContext(ctx context.Context) *Config {
+	if cfg, ok := ctx.Value(configContextKey).(*Config); ok {
+		return cfg
 	}
-	return openai.New(opts...)
+	return nil
 }

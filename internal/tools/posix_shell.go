@@ -3,12 +3,14 @@ package tools
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/llm/llmcompat"
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/interp"
 	"mvdan.cc/sh/v3/syntax"
@@ -16,12 +18,23 @@ import (
 
 // PosixShellInput represents the input for the posix_shell tool
 type PosixShellInput struct {
-	Command string `json:"command" description:"The shell command to execute"`
+	Command string `json:"command"`
 }
 
 // NewPosixShellTool creates a new posix_shell tool for executing shell commands
-func NewPosixShellTool() fantasy.AgentTool {
-	return fantasy.NewAgentTool(
+func NewPosixShellTool() llm.Tool {
+	schema := json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"command": {
+				"type": "string",
+				"description": "The shell command to execute"
+			}
+		},
+		"required": ["command"]
+	}`)
+
+	return llmcompat.NewTool(
 		"posix_shell",
 		`Execute a shell command.
 
@@ -31,10 +44,17 @@ Rules:
 - Quote filenames with spaces or special characters
 - Check command output for errors before proceeding
 - Clean up temporary files when done`,
-		func(ctx context.Context, input PosixShellInput, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
-			cmd := input.Command
+	).
+		WithSchema(schema).
+		WithExecute(func(ctx context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+			var args PosixShellInput
+			if err := json.Unmarshal(input, &args); err != nil {
+				return llmcompat.NewTextErrorResponse("failed to parse input: " + err.Error()), nil
+			}
+
+			cmd := args.Command
 			if cmd == "" {
-				return fantasy.NewTextErrorResponse("command is required"), nil
+				return llmcompat.NewTextErrorResponse("command is required"), nil
 			}
 
 			var stdout, stderr bytes.Buffer
@@ -42,7 +62,7 @@ Rules:
 			parser := syntax.NewParser()
 			prog, err := parser.Parse(strings.NewReader(cmd), "")
 			if err != nil {
-				return fantasy.NewTextErrorResponse("parse error: " + err.Error()), nil
+				return llmcompat.NewTextErrorResponse("parse error: " + err.Error()), nil
 			}
 
 			cwd, _ := os.Getwd()
@@ -53,7 +73,7 @@ Rules:
 				interp.ExecHandlers(),
 			)
 			if err != nil {
-				return fantasy.NewTextErrorResponse("failed to create runner: " + err.Error()), nil
+				return llmcompat.NewTextErrorResponse("failed to create runner: " + err.Error()), nil
 			}
 
 			err = runner.Run(ctx, prog)
@@ -68,15 +88,15 @@ Rules:
 			if err != nil {
 				var exitStatus interp.ExitStatus
 				if errors.As(err, &exitStatus) {
-					return fantasy.NewTextErrorResponse(fmt.Sprintf("[%d] %s", exitStatus, output)), nil
+					return llmcompat.NewTextErrorResponse(fmt.Sprintf("[%d] %s", exitStatus, output)), nil
 				}
 				if output != "" {
-					return fantasy.NewTextErrorResponse(fmt.Sprintf("%s\n%s", err.Error(), output)), nil
+					return llmcompat.NewTextErrorResponse(fmt.Sprintf("%s\n%s", err.Error(), output)), nil
 				}
-				return fantasy.NewTextErrorResponse(err.Error()), nil
+				return llmcompat.NewTextErrorResponse(err.Error()), nil
 			}
 
-			return fantasy.NewTextResponse(output), nil
-		},
-	)
+			return llmcompat.NewTextResponse(output), nil
+		}).
+		Build()
 }

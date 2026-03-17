@@ -2,10 +2,12 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"sync/atomic"
 
-	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/llm/llmcompat"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
@@ -15,10 +17,9 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 		s.autoSummarize(ctx)
 	}
 
-	s.Messages = append(s.Messages, fantasy.NewUserMessage(prompt))
-	history := s.Messages[:len(s.Messages)-1]
+	s.Messages = append(s.Messages, llmcompat.NewUserMessage(prompt))
 
-	_, err := s.processPrompt(ctx, prompt, history)
+	_, err := s.processPrompt(ctx, prompt, s.Messages)
 
 	// Clean incomplete tool calls to prevent API errors on next request
 	// (messages are appended incrementally in OnStepFinish)
@@ -46,57 +47,66 @@ func (s *Session) autoSummarize(ctx context.Context) {
 
 // processPrompt processes a prompt, appending messages to s.Messages via callbacks.
 // Returns the output tokens from the response.
-func (s *Session) processPrompt(ctx context.Context, prompt string, history []fantasy.Message) (int64, error) {
-	call := fantasy.AgentStreamCall{Prompt: prompt}
+func (s *Session) processPrompt(ctx context.Context, prompt string, history []llm.Message) (int64, error) {
 	promptID := atomic.AddUint64(&s.nextPromptID, 1) - 1
 
 	var stepCount int
 	var outputTokens int64
-
-	if len(history) > 0 {
-		call.Messages = history
-	}
 
 	/// the final ID is [:promptID-stepCount-id:]
 	assembleID := func(id string) string {
 		return "[:" + strconv.FormatUint(promptID, 10) + "-" + strconv.FormatInt(int64(stepCount), 10) + "-" + id + ":]"
 	}
 
-	call.OnStepStart = func(step int) error {
-		stepCount = step
-		return nil
-	}
-	call.OnStepFinish = func(stepResult fantasy.StepResult) error {
-		s.trackUsage(stepResult.Usage)
-		// Append messages incrementally so they're preserved on cancellation
-		// (fantasy returns nil result on error, losing all steps)
-		if len(stepResult.Messages) > 0 {
-			s.Messages = append(s.Messages, stepResult.Messages...)
-		}
-		outputTokens += stepResult.Usage.OutputTokens
-		return nil
-	}
+	// Stream with callbacks
+	_, err := s.Agent.Stream(ctx, history, llm.StreamCallbacks{
+		OnStepStart: func(step int) error {
+			stepCount = step
+			return nil
+		},
+		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
+			s.trackUsage(usage)
+			// Append messages incrementally so they're preserved on cancellation
+			if len(messages) > 0 {
+				s.Messages = append(s.Messages, messages...)
+			}
+			outputTokens += usage.OutputTokens
+			return nil
+		},
+		OnToolResult: func(toolCallID string, output llm.ToolResultOutput) error {
+			// Add tool result message to session messages
+			s.Messages = append(s.Messages, llm.Message{
+				Role: llm.RoleTool,
+				Content: []llm.ContentPart{llm.ToolResultPart{
+					Type:       "tool_result",
+					ToolCallID: toolCallID,
+					Output:     output,
+				}},
+			})
+			return nil
+		},
+		OnTextDelta: func(delta string) error {
+			stream.WriteTLV(s.Output, stream.TagTextAssistant, assembleID("t")+delta)
+			s.Output.Flush()
+			return nil
+		},
+		OnReasoningDelta: func(delta string) error {
+			stream.WriteTLV(s.Output, stream.TagTextReasoning, assembleID("r")+delta)
+			s.Output.Flush()
+			return nil
+		},
+		OnToolCall: func(toolCallID, toolName string, input json.RawMessage) error {
+			s.writeToolCall(toolName, string(input), toolCallID)
+			s.Output.Flush()
+			return nil
+		},
+	})
 
-	// The `id` in the callback is not reliable, it does not work for some providers.
-	// Here we only need to distinguish the delta type, so we give numbers directly.
-	call.OnTextDelta = func(_, text string) error {
-		stream.WriteTLV(s.Output, stream.TagTextAssistant, assembleID("t")+text)
-		s.Output.Flush()
-		return nil
-	}
-	call.OnReasoningDelta = func(_, text string) error {
-		stream.WriteTLV(s.Output, stream.TagTextReasoning, assembleID("r")+text)
-		s.Output.Flush()
-		return nil
-	}
-	call.OnToolCall = func(tc fantasy.ToolCallContent) error {
-		s.writeToolCall(tc.ToolName, tc.Input, tc.ToolCallID)
-		s.Output.Flush()
-		return nil
-	}
-
-	_, err := s.Agent.Stream(ctx, call)
 	s.Output.Flush()
 
-	return outputTokens, err
+	if err != nil {
+		return 0, err
+	}
+
+	return outputTokens, nil
 }

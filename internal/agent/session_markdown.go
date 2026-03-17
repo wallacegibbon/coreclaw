@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 	"gopkg.in/yaml.v3"
 )
@@ -41,23 +41,23 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 		for _, part := range msg.Content {
 			switch p := part.(type) {
 			// Text content tags
-			case fantasy.TextPart:
+			case llm.TextPart:
 				tag := stream.TagTextUser
-				if msg.Role == fantasy.MessageRoleAssistant {
+				if msg.Role == llm.RoleAssistant {
 					tag = stream.TagTextAssistant
 				}
 				writeTLV(&binaryBuf, tag, p.Text)
 
-			case fantasy.ReasoningPart:
+			case llm.ReasoningPart:
 				writeTLV(&binaryBuf, stream.TagTextReasoning, p.Text)
 
 			// Function tags
-			case fantasy.ToolCallPart:
+			case llm.ToolCallPart:
 				// Encode tool call as JSON
 				tc := toolCallData{
 					ID:    p.ToolCallID,
 					Name:  p.ToolName,
-					Input: p.Input,
+					Input: string(p.Input),
 				}
 				jsonData, err := json.Marshal(tc)
 				if err != nil {
@@ -65,7 +65,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				}
 				writeTLV(&binaryBuf, stream.TagFunctionCall, string(jsonData))
 
-			case fantasy.ToolResultPart:
+			case llm.ToolResultPart:
 				// Encode tool result as JSON
 				tr := toolResultData{
 					ID:     p.ToolCallID,
@@ -149,9 +149,9 @@ func parseSessionMarkdown(data []byte) (*SessionData, error) {
 }
 
 // parseMessagesTLV parses TLV-encoded message content.
-func parseMessagesTLV(body string) ([]fantasy.Message, error) {
-	var messages []fantasy.Message
-	var currentMsg *fantasy.Message
+func parseMessagesTLV(body string) ([]llm.Message, error) {
+	var messages []llm.Message
+	var currentMsg *llm.Message
 
 	reader := strings.NewReader(body)
 
@@ -204,48 +204,50 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 		}
 
 		// Parse based on tag
-		var msgPart fantasy.MessagePart
-		var msgRole fantasy.MessageRole
+		var msgPart llm.ContentPart
+		var msgRole llm.MessageRole
 		newMessage := false
 
 		switch tag {
 		// Text content tags
 		case stream.TagTextUser:
 			newMessage = true
-			msgRole = fantasy.MessageRoleUser
-			msgPart = fantasy.TextPart{Text: string(content)}
+			msgRole = llm.RoleUser
+			msgPart = llm.TextPart{Type: "text", Text: string(content)}
 
 		case stream.TagTextAssistant:
 			newMessage = true
-			msgRole = fantasy.MessageRoleAssistant
-			msgPart = fantasy.TextPart{Text: string(content)}
+			msgRole = llm.RoleAssistant
+			msgPart = llm.TextPart{Type: "text", Text: string(content)}
 
 		case stream.TagTextReasoning:
-			msgRole = fantasy.MessageRoleAssistant
-			msgPart = fantasy.ReasoningPart{Text: string(content)}
+			msgRole = llm.RoleAssistant
+			msgPart = llm.ReasoningPart{Type: "thinking", Text: string(content)}
 
 		// Function tags
 		case stream.TagFunctionCall:
-			msgRole = fantasy.MessageRoleAssistant
+			msgRole = llm.RoleAssistant
 			var tc toolCallData
 			if err := json.Unmarshal(content, &tc); err != nil {
 				return nil, fmt.Errorf("failed to parse tool call: %w", err)
 			}
-			msgPart = fantasy.ToolCallPart{
+			msgPart = llm.ToolCallPart{
+				Type:       "tool_use",
 				ToolCallID: tc.ID,
 				ToolName:   tc.Name,
-				Input:      tc.Input,
+				Input:      json.RawMessage(tc.Input),
 			}
 
 		case stream.TagFunctionResult:
-			msgRole = fantasy.MessageRoleTool
+			msgRole = llm.RoleTool
 			var tr toolResultData
 			if err := json.Unmarshal(content, &tr); err != nil {
 				return nil, fmt.Errorf("failed to parse tool result: %w", err)
 			}
-			msgPart = fantasy.ToolResultPart{
+			msgPart = llm.ToolResultPart{
+				Type:       "tool_result",
 				ToolCallID: tr.ID,
-				Output:     fantasy.ToolResultOutputContentText{Text: tr.Output},
+				Output:     llm.ToolResultOutputText{Type: "text", Text: tr.Output},
 			}
 
 		default:
@@ -258,9 +260,9 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 			if currentMsg != nil {
 				messages = append(messages, *currentMsg)
 			}
-			currentMsg = &fantasy.Message{
+			currentMsg = &llm.Message{
 				Role:    msgRole,
-				Content: []fantasy.MessagePart{msgPart},
+				Content: []llm.ContentPart{msgPart},
 			}
 		} else {
 			currentMsg.Content = append(currentMsg.Content, msgPart)
@@ -274,17 +276,13 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 	return messages, nil
 }
 
-// formatToolResultOutput converts ToolResultOutputContent to string.
-func formatToolResultOutput(output fantasy.ToolResultOutputContent) string {
-	if text, ok := output.(fantasy.ToolResultOutputContentText); ok {
+// formatToolResultOutput converts ToolResultOutput to string.
+func formatToolResultOutput(output llm.ToolResultOutput) string {
+	if text, ok := output.(llm.ToolResultOutputText); ok {
 		return text.Text
 	}
-	if m, ok := output.(fantasy.ToolResultOutputContentMedia); ok {
-		data, _ := json.Marshal(m)
-		return string(data)
-	}
-	if e, ok := output.(fantasy.ToolResultOutputContentError); ok {
-		return e.Error.Error()
+	if e, ok := output.(llm.ToolResultOutputError); ok {
+		return e.Error
 	}
 	return fmt.Sprintf("%v", output)
 }

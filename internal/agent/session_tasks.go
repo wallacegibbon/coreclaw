@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/llm"
 )
 
 func (s *Session) submitTask(task Task) {
@@ -146,10 +146,10 @@ func (s *Session) appendCancelMessage() {
 	if len(s.Messages) == 0 {
 		return
 	}
-	if s.Messages[len(s.Messages)-1].Role == fantasy.MessageRoleUser {
-		s.Messages = append(s.Messages, fantasy.Message{
-			Role:    fantasy.MessageRoleAssistant,
-			Content: []fantasy.MessagePart{fantasy.TextPart{Text: "The user canceled."}},
+	if s.Messages[len(s.Messages)-1].Role == llm.RoleUser {
+		s.Messages = append(s.Messages, llm.Message{
+			Role:    llm.RoleAssistant,
+			Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "The user canceled."}},
 		})
 	}
 }

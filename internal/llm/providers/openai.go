@@ -1,0 +1,503 @@
+package providers
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"sync"
+
+	"github.com/alayacore/alayacore/internal/llm"
+)
+
+// openAIStreamState tracks state across streaming events
+type openAIStreamState struct {
+	mu               sync.Mutex
+	textBuilder      strings.Builder
+	reasoningBuilder strings.Builder
+	toolCallArgs     map[int]*strings.Builder // tool call index -> arguments builder
+	toolCalls        []llm.ToolCallPart
+	usage            llm.Usage
+}
+
+func (s *openAIStreamState) addTextDelta(delta string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.textBuilder.WriteString(delta)
+}
+
+func (s *openAIStreamState) addReasoningDelta(delta string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reasoningBuilder.WriteString(delta)
+}
+
+func (s *openAIStreamState) appendToolCallArgs(index int, args json.RawMessage) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.toolCallArgs == nil {
+		s.toolCallArgs = make(map[int]*strings.Builder)
+	}
+	if _, exists := s.toolCallArgs[index]; !exists {
+		s.toolCallArgs[index] = &strings.Builder{}
+	}
+	// Each arguments chunk may be a JSON string or raw JSON
+	// If it starts with a quote, unquote it first
+	if len(args) > 0 && args[0] == '"' {
+		var unquoted string
+		if err := json.Unmarshal(args, &unquoted); err == nil {
+			s.toolCallArgs[index].WriteString(unquoted)
+			return
+		}
+	}
+	// Otherwise append as-is (building up JSON object)
+	s.toolCallArgs[index].WriteString(string(args))
+}
+
+func (s *openAIStreamState) setToolCallName(index int, id, name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Ensure tool calls slice is big enough
+	for len(s.toolCalls) <= index {
+		s.toolCalls = append(s.toolCalls, llm.ToolCallPart{
+			Type: "tool_use",
+		})
+	}
+	s.toolCalls[index].ToolCallID = id
+	s.toolCalls[index].ToolName = name
+}
+
+func (s *openAIStreamState) finalizeToolCalls() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Merge accumulated arguments into tool calls
+	for i := range s.toolCalls {
+		if builder, exists := s.toolCallArgs[i]; exists {
+			args := builder.String()
+			s.toolCalls[i].Input = json.RawMessage(args)
+		}
+	}
+}
+
+func (s *openAIStreamState) setUsage(usage llm.Usage) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.usage = usage
+}
+
+func (s *openAIStreamState) getToolCalls() []llm.ToolCallPart {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.toolCalls
+}
+
+func (s *openAIStreamState) getMessage() llm.Message {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Build content parts from accumulated text
+	var content []llm.ContentPart
+
+	// Add reasoning first (thinking before response)
+	if s.reasoningBuilder.Len() > 0 {
+		content = append(content, llm.ReasoningPart{
+			Type: "reasoning",
+			Text: s.reasoningBuilder.String(),
+		})
+	}
+
+	// Add text content
+	if s.textBuilder.Len() > 0 {
+		content = append(content, llm.TextPart{
+			Type: "text",
+			Text: s.textBuilder.String(),
+		})
+	}
+
+	// Add tool calls
+	for _, tc := range s.toolCalls {
+		content = append(content, tc)
+	}
+
+	return llm.Message{
+		Role:    llm.RoleAssistant,
+		Content: content,
+	}
+}
+
+func (s *openAIStreamState) getUsage() llm.Usage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.usage
+}
+
+// OpenAIProvider implements the OpenAI API
+type OpenAIProvider struct {
+	apiKey  string
+	baseURL string
+	client  *http.Client
+	model   string
+}
+
+// OpenAIOption configures the provider
+type OpenAIOption func(*OpenAIProvider)
+
+// NewOpenAI creates a new OpenAI provider
+func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
+	p := &OpenAIProvider{
+		baseURL: "https://api.openai.com/v1",
+		client:  &http.Client{},
+		model:   "gpt-4o",
+	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	if p.apiKey == "" {
+		return nil, fmt.Errorf("API key is required")
+	}
+	return p, nil
+}
+
+// WithOpenAIAPIKey sets the API key
+func WithOpenAIAPIKey(key string) OpenAIOption {
+	return func(p *OpenAIProvider) {
+		p.apiKey = key
+	}
+}
+
+// WithOpenAIBaseURL sets the base URL
+func WithOpenAIBaseURL(url string) OpenAIOption {
+	return func(p *OpenAIProvider) {
+		p.baseURL = strings.TrimSuffix(url, "/")
+	}
+}
+
+// WithOpenAIHTTPClient sets the HTTP client
+func WithOpenAIHTTPClient(client *http.Client) OpenAIOption {
+	return func(p *OpenAIProvider) {
+		p.client = client
+	}
+}
+
+// WithOpenAIModel sets the model
+func WithOpenAIModel(model string) OpenAIOption {
+	return func(p *OpenAIProvider) {
+		p.model = model
+	}
+}
+
+// openAIRequest represents the OpenAI API request
+type openAIRequest struct {
+	Model       string          `json:"model"`
+	Messages    []openAIMessage `json:"messages"`
+	Tools       []openAITool    `json:"tools,omitempty"`
+	Stream      bool            `json:"stream"`
+	MaxTokens   int             `json:"max_tokens,omitempty"`
+	Temperature float64         `json:"temperature,omitempty"`
+}
+
+type openAIMessage struct {
+	Role             string           `json:"role"`
+	Content          interface{}      `json:"content,omitempty"`
+	ReasoningContent string           `json:"reasoning_content,omitempty"`
+	ToolCalls        []openAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string           `json:"tool_call_id,omitempty"`
+}
+
+type openAIToolCall struct {
+	Index    int            `json:"index"`
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Function openAIFunction `json:"function"`
+}
+
+type openAIFunction struct {
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments"`
+}
+
+type openAITool struct {
+	Type     string         `json:"type"`
+	Function openAIToolFunc `json:"function"`
+}
+
+type openAIToolFunc struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Parameters  json.RawMessage `json:"parameters"`
+}
+
+// StreamMessages streams messages from OpenAI
+func (p *OpenAIProvider) StreamMessages(
+	ctx context.Context,
+	messages []llm.Message,
+	tools []llm.ToolDefinition,
+	systemPrompt string,
+) (<-chan llm.StreamEvent, error) {
+
+	// Convert messages to OpenAI format
+	apiMessages := make([]openAIMessage, 0, len(messages)+1)
+
+	// Add system message first
+	if systemPrompt != "" {
+		apiMessages = append(apiMessages, openAIMessage{
+			Role:    "system",
+			Content: systemPrompt,
+		})
+	}
+
+	// Convert conversation messages
+	for _, msg := range messages {
+		apiMsg := p.convertMessage(msg)
+		apiMessages = append(apiMessages, apiMsg)
+	}
+
+	// Convert tools to OpenAI format
+	apiTools := make([]openAITool, 0, len(tools))
+	for _, tool := range tools {
+		apiTools = append(apiTools, openAITool{
+			Type: "function",
+			Function: openAIToolFunc{
+				Name:        tool.Name,
+				Description: tool.Description,
+				Parameters:  tool.Schema,
+			},
+		})
+	}
+
+	// Build request
+	reqBody := openAIRequest{
+		Model:    p.model,
+		Messages: apiMessages,
+		Tools:    apiTools,
+		Stream:   true,
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/chat/completions", bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+p.apiKey)
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Create event channel
+	eventChan := make(chan llm.StreamEvent, 100)
+
+	// Start streaming goroutine
+	go p.parseStream(resp.Body, eventChan)
+
+	return eventChan, nil
+}
+
+// convertMessage converts our message to OpenAI format
+func (p *OpenAIProvider) convertMessage(msg llm.Message) openAIMessage {
+	apiMsg := openAIMessage{
+		Role: string(msg.Role),
+	}
+
+	// Handle tool results specially
+	if msg.Role == llm.RoleTool {
+		if len(msg.Content) > 0 {
+			if tr, ok := msg.Content[0].(llm.ToolResultPart); ok {
+				apiMsg.ToolCallID = tr.ToolCallID
+				switch out := tr.Output.(type) {
+				case llm.ToolResultOutputText:
+					apiMsg.Content = out.Text
+				case llm.ToolResultOutputError:
+					apiMsg.Content = out.Error
+				}
+			}
+		}
+		return apiMsg
+	}
+
+	// Handle assistant messages with tool calls
+	if msg.Role == llm.RoleAssistant {
+		var hasToolCalls bool
+		for _, part := range msg.Content {
+			if _, ok := part.(llm.ToolCallPart); ok {
+				hasToolCalls = true
+				break
+			}
+		}
+
+		if hasToolCalls {
+			apiMsg.ToolCalls = make([]openAIToolCall, 0)
+			for _, part := range msg.Content {
+				if tc, ok := part.(llm.ToolCallPart); ok {
+					// OpenAI expects arguments to be a JSON-encoded string
+					// We need to marshal the raw JSON to a string
+					argsStr, _ := json.Marshal(string(tc.Input))
+					apiMsg.ToolCalls = append(apiMsg.ToolCalls, openAIToolCall{
+						ID:   tc.ToolCallID,
+						Type: "function",
+						Function: openAIFunction{
+							Name:      tc.ToolName,
+							Arguments: argsStr,
+						},
+					})
+				}
+			}
+			// Content can be nil for tool calls
+			apiMsg.Content = nil
+			return apiMsg
+		}
+	}
+
+	// Regular text/reasoning content
+	var contentParts []map[string]interface{}
+	var reasoningText string
+	for _, part := range msg.Content {
+		switch v := part.(type) {
+		case llm.TextPart:
+			contentParts = append(contentParts, map[string]interface{}{
+				"type": "text",
+				"text": v.Text,
+			})
+		case llm.ReasoningPart:
+			// Accumulate reasoning content
+			reasoningText += v.Text
+		}
+	}
+
+	// Set reasoning_content if present
+	if reasoningText != "" {
+		apiMsg.ReasoningContent = reasoningText
+	}
+
+	if len(contentParts) == 1 {
+		// Single text part - use simple string
+		apiMsg.Content = contentParts[0]["text"]
+	} else if len(contentParts) > 1 {
+		apiMsg.Content = contentParts
+	}
+
+	return apiMsg
+}
+
+// parseStream parses the SSE stream from OpenAI
+func (p *OpenAIProvider) parseStream(reader io.Reader, eventChan chan<- llm.StreamEvent) {
+	defer close(eventChan)
+
+	state := &openAIStreamState{}
+	scanner := bufio.NewScanner(reader)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+
+		data := strings.TrimPrefix(line, "data: ")
+		if data == "[DONE]" {
+			break
+		}
+
+		if err := p.handleEvent(data, eventChan, state); err != nil {
+			eventChan <- llm.StreamErrorEvent{Error: err}
+			return
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		eventChan <- llm.StreamErrorEvent{Error: err}
+		return
+	}
+
+	// Finalize tool calls and emit events
+	state.finalizeToolCalls()
+	for _, tc := range state.getToolCalls() {
+		eventChan <- llm.ToolCallEvent{
+			ToolCallID: tc.ToolCallID,
+			ToolName:   tc.ToolName,
+			Input:      tc.Input,
+		}
+	}
+
+	// Send final StepCompleteEvent with accumulated message
+	eventChan <- llm.StepCompleteEvent{
+		Messages: []llm.Message{state.getMessage()},
+		Usage:    state.getUsage(),
+	}
+}
+
+// handleEvent handles a single SSE event
+func (p *OpenAIProvider) handleEvent(data string, eventChan chan<- llm.StreamEvent, state *openAIStreamState) error {
+	var streamResp struct {
+		Choices []struct {
+			Delta struct {
+				Content          string           `json:"content"`
+				ReasoningContent string           `json:"reasoning_content"`
+				ToolCalls        []openAIToolCall `json:"tool_calls"`
+			} `json:"delta"`
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+		Usage struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+		} `json:"usage"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+		return fmt.Errorf("failed to parse event: %w", err)
+	}
+
+	for _, choice := range streamResp.Choices {
+		// Handle reasoning content (DeepSeek, Qwen, etc.)
+		if choice.Delta.ReasoningContent != "" {
+			state.addReasoningDelta(choice.Delta.ReasoningContent)
+			eventChan <- llm.ReasoningDeltaEvent{Delta: choice.Delta.ReasoningContent}
+		}
+
+		// Handle text content
+		if choice.Delta.Content != "" {
+			state.addTextDelta(choice.Delta.Content)
+			eventChan <- llm.TextDeltaEvent{Delta: choice.Delta.Content}
+		}
+
+		// Handle tool calls - arguments may come in chunks
+		for _, tc := range choice.Delta.ToolCalls {
+			// Accumulate arguments (may come in multiple chunks)
+			if len(tc.Function.Arguments) > 0 {
+				state.appendToolCallArgs(tc.Index, tc.Function.Arguments)
+			}
+			// Set name and ID when available (usually first chunk)
+			if tc.Function.Name != "" {
+				state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
+			}
+		}
+
+		// Track usage if available
+		if streamResp.Usage.PromptTokens > 0 || streamResp.Usage.CompletionTokens > 0 {
+			state.setUsage(llm.Usage{
+				InputTokens:  int64(streamResp.Usage.PromptTokens),
+				OutputTokens: int64(streamResp.Usage.CompletionTokens),
+			})
+		}
+	}
+
+	return nil
+}

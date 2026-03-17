@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/llm"
 )
 
 func TestEditFileTool(t *testing.T) {
@@ -168,27 +168,35 @@ func TestEditFileTool(t *testing.T) {
 
 			// Run tool
 			tool := NewEditFileTool()
-			resp, err := tool.Run(context.Background(), fantasy.ToolCall{
-				ID:    "test",
-				Name:  "edit_file",
-				Input: toJSON(input),
-			})
+			inputJSON, _ := json.Marshal(input)
+			resp, err := tool.Execute(context.Background(), inputJSON)
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
 			if tt.expectError {
-				if !strings.Contains(resp.Content, tt.errorMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.errorMsg, resp.Content)
+				// Check for error response
+				var errMsg string
+				switch r := resp.(type) {
+				case llm.ToolResultOutputError:
+					errMsg = r.Error
+				default:
+					t.Errorf("expected error response, got %T", resp)
+					return
+				}
+				if !strings.Contains(errMsg, tt.errorMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.errorMsg, errMsg)
 				}
 				return
 			}
 
 			// Check result
-			if resp.Type != "text" {
-				t.Errorf("expected text response, got %s", resp.Type)
+			textResp, ok := resp.(llm.ToolResultOutputText)
+			if !ok {
+				t.Errorf("expected text response, got %T", resp)
 			}
+			_ = textResp // We don't check the success message content
 
 			// Verify file content
 			content, err := os.ReadFile(testFile)
@@ -202,9 +210,4 @@ func TestEditFileTool(t *testing.T) {
 			}
 		})
 	}
-}
-
-func toJSON(v any) string {
-	b, _ := json.Marshal(v)
-	return string(b)
 }

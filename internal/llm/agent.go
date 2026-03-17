@@ -1,0 +1,224 @@
+package llm
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"sync"
+)
+
+// Tool represents an executable tool
+type Tool struct {
+	Definition ToolDefinition
+	Execute    func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error)
+}
+
+// AgentConfig configures the agent
+type AgentConfig struct {
+	Provider     Provider
+	Tools        []Tool
+	SystemPrompt string
+	MaxSteps     int
+}
+
+// Agent orchestrates tool-calling loops
+type Agent struct {
+	config AgentConfig
+}
+
+// NewAgent creates a new agent
+func NewAgent(config AgentConfig) *Agent {
+	if config.MaxSteps == 0 {
+		config.MaxSteps = 10
+	}
+	return &Agent{config: config}
+}
+
+// StreamCallbacks receives streaming events
+type StreamCallbacks struct {
+	OnTextDelta      func(delta string) error
+	OnReasoningDelta func(delta string) error
+	OnToolCall       func(toolCallID, toolName string, input json.RawMessage) error
+	OnToolResult     func(toolCallID string, output ToolResultOutput) error
+	OnStepStart      func(step int) error
+	OnStepFinish     func(messages []Message, usage Usage) error
+}
+
+// StreamResult is the final result of streaming
+type StreamResult struct {
+	Messages []Message
+	Usage    Usage
+}
+
+// Stream executes the agent with streaming callbacks
+func (a *Agent) Stream(
+	ctx context.Context,
+	messages []Message,
+	callbacks StreamCallbacks,
+) (*StreamResult, error) {
+	var (
+		allMessages = make([]Message, len(messages))
+		totalUsage  Usage
+		step        int
+		mu          sync.Mutex
+	)
+
+	copy(allMessages, messages)
+
+	for step = 1; step <= a.config.MaxSteps; step++ {
+		if callbacks.OnStepStart != nil {
+			if err := callbacks.OnStepStart(step); err != nil {
+				return nil, fmt.Errorf("OnStepStart callback failed: %w", err)
+			}
+		}
+
+		// Convert tools to definitions
+		toolDefs := make([]ToolDefinition, len(a.config.Tools))
+		for i, tool := range a.config.Tools {
+			toolDefs[i] = tool.Definition
+		}
+
+		// Stream from provider
+		eventChan, err := a.config.Provider.StreamMessages(
+			ctx,
+			allMessages,
+			toolDefs,
+			a.config.SystemPrompt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("provider stream failed: %w", err)
+		}
+
+		// Process events
+		var (
+			stepMessages []Message
+			stepUsage    Usage
+			toolCalls    []ToolCallPart
+		)
+
+		for event := range eventChan {
+			switch e := event.(type) {
+			case TextDeltaEvent:
+				if callbacks.OnTextDelta != nil {
+					if err := callbacks.OnTextDelta(e.Delta); err != nil {
+						return nil, fmt.Errorf("OnTextDelta callback failed: %w", err)
+					}
+				}
+
+			case ReasoningDeltaEvent:
+				if callbacks.OnReasoningDelta != nil {
+					if err := callbacks.OnReasoningDelta(e.Delta); err != nil {
+						return nil, fmt.Errorf("OnReasoningDelta callback failed: %w", err)
+					}
+				}
+
+			case ToolCallEvent:
+				toolCalls = append(toolCalls, ToolCallPart{
+					Type:       "tool_use",
+					ToolCallID: e.ToolCallID,
+					ToolName:   e.ToolName,
+					Input:      e.Input,
+				})
+
+				if callbacks.OnToolCall != nil {
+					if err := callbacks.OnToolCall(e.ToolCallID, e.ToolName, e.Input); err != nil {
+						return nil, fmt.Errorf("OnToolCall callback failed: %w", err)
+					}
+				}
+
+			case StepCompleteEvent:
+				stepMessages = e.Messages
+				stepUsage = e.Usage
+
+			case StreamErrorEvent:
+				return nil, e.Error
+			}
+		}
+
+		mu.Lock()
+		totalUsage.InputTokens += stepUsage.InputTokens
+		totalUsage.OutputTokens += stepUsage.OutputTokens
+		mu.Unlock()
+
+		if callbacks.OnStepFinish != nil {
+			if err := callbacks.OnStepFinish(stepMessages, stepUsage); err != nil {
+				return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
+			}
+		}
+
+		// If no tool calls, we're done - add the step messages (assistant response)
+		if len(toolCalls) == 0 {
+			allMessages = append(allMessages, stepMessages...)
+			break
+		}
+
+		// There are tool calls - add assistant message with tool calls
+		// Note: We construct the assistant message from ToolCallEvents which have complete tool input
+		assistantContent := make([]ContentPart, len(toolCalls))
+		for i, tc := range toolCalls {
+			assistantContent[i] = tc
+		}
+		allMessages = append(allMessages, Message{
+			Role:    RoleAssistant,
+			Content: assistantContent,
+		})
+
+		// Execute tools and add results to messages
+		toolResults := make([]ContentPart, len(toolCalls))
+		for i, tc := range toolCalls {
+			// Find the tool
+			var tool *Tool
+			for _, t := range a.config.Tools {
+				if t.Definition.Name == tc.ToolName {
+					tool = &t
+					break
+				}
+			}
+
+			if tool == nil {
+				toolResults[i] = ToolResultPart{
+					Type:       "tool_result",
+					ToolCallID: tc.ToolCallID,
+					Output: ToolResultOutputError{
+						Type:  "error",
+						Error: fmt.Sprintf("unknown tool: %s", tc.ToolName),
+					},
+				}
+				continue
+			}
+
+			// Execute tool
+			output, err := tool.Execute(ctx, tc.Input)
+			if err != nil {
+				output = ToolResultOutputError{
+					Type:  "error",
+					Error: err.Error(),
+				}
+			}
+
+			toolResults[i] = ToolResultPart{
+				Type:       "tool_result",
+				ToolCallID: tc.ToolCallID,
+				Output:     output,
+			}
+
+			// Notify callback about tool result
+			if callbacks.OnToolResult != nil {
+				if err := callbacks.OnToolResult(tc.ToolCallID, output); err != nil {
+					return nil, fmt.Errorf("OnToolResult callback failed: %w", err)
+				}
+			}
+		}
+
+		// Add tool results as a new message
+		allMessages = append(allMessages, Message{
+			Role:    RoleTool,
+			Content: toolResults,
+		})
+	}
+
+	return &StreamResult{
+		Messages: allMessages,
+		Usage:    totalUsage,
+	}, nil
+}

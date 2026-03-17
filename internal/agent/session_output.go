@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
@@ -45,12 +45,10 @@ func (s *Session) writeToolCall(toolName, input, id string) {
 }
 
 // trackUsage updates token usage statistics
-func (s *Session) trackUsage(usage fantasy.Usage) {
+func (s *Session) trackUsage(usage llm.Usage) {
 	s.mu.Lock()
 	s.TotalSpent.InputTokens += usage.InputTokens
 	s.TotalSpent.OutputTokens += usage.OutputTokens
-	s.TotalSpent.TotalTokens += usage.TotalTokens
-	s.TotalSpent.ReasoningTokens += usage.ReasoningTokens
 	// ContextTokens tracks the total context size (input tokens sent to API)
 	// This is what counts toward provider context limits
 	s.ContextTokens = usage.InputTokens
@@ -107,7 +105,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 	inProgress := s.inProgress
 	contextTokens := s.ContextTokens
 	contextLimit := s.ContextLimit
-	totalTokens := s.TotalSpent.TotalTokens
+	totalTokens := s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens
 	s.mu.Unlock()
 
 	info := SystemInfo{
@@ -132,15 +130,15 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 // Uses two-phase approach:
 // 1. Forward pass to identify all unmatched tool calls (tool_call without corresponding tool_result)
 // 2. Reverse pass to remove/filter messages containing unmatched tool calls
-func cleanIncompleteToolCalls(messages []fantasy.Message) []fantasy.Message {
+func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 	// Phase 1: Forward pass to find all unmatched tool calls
 	unmatchedCalls := make(map[string]bool)
 	for _, msg := range messages {
 		for _, part := range msg.Content {
 			switch p := part.(type) {
-			case fantasy.ToolCallPart:
+			case llm.ToolCallPart:
 				unmatchedCalls[p.ToolCallID] = true
-			case fantasy.ToolResultPart:
+			case llm.ToolResultPart:
 				delete(unmatchedCalls, p.ToolCallID)
 			}
 		}
@@ -159,7 +157,7 @@ func cleanIncompleteToolCalls(messages []fantasy.Message) []fantasy.Message {
 		// Check if message has any unmatched tool calls
 		hasUnmatchedCall := false
 		for _, part := range msg.Content {
-			if tc, ok := part.(fantasy.ToolCallPart); ok && unmatchedCalls[tc.ToolCallID] {
+			if tc, ok := part.(llm.ToolCallPart); ok && unmatchedCalls[tc.ToolCallID] {
 				hasUnmatchedCall = true
 				break
 			}
@@ -167,9 +165,9 @@ func cleanIncompleteToolCalls(messages []fantasy.Message) []fantasy.Message {
 
 		if hasUnmatchedCall {
 			// Filter out unmatched tool calls
-			filteredParts := make([]fantasy.MessagePart, 0, len(msg.Content))
+			filteredParts := make([]llm.ContentPart, 0, len(msg.Content))
 			for _, part := range msg.Content {
-				if tc, ok := part.(fantasy.ToolCallPart); ok && unmatchedCalls[tc.ToolCallID] {
+				if tc, ok := part.(llm.ToolCallPart); ok && unmatchedCalls[tc.ToolCallID] {
 					continue // Skip unmatched tool call
 				}
 				filteredParts = append(filteredParts, part)

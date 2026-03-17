@@ -51,7 +51,6 @@ func (a *TerminalAdaptor) Start() {
 
 	// Load session synchronously before starting the UI
 	session, _ := agentpkg.LoadOrNewSession(
-		a.Config.Model,
 		a.Config.AgentTools,
 		a.Config.SystemPrompt,
 		a.Config.ExtraSystemPrompt,

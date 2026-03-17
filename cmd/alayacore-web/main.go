@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -43,23 +42,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Get the active model and create provider/model
-	activeModel := modelManager.GetActive()
-	if activeModel != nil {
-		provider, err := app.CreateProvider(activeModel.ProtocolType, activeModel.APIKey, activeModel.BaseURL, cfg.DebugAPI, cfg.Proxy)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to create provider: %v\n\n", err)
-			os.Exit(1)
-		}
-
-		model, err := provider.LanguageModel(context.Background(), activeModel.ModelName)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to create language model: %v\n\n", err)
-			os.Exit(1)
-		}
-
-		appCfg.Model = model
-	}
+	// The session will load the model from config when it starts
+	// No need to set appCfg.Provider here
 
 	port := cfg.Addr
 	if port == "" {

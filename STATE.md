@@ -1,7 +1,10 @@
 # AlayaCore Project Status
 
 ## Current Work
-- 
+- **Fantasy → Custom LLM migration: COMPLETE** ✅
+  - All phases completed
+  - Fantasy dependency removed from go.mod
+  - All tests passing
 
 ## Key Gotchas
 
@@ -18,3 +21,9 @@
 - **Dual system prompt architecture**: `--system` flag appends extra system prompt rather than replacing default. Both prompts become separate system messages, each with cache_control for Anthropic APIs.
 
 - **Prompt cache is per-model config**: `prompt_cache: true` in model.conf enables cache_control markers for Anthropic. Other providers auto-cache and ignore this setting.
+
+- **OpenAI tool call arguments chunking**: OpenAI-compatible APIs split tool call arguments across multiple delta events. Critical: subsequent chunks have `"id": ""` (empty) but correct `"index"`. Must use `index` (not `id`) to associate argument chunks with their tool call. See `openAIStreamState.appendToolCallArgs()` in `openai.go`.
+
+- **OpenAI tool call arguments in requests**: When sending tool calls back in conversation history, arguments must be marshaled to a JSON string (not raw JSON). See `convertMessage()` in `openai.go`.
+
+- **OpenAI reasoning support**: OpenAI-compatible APIs (DeepSeek, Qwen, etc.) use `reasoning_content` field for thinking tokens. Both `openai.go` and `openaicompat.go` handle this.

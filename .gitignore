@@ -1,5 +1,6 @@
 alayacore-web
 alayacore
+model.conf
 alayacore-*.log
 *.swp
 *~

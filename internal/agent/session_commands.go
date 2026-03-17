@@ -4,9 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"charm.land/fantasy"
-	"github.com/alayacore/alayacore/internal/app"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
+	"github.com/alayacore/alayacore/internal/llm"
 )
 
 func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
@@ -51,14 +50,14 @@ func (s *Session) summarize(ctx context.Context) {
 	}
 
 	// Find the last assistant message (the summary) from newly added messages
-	var lastAssistantMsg fantasy.Message
+	var lastAssistantMsg llm.Message
 	for i := beforeCount; i < len(s.Messages); i++ {
-		if s.Messages[i].Role == fantasy.MessageRoleAssistant {
+		if s.Messages[i].Role == llm.RoleAssistant {
 			lastAssistantMsg = s.Messages[i]
 		}
 	}
 
-	s.Messages = []fantasy.Message{lastAssistantMsg}
+	s.Messages = []llm.Message{lastAssistantMsg}
 	// Update context tokens to reflect the new, smaller context (the summary)
 	if outputTokens > 0 {
 		s.mu.Lock()
@@ -120,27 +119,11 @@ func (s *Session) handleModelSet(args []string) {
 		_ = s.RuntimeManager.SetActiveModel(model.Name)
 	}
 
-	// Create provider and model
-	provider, err := app.CreateProvider(
-		model.ProtocolType,
-		model.APIKey,
-		model.BaseURL,
-		s.debugAPI,
-		s.proxyURL,
-	)
-	if err != nil {
-		s.writeError("Failed to create provider: " + err.Error())
-		return
-	}
-
-	newModel, err := provider.LanguageModel(context.Background(), model.ModelName)
-	if err != nil {
-		s.writeError("Failed to create language model: " + err.Error())
-		return
-	}
-
 	// Switch to the new model
-	s.SwitchModel(newModel, model)
+	if err := s.SwitchModel(model); err != nil {
+		s.writeError("Failed to switch model: " + err.Error())
+		return
+	}
 
 	// Send notification
 	s.writeNotifyf("Switched to model: %s (%s)", model.Name, model.ModelName)
