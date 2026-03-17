@@ -1,9 +1,9 @@
 # AlayaCore Project Status
 
 ## Current Work
-- **Queue notification cleanup**: Removed "Queued as Q#" and "Queue item deleted" messages from display
+None
 
-## Key Gotchas
+## Critical Gotchas
 
 - **SwitchModel deadlock**: Don't hold mutex while calling methods that may need the same mutex. Pattern: lock → update fields → unlock → call methods.
 

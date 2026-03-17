@@ -34,7 +34,7 @@ AlayaCore follows a layered architecture with clear separation of concerns:
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │                    Agent Layer                           │   │
 │  │  ┌─────────────────────────────────────────────────────┐ │   │
-│  │  │              Fantasy Framework                      │ │   │
+│  │  │              LLM Package                            │ │   │
 │  │  │  (Language Model + Tool Calling)                    │ │   │
 │  │  └─────────────────────────────────────────────────────┘ │   │
 │  └──────────────────────────┬───────────────────────────────┘   │
@@ -85,13 +85,31 @@ The session layer manages conversation state, task execution, and model interact
 - **RuntimeManager**: Persists runtime settings (active model)
 - **CommandRegistry**: Declarative command registration
 
-### Agent Layer
+### Agent Layer (`internal/llm/`)
 
-The agent layer interfaces with the Fantasy framework for language model interaction.
+The agent layer handles language model interaction and tool-calling orchestration.
 
-- Tool calling orchestration
-- Streaming response handling
-- Context management
+- **Agent**: Tool-calling loop orchestration
+- **Provider interface**: Streaming LLM abstraction
+- **Providers**: Anthropic, OpenAI implementations
+- **Types**: Message, ContentPart, StreamEvent definitions
+
+**Key Pattern - Callback Streaming:**
+```go
+Agent.Stream(ctx, messages, llm.StreamCallbacks{
+    OnTextDelta:    func(delta string) error { ... },
+    OnToolCall:     func(id, name string, input json.RawMessage) error { ... },
+    OnStepFinish:   func(msgs []Message, usage Usage) error { ... },
+})
+```
+Messages are appended incrementally in `OnStepFinish` so they're preserved even if user cancels.
+
+**Stream ID Format:** Content is tagged with IDs like `[:0-1-abc123:]`:
+- `0` = prompt counter (increments per user message)  
+- `1` = step number within that prompt
+- `abc123` = tool call ID or `t` (text) / `r` (reasoning)
+
+This allows the terminal to route content to correct windows across multi-step tool calls.
 
 ### Tools Layer (`internal/tools/`)
 
@@ -153,7 +171,7 @@ submitTask(UserPrompt) → Task Queue
                                     ↓
 taskRunner() → handleUserPrompt()
                                     ↓
-processPrompt() → Fantasy Agent
+processPrompt() → LLM Agent
                                     ↓
 writeColored(TA, response) → Output
                                     ↓
@@ -217,6 +235,35 @@ active_model: "OpenAI GPT-4o"
 4. **Domain Errors**: Structured error types with operation context for consistent error handling
 5. **Command Registry**: Declarative command registration for extensibility
 6. **Interface Abstraction**: OutputWriter interface for testability
+
+## Critical Implementation Gotchas
+
+These are non-obvious patterns that have caused bugs. When modifying related code, read the corresponding section carefully.
+
+### Mutex Deadlock in SwitchModel
+Don't hold mutex while calling methods that may need the same mutex.
+```
+❌ lock → update fields → call method (needs lock) → deadlock
+✅ lock → update fields → unlock → call method
+```
+
+### OpenAI Tool Call Chunking
+Tool arguments arrive in chunks across multiple delta events:
+- First chunk: has `id` and `name`
+- Subsequent chunks: `id: ""` but correct `index`
+- **Must use `index` (not `id`) to associate chunks** - see `openAIStreamState.appendToolCallArgs()`
+- When sending back in history, arguments must be JSON-string (not raw JSON) - see `convertMessage()`
+
+### Anthropic Prompt Caching
+- System message must be ≥1024 tokens for caching to activate
+- `cache_control` only applied to first 2 system messages
+- Enabled per-model via `prompt_cache: true` in model.conf (other providers ignore)
+
+### Terminal Scroll Position
+`userMovedCursorAway` must be set for J/K (page scroll), not just j/k (line scroll), or scroll position is lost on focus switch.
+
+### Incomplete Tool Calls on Cancel
+When user cancels mid-tool-call, messages may have `tool_use` without matching `tool_result`. `cleanIncompleteToolCalls()` removes these to prevent API errors on next request.
 
 ## File Organization
 
