@@ -1,10 +1,7 @@
 # AlayaCore Project Status
 
 ## Current Work
-- **Fantasy → Custom LLM migration: COMPLETE** ✅
-  - All phases completed
-  - Fantasy dependency removed from go.mod
-  - All tests passing
+- **Queue notification cleanup**: Removed "Queued as Q#" and "Queue item deleted" messages from display
 
 ## Key Gotchas
 

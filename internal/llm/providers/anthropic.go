@@ -181,11 +181,11 @@ func (s *streamState) finishBlock() {
 	s.currentType = ""
 }
 
-func (s *streamState) setUsage(inputTokens, outputTokens int64) {
+func (s *streamState) setUsage(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.usage = llm.Usage{
-		InputTokens:  inputTokens,
+		InputTokens:  inputTokens + cacheReadTokens + cacheCreationTokens,
 		OutputTokens: outputTokens,
 	}
 }
@@ -519,7 +519,16 @@ func (p *AnthropicProvider) handleMessageDelta(payload map[string]interface{}, _
 		if v, ok := usage["output_tokens"].(float64); ok {
 			outputTokens = v
 		}
-		state.setUsage(int64(inputTokens), int64(outputTokens))
+		// Cache tokens are part of input tokens
+		cacheReadTokens := 0.0
+		if v, ok := usage["cache_read_input_tokens"].(float64); ok {
+			cacheReadTokens = v
+		}
+		cacheCreationTokens := 0.0
+		if v, ok := usage["cache_creation_input_tokens"].(float64); ok {
+			cacheCreationTokens = v
+		}
+		state.setUsage(int64(inputTokens), int64(outputTokens), int64(cacheReadTokens), int64(cacheCreationTokens))
 	}
 
 	return nil

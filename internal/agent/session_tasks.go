@@ -45,7 +45,7 @@ func (s *Session) submitTask(task Task) {
 	s.mu.Unlock()
 
 	if inProgress {
-		s.writeNotifyf("Queued as %s. Previous task in progress. Will run after completion.", queueID)
+		// Silent - queue is running, task will start automatically
 	}
 	// Always send system info so queue manager can update
 	s.sendSystemInfo()
@@ -163,7 +163,7 @@ func (s *Session) GetQueueItems() []QueueItem {
 	return items
 }
 
-// DeleteQueueItem removes a queue item by ID and sends a notification
+// DeleteQueueItem removes a queue item by ID
 func (s *Session) DeleteQueueItem(queueID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -172,8 +172,6 @@ func (s *Session) DeleteQueueItem(queueID string) bool {
 		if item.QueueID == queueID {
 			// Remove the item
 			s.taskQueue = append(s.taskQueue[:i], s.taskQueue[i+1:]...)
-			// Send notification
-			s.writeNotify(fmt.Sprintf("Queue item %s deleted", queueID))
 			return true
 		}
 	}

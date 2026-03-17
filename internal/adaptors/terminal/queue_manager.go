@@ -230,7 +230,7 @@ func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
 		typeStr = "C"
 	}
 
-	line := fmt.Sprintf("%s [%s] %s", item.QueueID, typeStr, content)
+	line := fmt.Sprintf("[%s] %s", typeStr, content)
 
 	if selected {
 		return qm.styles.Prompt.Render("> " + line)

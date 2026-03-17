@@ -523,14 +523,14 @@ func (p *OpenAIProvider) handleEvent(data string, eventChan chan<- llm.StreamEve
 				state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
 			}
 		}
+	}
 
-		// Track usage if available
-		if streamResp.Usage.PromptTokens > 0 || streamResp.Usage.CompletionTokens > 0 {
-			state.setUsage(llm.Usage{
-				InputTokens:  int64(streamResp.Usage.PromptTokens),
-				OutputTokens: int64(streamResp.Usage.CompletionTokens),
-			})
-		}
+	// Track usage if available (may come in a chunk with empty choices)
+	if streamResp.Usage.PromptTokens > 0 || streamResp.Usage.CompletionTokens > 0 {
+		state.setUsage(llm.Usage{
+			InputTokens:  int64(streamResp.Usage.PromptTokens),
+			OutputTokens: int64(streamResp.Usage.CompletionTokens),
+		})
 	}
 
 	return nil
