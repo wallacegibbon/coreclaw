@@ -16,9 +16,17 @@
 //	  - TagFunctionShow (FS): Function call for display
 //	  - TagFunctionCall (FC): Function call for session saving
 //	  - TagFunctionResult (FR): Function result for session saving
+//	  - TagFunctionState (FO): Function state indicator (pending/success/error)
 //	  - TagSystemError (SE): System error messages
 //	  - TagSystemNotify (SN): System notifications
 //	  - TagSystemData (SD): System data (JSON)
+//
+// State Indicators:
+//
+// The TagFunctionState tag is used to display state indicators for tool calls:
+//   - "pending": Tool is currently executing (· dot)
+//   - "success": Tool executed successfully (✓ checkmark)
+//   - "error": Tool execution failed (✗ cross)
 //
 // Key Types:
 //

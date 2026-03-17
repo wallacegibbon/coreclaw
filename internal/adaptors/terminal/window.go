@@ -21,6 +21,9 @@ type Window struct {
 	// For diff windows - if non-nil, Content is ignored and Diff is rendered instead
 	Diff *DiffContainer
 
+	// Status indicator for tool windows
+	Status string // "success", "error", or "" (no status)
+
 	// Cached rendering state
 	lastContentLen     int    // length of content when last rendered (for quick change detection)
 	cachedRender       string // full output with border
@@ -234,4 +237,16 @@ func (wb *WindowBuffer) ToggleWrap(windowIndex int) bool {
 	wb.Windows[windowIndex].Wrapped = !wb.Windows[windowIndex].Wrapped
 	wb.markDirty(windowIndex)
 	return true
+}
+
+// UpdateToolStatus updates the status indicator for a tool window.
+// The toolCallID should match the window ID.
+func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status string) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+
+	if idx, ok := wb.idIndex[toolCallID]; ok {
+		wb.Windows[idx].Status = status
+		wb.markDirty(idx)
+	}
 }

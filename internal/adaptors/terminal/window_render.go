@@ -163,12 +163,35 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 	// Handle diff windows
 	if w.IsDiffWindow() {
-		return wb.renderDiffContent(w.Diff, innerWidth)
+		return wb.renderDiffContent(w.Diff, innerWidth, w.Status)
+	}
+
+	// Build content with optional status indicator
+	content := w.Content
+	if w.Status != "" {
+		var indicator string
+		if w.Status == "success" {
+			// Green checkmark
+			indicator = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorSuccess)).
+				Render("✓ ")
+		} else if w.Status == "error" {
+			// Red cross
+			indicator = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorError)).
+				Render("✗ ")
+		} else if w.Status == "pending" {
+			// Yellow dot for pending (same width as checkmark)
+			indicator = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorWarning)).
+				Render("· ")
+		}
+		content = indicator + content
 	}
 
 	if w.Wrapped {
 		// In wrapped mode, show up to 5 lines
-		wrappedContent := lipgloss.Wrap(w.Content, innerWidth, " ")
+		wrappedContent := lipgloss.Wrap(content, innerWidth, " ")
 
 		// Check if content spans more than 5 lines (needs truncation)
 		lines := strings.Split(wrappedContent, "\n")
@@ -188,5 +211,5 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 		// Content fits in 5 lines or less, just show wrapped content
 		return wrappedContent
 	}
-	return lipgloss.Wrap(w.Content, innerWidth, " ")
+	return lipgloss.Wrap(content, innerWidth, " ")
 }

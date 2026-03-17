@@ -19,12 +19,35 @@ type DiffLinePair struct {
 }
 
 // renderDiffContent renders a diff container side by side
-func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int) string {
+func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int, status string) string {
 	// Preallocate lines: header + diff lines
 	lines := make([]string, 0, 1+len(diff.Lines))
 
-	// Add header with file path
-	lines = append(lines, wb.styles.Tool.Render("edit_file: ")+wb.styles.ToolContent.Render(diff.Path))
+	// Add header with file path and optional status indicator
+	var header string
+	if status != "" {
+		var indicator string
+		if status == "success" {
+			// Green checkmark
+			indicator = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorSuccess)).
+				Render("✓ ")
+		} else if status == "error" {
+			// Red cross
+			indicator = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorError)).
+				Render("✗ ")
+		} else if status == "pending" {
+			// Yellow dot for pending
+			indicator = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorWarning)).
+				Render("· ")
+		}
+		header = indicator + wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)
+	} else {
+		header = wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)
+	}
+	lines = append(lines, header)
 
 	// Calculate width for each side
 	// Line format: "= " + paddedOld + " " + "|" + " " + "+ " + newPart

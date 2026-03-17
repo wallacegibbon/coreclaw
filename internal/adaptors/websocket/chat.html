@@ -48,9 +48,13 @@
         .user { background: #89b4fa; color: #1e1e2e; }
         .assistant { background: transparent; }
         .tool { background: #313244; font-size: 0.9em; color: #f9e2af; }
+        .tool pre { color: #f9e2af; }
         .error { background: #f38ba8; color: #1e1e2e; }
         .reasoning { background: transparent; color: #6c7086; font-style: italic; }
         .system { background: transparent; color: #6c7086; font-size: 0.9em }
+        .status-success { color: #a6e3a1; font-weight: bold; }
+        .status-error { color: #f38ba8; font-weight: bold; }
+        .status-pending { color: #f9e2af; font-weight: bold; }
         .message.assistant p { margin: 0 0 8px 0; }
         .message.assistant p:last-child { margin-bottom: 0; }
         .message.assistant code { background: #313244; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
@@ -253,15 +257,24 @@
                 if (currentStreams[streamId]) {
                     // Append to existing stream
                     currentStreams[streamId].value += content;
-                    updateMessageContent(currentStreams[streamId].element, streamType, currentStreams[streamId].value);
+                    updateMessageContent(currentStreams[streamId].element, streamType, currentStreams[streamId].value, currentStreams[streamId].status);
                 } else {
                     // New stream
                     currentStreams[streamId] = {
                         value: content,
                         element: addMessageElement(streamType, content),
-                        type: streamType
+                        type: streamType,
+                        status: ''
                     };
                     streamOrder.push(streamId);
+                }
+            // Function output status indicator
+            } else if (tag === 'FO') {
+                const {id, content} = parseStreamID(value);
+                if (id && currentStreams[id]) {
+                    // Update status for existing tool stream
+                    currentStreams[id].status = content;
+                    updateMessageContent(currentStreams[id].element, currentStreams[id].type, currentStreams[id].value, content);
                 }
             // System tags
             } else if (tag === 'SE') {
@@ -326,9 +339,21 @@
             return div;
         }
 
-        function updateMessageContent(element, type, text) {
+        function updateMessageContent(element, type, text, status) {
+            // Add status indicator for tool messages
+            let displayText = text;
+            if (type === 'tool' && status) {
+                if (status === 'success') {
+                    displayText = '<span class="status-success">✓</span> ' + escapeHtml(text);
+                } else if (status === 'error') {
+                    displayText = '<span class="status-error">✗</span> ' + escapeHtml(text);
+                } else if (status === 'pending') {
+                    displayText = '<span class="status-pending">·</span> ' + escapeHtml(text);
+                }
+            }
+            
             if (type === 'tool') {
-                element.innerHTML = '<pre>' + escapeHtml(text) + '</pre>';
+                element.innerHTML = '<pre>' + displayText + '</pre>';
             } else if (type === 'assistant' || type === 'reasoning') {
                 element.innerHTML = marked.parse(text);
             } else {

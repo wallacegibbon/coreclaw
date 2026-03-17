@@ -21,6 +21,7 @@ const (
 	TagFunctionShow   = "FS" // Function call output for display (adaptors)
 	TagFunctionCall   = "FC" // Function call for session saving/loading
 	TagFunctionResult = "FR" // Function result for session saving/loading
+	TagFunctionState  = "FO" // Function state indicator (pending/success/error)
 
 	// System tags
 	TagSystemError  = "SE" // System error messages

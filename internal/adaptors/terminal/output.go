@@ -160,6 +160,15 @@ func (w *outputWriter) writeColored(tag string, value string) {
 		}
 		w.windowBuffer.AppendOrUpdate(id, tag, styled)
 
+	// Function output status indicator
+	case stream.TagFunctionState:
+		id, content, ok := w.parseStreamID(value)
+		if !ok {
+			return
+		}
+		// Update the tool window with status indicator
+		w.updateToolStatus(id, content)
+
 	// System tags
 	case stream.TagSystemError:
 		id := w.generateWindowID()
@@ -430,6 +439,11 @@ func (w *outputWriter) parseStreamID(value string) (string, string, bool) {
 	id := value[len(prefixStart):endIdx]
 	content := value[endIdx+len(prefixEnd):]
 	return id, content, true
+}
+
+// updateToolStatus adds a status indicator to a tool window
+func (w *outputWriter) updateToolStatus(toolCallID string, status string) {
+	w.windowBuffer.UpdateToolStatus(toolCallID, status)
 }
 
 // generateWindowID returns a unique window ID for non-delta messages.

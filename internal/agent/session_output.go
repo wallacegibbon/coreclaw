@@ -39,9 +39,23 @@ func (s *Session) writeGapped(tag string, msg string) {
 }
 
 func (s *Session) writeToolCall(toolName, input, id string) {
+	// Send the tool call display first (creates the window)
 	if value := formatToolCall(toolName, input); value != "" {
 		_ = stream.WriteTLV(s.Output, stream.TagFunctionShow, "[:"+id+":]"+value) //nolint:errcheck // output stream
+		s.Output.Flush()
 	}
+
+	// Then send pending status indicator
+	s.writeToolResult(id, "pending")
+}
+
+// writeToolResult writes a tool result state indicator to the output stream
+func (s *Session) writeToolResult(toolCallID string, status string) {
+	if s.Output == nil {
+		return
+	}
+	_ = stream.WriteTLV(s.Output, stream.TagFunctionState, "[:"+toolCallID+":]"+status) //nolint:errcheck // output stream
+	s.Output.Flush()
 }
 
 // trackUsage updates token usage statistics

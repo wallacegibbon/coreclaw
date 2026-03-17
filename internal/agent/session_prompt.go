@@ -82,6 +82,14 @@ func (s *Session) processPrompt(ctx context.Context, _ string, history []llm.Mes
 					Output:     output,
 				}},
 			})
+
+			// Send tool result status indicator to adaptor
+			status := "success"
+			if _, ok := output.(llm.ToolResultOutputError); ok {
+				status = "error"
+			}
+			s.writeToolResult(toolCallID, status)
+
 			return nil
 		},
 		OnTextDelta: func(delta string) error {
