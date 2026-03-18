@@ -262,8 +262,10 @@ Tool arguments arrive in chunks across multiple delta events:
 
 ### Anthropic Prompt Caching
 - System message must be ≥1024 tokens for caching to activate
-- `cache_control` only applied to first 2 system messages
+- Uses **automatic caching**: single `cache_control: {"type": "ephemeral"}` at top level of request
+- Anthropic automatically applies cache breakpoint to the last cacheable block and moves it forward as conversations grow
 - Enabled per-model via `prompt_cache: true` in model.conf (other providers ignore)
+- Best for multi-turn conversations where growing message history should be cached automatically
 
 ### Terminal Scroll Position
 `userMovedCursorAway` must be set for J/K (page scroll), not just j/k (line scroll), or scroll position is lost on focus switch.

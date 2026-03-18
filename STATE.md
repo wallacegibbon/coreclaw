@@ -4,13 +4,12 @@
 None
 
 ## Recent Changes
-- Fixed system prompt handling: external `--system` prompts are now sent as separate system messages
-  - Multiple `--system` flags are merged with "\n\n" separator in config parsing
-  - Default and extra system prompts are passed separately through the entire stack
-  - Providers send them as separate system message objects (not merged strings):
-    - Anthropic: `system: [{"type": "text", "text": "default"}, {"type": "text", "text": "extra"}]`
-    - OpenAI: `messages: [{"role": "system", "content": "default"}, {"role": "system", "content": "extra"}]`
-  - This preserves API cache efficiency and allows proper prompt separation
+- Implemented Anthropic automatic prompt caching via `prompt_cache: true` in model.conf
+  - Uses single top-level `cache_control: {"type": "ephemeral"}` field in request
+  - Anthropic automatically applies cache breakpoint to last cacheable block
+  - Cache breakpoint moves forward as conversations grow (best for multi-turn)
+  - Factory passes `PromptCache` config through to Anthropic provider
+  - Other providers (OpenAI) ignore the setting as they handle caching automatically
 
 ## Critical Gotchas
 

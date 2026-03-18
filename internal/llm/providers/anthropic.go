@@ -18,10 +18,11 @@ import (
 
 // AnthropicProvider implements the Anthropic API
 type AnthropicProvider struct {
-	apiKey  string
-	baseURL string
-	client  *http.Client
-	model   string
+	apiKey      string
+	baseURL     string
+	client      *http.Client
+	model       string
+	promptCache bool
 }
 
 // AnthropicOption configures the provider
@@ -68,6 +69,13 @@ func WithHTTPClient(client *http.Client) AnthropicOption {
 func WithAnthropicModel(model string) AnthropicOption {
 	return func(p *AnthropicProvider) {
 		p.model = model
+	}
+}
+
+// WithPromptCache enables prompt caching for Anthropic
+func WithPromptCache(enabled bool) AnthropicOption {
+	return func(p *AnthropicProvider) {
+		p.promptCache = enabled
 	}
 }
 
@@ -333,6 +341,11 @@ func (p *AnthropicProvider) StreamMessages(
 		System:    systemMessages,
 		Tools:     apiTools,
 		Stream:    true,
+	}
+
+	// Add top-level cache_control for automatic caching (Anthropic's automatic caching)
+	if p.promptCache {
+		reqBody.CacheControl = &anthropicCacheControl{Type: "ephemeral"}
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
