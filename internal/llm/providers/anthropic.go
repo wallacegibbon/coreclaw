@@ -426,6 +426,9 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, eventChan chan<-
 	}
 
 	switch eventType {
+	case "message_start":
+		return p.handleMessageStart(payload, eventChan, state)
+
 	case "content_block_start":
 		return p.handleContentBlockStart(payload, eventChan, state)
 
@@ -439,7 +442,7 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, eventChan chan<-
 		return p.handleMessageDelta(payload, eventChan, state)
 
 	case "message_stop":
-		return p.handleMessageStop(eventChan, state)
+		return p.handleMessageStop(payload, eventChan, state)
 
 	case "ping":
 		// Ignore ping events
@@ -453,6 +456,39 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, eventChan chan<-
 	}
 
 	return nil
+}
+
+// handleMessageStart handles message_start events - may contain initial usage
+func (p *AnthropicProvider) handleMessageStart(payload map[string]interface{}, _ chan<- llm.StreamEvent, state *streamState) error {
+	// Extract usage from message_start if present
+	if msg, ok := payload["message"].(map[string]interface{}); ok {
+		if usage, ok := msg["usage"].(map[string]interface{}); ok {
+			p.extractAndSetUsage(usage, state)
+		}
+	}
+	return nil
+}
+
+// extractAndSetUsage extracts token counts from usage map and updates state
+func (p *AnthropicProvider) extractAndSetUsage(usage map[string]interface{}, state *streamState) {
+	inputTokens := 0.0
+	if v, ok := usage["input_tokens"].(float64); ok {
+		inputTokens = v
+	}
+	outputTokens := 0.0
+	if v, ok := usage["output_tokens"].(float64); ok {
+		outputTokens = v
+	}
+	// Cache tokens are part of input tokens
+	cacheReadTokens := 0.0
+	if v, ok := usage["cache_read_input_tokens"].(float64); ok {
+		cacheReadTokens = v
+	}
+	cacheCreationTokens := 0.0
+	if v, ok := usage["cache_creation_input_tokens"].(float64); ok {
+		cacheCreationTokens = v
+	}
+	state.setUsage(int64(inputTokens), int64(outputTokens), int64(cacheReadTokens), int64(cacheCreationTokens))
 }
 
 // handleContentBlockStart handles content_block_start events
@@ -527,42 +563,20 @@ func (p *AnthropicProvider) handleContentBlockStop(_ map[string]interface{}, eve
 
 // handleMessageDelta handles message-level delta events (usage, etc.)
 func (p *AnthropicProvider) handleMessageDelta(payload map[string]interface{}, _ chan<- llm.StreamEvent, state *streamState) error {
-	// Check for usage
-	usage, ok := payload["usage"].(map[string]interface{})
-	if !ok {
-		// Also check in delta.usage
-		delta, deltaOK := payload["delta"].(map[string]interface{})
-		if deltaOK {
-			usage, ok = delta["usage"].(map[string]interface{})
-		}
+	// Check for usage in payload["usage"]
+	if usage, ok := payload["usage"].(map[string]interface{}); ok {
+		p.extractAndSetUsage(usage, state)
 	}
-
-	if ok {
-		inputTokens := 0.0
-		if v, ok := usage["input_tokens"].(float64); ok {
-			inputTokens = v
-		}
-		outputTokens := 0.0
-		if v, ok := usage["output_tokens"].(float64); ok {
-			outputTokens = v
-		}
-		// Cache tokens are part of input tokens
-		cacheReadTokens := 0.0
-		if v, ok := usage["cache_read_input_tokens"].(float64); ok {
-			cacheReadTokens = v
-		}
-		cacheCreationTokens := 0.0
-		if v, ok := usage["cache_creation_input_tokens"].(float64); ok {
-			cacheCreationTokens = v
-		}
-		state.setUsage(int64(inputTokens), int64(outputTokens), int64(cacheReadTokens), int64(cacheCreationTokens))
-	}
-
 	return nil
 }
 
 // handleMessageStop handles message_stop events - sends final StepCompleteEvent
-func (p *AnthropicProvider) handleMessageStop(eventChan chan<- llm.StreamEvent, state *streamState) error {
+func (p *AnthropicProvider) handleMessageStop(payload map[string]interface{}, eventChan chan<- llm.StreamEvent, state *streamState) error {
+	// Check for final usage in message_stop
+	if usage, ok := payload["usage"].(map[string]interface{}); ok {
+		p.extractAndSetUsage(usage, state)
+	}
+
 	// Send the accumulated message with usage
 	eventChan <- llm.StepCompleteEvent{
 		Messages: []llm.Message{state.getMessage()},
