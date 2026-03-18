@@ -101,6 +101,15 @@ func (s *Session) handleModelSet(args []string) {
 		return
 	}
 
+	// Check if a task is currently running
+	s.mu.Lock()
+	inProgress := s.inProgress
+	s.mu.Unlock()
+	if inProgress {
+		s.writeError("Cannot switch model while a task is running. Please wait or cancel the current task.")
+		return
+	}
+
 	modelID := args[0]
 	model := s.ModelManager.GetModel(modelID)
 	if model == nil {

@@ -434,21 +434,21 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		t.Error("model_set should succeed when no task is running, but got error")
 	}
 
-	// Test 2: model_set should also work when task is running (no restriction)
+	// Test 2: model_set should fail when task is running
 	output.Messages = nil // Clear previous messages
 	session.inProgress = true
 	session.handleModelSet([]string{"test-model-1"})
 
-	// Check that the model was switched (no error should be in output)
+	// Check that the model was NOT switched (error should be in output)
 	foundError = false
 	for _, msg := range output.Messages {
-		if strings.Contains(msg, "error") || strings.Contains(msg, "Error") {
+		if strings.Contains(msg, "Cannot switch model while a task is running") {
 			foundError = true
 			break
 		}
 	}
-	if foundError {
-		t.Error("model_set should succeed even when task is running, but got error")
+	if !foundError {
+		t.Error("model_set should fail when task is running, but no error was found")
 	}
 
 	// Test 3: model_set should work again after task completes
