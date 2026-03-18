@@ -4,7 +4,9 @@
 None
 
 ## Recent Changes
-- Steps counter in status bar shows "Steps: (N/MAX)" during agent execution, updated via TagSystemData at each step start
+- Tool windows from loaded sessions now show dimmed `·` as default status sign (no status in session file)
+- Tool windows during execution: dimmed `•` for pending, green `•` for success, red `•` for error
+- Status indicator logic moved from "only when Status is set" to "always show for tool windows (TagFunctionNotify)"
 
 ## Critical Gotchas
 

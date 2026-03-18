@@ -56,10 +56,14 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	// Create a tool window
 	wb.AppendOrUpdate("tool123", stream.TagFunctionNotify, "posix_shell: git status")
 
-	// Test rendering without status
+	// Test rendering without status (default for loaded sessions)
 	content := wb.renderWindowContent(wb.Windows[0], 76)
 	if content == "" {
 		t.Error("Expected non-empty content")
+	}
+	// Should contain dimmed hollow dot (·) as default for tool windows without status
+	if !contains(content, "·") {
+		t.Errorf("Expected content to contain hollow dot (·), got: %s", content)
 	}
 
 	// Update with pending status
@@ -70,7 +74,10 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	if content == "" {
 		t.Error("Expected non-empty content")
 	}
-	// Should contain hollow dot (·)
+	// Should contain dimmed filled dot (•)
+	if !contains(content, "•") {
+		t.Errorf("Expected content to contain filled dot (•), got: %s", content)
+	}
 
 	// Update with success status
 	wb.UpdateToolStatus("tool123", "success")
@@ -81,6 +88,9 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 		t.Error("Expected non-empty content")
 	}
 	// Should contain filled dot (•)
+	if !contains(content, "•") {
+		t.Errorf("Expected content to contain filled dot (•), got: %s", content)
+	}
 
 	// Update with error status
 	wb.UpdateToolStatus("tool123", "error")
@@ -91,4 +101,17 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 		t.Error("Expected non-empty content")
 	}
 	// Should contain filled dot (•)
+	if !contains(content, "•") {
+		t.Errorf("Expected content to contain filled dot (•), got: %s", content)
+	}
+}
+
+// contains checks if a string contains a substring
+func contains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

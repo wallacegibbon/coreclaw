@@ -4,6 +4,8 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // GetAll returns the concatenated rendered windows as a single string.
@@ -188,7 +190,8 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 
 	// Build content with optional status indicator
 	content := w.Content
-	if w.Status != "" {
+	if w.Tag == stream.TagFunctionNotify {
+		// Tool windows always have a status indicator
 		var indicator string
 		if w.Status == "success" {
 			// Green filled dot
@@ -201,9 +204,14 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 				Foreground(lipgloss.Color(ColorError)).
 				Render("• ")
 		} else if w.Status == "pending" {
-			// Yellow hollow dot for pending
+			// Dimmed filled dot for pending
 			indicator = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorWarning)).
+				Foreground(lipgloss.Color(ColorDim)).
+				Render("• ")
+		} else {
+			// Default: dimmed hollow dot (for loaded sessions without status)
+			indicator = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorDim)).
 				Render("· ")
 		}
 		content = indicator + content

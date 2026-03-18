@@ -24,9 +24,10 @@
 // State Indicators:
 //
 // The TagFunctionState tag is used to display state indicators for tool calls:
-//   - "pending": Tool is currently executing (· hollow dot)
-//   - "success": Tool executed successfully (• filled dot)
-//   - "error": Tool execution failed (• filled dot)
+//   - "pending": Tool is currently executing (• dimmed filled dot)
+//   - "success": Tool executed successfully (• green filled dot)
+//   - "error": Tool execution failed (• red filled dot)
+//   - default: Tool from loaded session with no status (· dimmed hollow dot)
 //
 // Key Types:
 //

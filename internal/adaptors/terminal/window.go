@@ -22,7 +22,7 @@ type Window struct {
 	Diff *DiffContainer
 
 	// Status indicator for tool windows
-	Status string // "success", "error", or "" (no status)
+	Status string // "success", "error", "pending", or "" (default: dimmed hollow dot for loaded sessions)
 
 	// Cached rendering state
 	lastContentLen     int    // length of content when last rendered (for quick change detection)

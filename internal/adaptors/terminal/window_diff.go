@@ -23,30 +23,31 @@ func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int, s
 	// Preallocate lines: header + diff lines
 	lines := make([]string, 0, 1+len(diff.Lines))
 
-	// Add header with file path and optional status indicator
-	var header string
-	if status != "" {
-		var indicator string
-		if status == "success" {
-			// Green filled dot
-			indicator = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorSuccess)).
-				Render("• ")
-		} else if status == "error" {
-			// Red filled dot
-			indicator = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorError)).
-				Render("• ")
-		} else if status == "pending" {
-			// Yellow hollow dot for pending
-			indicator = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorWarning)).
-				Render("· ")
-		}
-		header = indicator + wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)
+	// Add header with file path and status indicator
+	// Diff windows always have a status indicator (they're tool windows)
+	var indicator string
+	if status == "success" {
+		// Green filled dot
+		indicator = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(ColorSuccess)).
+			Render("• ")
+	} else if status == "error" {
+		// Red filled dot
+		indicator = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(ColorError)).
+			Render("• ")
+	} else if status == "pending" {
+		// Dimmed filled dot for pending
+		indicator = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(ColorDim)).
+			Render("• ")
 	} else {
-		header = wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)
+		// Default: dimmed hollow dot (for loaded sessions without status)
+		indicator = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(ColorDim)).
+			Render("· ")
 	}
+	header := indicator + wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)
 	lines = append(lines, header)
 
 	// Calculate width for each side
