@@ -133,7 +133,7 @@ func (wb *WindowBuffer) AppendDiff(id string, path string, lines []DiffLinePair)
 	// Create window with diff
 	window := &Window{
 		ID:      id,
-		Tag:     stream.TagFunctionShow,
+		Tag:     stream.TagFunctionNotify,
 		Style:   wb.borderStyle,
 		Diff:    diff,
 		Wrapped: true, // Enable folding like other windows

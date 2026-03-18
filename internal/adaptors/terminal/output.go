@@ -137,7 +137,7 @@ func (w *outputWriter) writeColored(tag string, value string) {
 
 	switch tag {
 	// Text content tags (delta messages with stream ID prefix)
-	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagFunctionShow:
+	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagFunctionNotify:
 		id, content, ok := w.parseStreamID(value)
 		if !ok {
 			// Should not happen, but fallback
@@ -150,7 +150,7 @@ func (w *outputWriter) writeColored(tag string, value string) {
 			styled = output(w.styles.Text, content)
 		case stream.TagTextReasoning:
 			styled = output(w.styles.Reasoning, content)
-		case stream.TagFunctionShow:
+		case stream.TagFunctionNotify:
 			// Check if this is an edit_file with raw diff data
 			if diffPath, diffLines := w.parseRawDiff(content); diffLines != nil {
 				w.windowBuffer.AppendDiff(id, diffPath, diffLines)
@@ -202,7 +202,7 @@ func (w *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
 	// Text content tags
 	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagTextUser,
-		stream.TagFunctionShow,
+		stream.TagFunctionNotify,
 		// System tags
 		stream.TagSystemError, stream.TagSystemNotify, stream.TagSystemData:
 		w.updateMu.Lock()

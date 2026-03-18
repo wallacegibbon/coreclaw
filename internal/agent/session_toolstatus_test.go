@@ -139,13 +139,13 @@ func TestWriteToolCallWithPending(t *testing.T) {
 	session.writeToolCall("posix_shell", `{"command":"ls"}`, "tool123")
 
 	// Should have written two TLV messages:
-	// 1. TagFunctionShow with tool call info (creates window)
+	// 1. TagFunctionNotify with tool call info (creates window)
 	// 2. TagFunctionState with pending status (updates window)
 
 	// Parse first message (tool call display)
 	tag1, value1 := parseTLVFromBytes(output.data)
-	if tag1 != stream.TagFunctionShow {
-		t.Errorf("Expected first tag %s, got %s", stream.TagFunctionShow, tag1)
+	if tag1 != stream.TagFunctionNotify {
+		t.Errorf("Expected first tag %s, got %s", stream.TagFunctionNotify, tag1)
 	}
 
 	// The tool call should contain "posix_shell"

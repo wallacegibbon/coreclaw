@@ -131,7 +131,7 @@ func TestWindowBufferDiff(t *testing.T) {
 	t.Run("append diff content", func(t *testing.T) {
 		wb := NewWindowBuffer(80)
 		// Diff windows are created differently, this tests the structure
-		wb.AppendOrUpdate("diff-1", stream.TagFunctionShow, "diff content")
+		wb.AppendOrUpdate("diff-1", stream.TagFunctionNotify, "diff content")
 
 		if len(wb.Windows) != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", len(wb.Windows))

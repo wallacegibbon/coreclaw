@@ -23,7 +23,7 @@
 //
 //	Adaptors communicate with Session via TLV (Tag-Length-Value) streams:
 //	  - Input: TagTextUser for prompts and commands
-//	  - Output: TagTextAssistant, TagTextReasoning, TagFunctionShow, etc.
+//	  - Output: TagTextAssistant, TagTextReasoning, TagFunctionNotify, etc.
 //
 // Key Components:
 //

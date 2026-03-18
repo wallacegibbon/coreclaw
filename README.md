@@ -234,7 +234,7 @@ AlayaCore follows a layered architecture with clean separation via the TLV proto
 └────────┬────────┘                    └────────┬────────┘
          │                                      │
          │  Tags: TU (user), TA (assistant),    │
-         │        FS (function), SN (notify)    │
+         │        FN (function), SN (notify)    │
          └──────────────────────────────────────┘
 ```
 

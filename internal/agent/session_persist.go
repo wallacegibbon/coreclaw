@@ -75,7 +75,7 @@ func (s *Session) displayAssistantMessage(msg llm.Message) {
 			s.Output.Flush()
 		case llm.ToolCallPart:
 			if info := formatToolCall(p.ToolName, string(p.Input)); info != "" {
-				_ = stream.WriteTLV(s.Output, stream.TagFunctionShow, info) //nolint:errcheck // output stream
+				_ = stream.WriteTLV(s.Output, stream.TagFunctionNotify, info) //nolint:errcheck // output stream
 				s.Output.Flush()
 			}
 		}
@@ -86,7 +86,7 @@ func (s *Session) displayToolMessage(msg llm.Message) {
 	for _, part := range msg.Content {
 		if tc, ok := part.(llm.ToolCallPart); ok {
 			if info := formatToolCall(tc.ToolName, string(tc.Input)); info != "" {
-				_ = stream.WriteTLV(s.Output, stream.TagFunctionShow, info) //nolint:errcheck // output stream
+				_ = stream.WriteTLV(s.Output, stream.TagFunctionNotify, info) //nolint:errcheck // output stream
 				s.Output.Flush()
 			}
 		}

@@ -10,7 +10,7 @@ func TestUpdateToolStatus(t *testing.T) {
 	wb := NewWindowBuffer(80)
 
 	// Create a tool window
-	wb.AppendOrUpdate("tool123", stream.TagFunctionShow, "posix_shell: git status")
+	wb.AppendOrUpdate("tool123", stream.TagFunctionNotify, "posix_shell: git status")
 
 	// Verify window was created
 	if len(wb.Windows) != 1 {
@@ -54,7 +54,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb := NewWindowBuffer(80)
 
 	// Create a tool window
-	wb.AppendOrUpdate("tool123", stream.TagFunctionShow, "posix_shell: git status")
+	wb.AppendOrUpdate("tool123", stream.TagFunctionNotify, "posix_shell: git status")
 
 	// Test rendering without status
 	content := wb.renderWindowContent(wb.Windows[0], 76)

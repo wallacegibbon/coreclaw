@@ -41,7 +41,7 @@ func (s *Session) writeGapped(tag string, msg string) {
 func (s *Session) writeToolCall(toolName, input, id string) {
 	// Send the tool call display first (creates the window)
 	if value := formatToolCall(toolName, input); value != "" {
-		_ = stream.WriteTLV(s.Output, stream.TagFunctionShow, "[:"+id+":]"+value) //nolint:errcheck // output stream
+		_ = stream.WriteTLV(s.Output, stream.TagFunctionNotify, "[:"+id+":]"+value) //nolint:errcheck // output stream
 		s.Output.Flush()
 	}
 

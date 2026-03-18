@@ -250,7 +250,7 @@
 
         function handleTLV(tag, value) {
             // Text content tags (delta messages with stream ID prefix)
-            if (tag === 'TA' || tag === 'TR' || tag === 'FS') {
+            if (tag === 'TA' || tag === 'TR' || tag === 'FN') {
                 const {id, content} = parseStreamID(value);
                 const streamId = id || ('unknown-' + Date.now());
                 const streamType = tag === 'TA' ? 'assistant' : tag === 'TR' ? 'reasoning' : 'tool';

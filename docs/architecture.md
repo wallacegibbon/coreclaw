@@ -140,7 +140,7 @@ Communication between adaptors and session uses a simple Tag-Length-Value (TLV) 
 | `TagTextUser` | TU | Input | User text input |
 | `TagTextAssistant` | TA | Output | Assistant text output |
 | `TagTextReasoning` | TR | Output | Reasoning/thinking content |
-| `TagFunctionShow` | FS | Output | Function call for display |
+| `TagFunctionNotify` | FN | Output | Function call for display |
 | `TagFunctionCall` | FC | Output | Function call for persistence |
 | `TagFunctionResult` | FR | Output | Function result for persistence |
 | `TagFunctionState` | FO | Output | Function state indicator (pending/success/error) |
