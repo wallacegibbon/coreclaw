@@ -4,7 +4,7 @@
 None
 
 ## Recent Changes
-- Queue count in status bar shows "Queued(Ctrl-Q): N" with count highlighted; StatusModel.RenderString no longer re-renders to preserve ANSI codes
+- Steps counter in status bar shows "Steps: (N/MAX)" during agent execution, updated via TagSystemData at each step start
 
 ## Critical Gotchas
 

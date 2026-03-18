@@ -153,6 +153,8 @@ type SystemInfo struct {
 	TotalTokens       int64           `json:"total"`
 	QueueItems        []QueueItemInfo `json:"queue_items,omitempty"`
 	InProgress        bool            `json:"in_progress"`
+	CurrentStep       int             `json:"current_step,omitempty"` // Current step number (1-indexed)
+	MaxSteps          int             `json:"max_steps,omitempty"`    // Maximum steps allowed
 	Models            []ModelInfo     `json:"models,omitempty"`
 	ActiveModelID     string          `json:"active_model_id,omitempty"`
 	ActiveModelConfig *ModelConfig    `json:"active_model_config,omitempty"` // Full config (with API key), only when model changes
@@ -188,6 +190,7 @@ type Session struct {
 	cancelCurrent func()
 	nextPromptID  uint64
 	nextQueueID   uint64
+	currentStep   int // Current step in the agent loop (1-indexed during execution)
 	mu            sync.Mutex
 }
 

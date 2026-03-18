@@ -233,17 +233,42 @@ func (m *Terminal) updateDisplayHeight() {
 func (m *Terminal) updateStatusWithQueue() {
 	status := m.out.GetStatus()
 	queueCount := m.out.GetQueueCount()
+
+	// Add steps info if we're in progress
+	currentStep := m.out.GetCurrentStep()
+	maxSteps := m.out.GetMaxSteps()
+	inProgress := m.out.IsInProgress()
+
+	var stepsPart string
+	if inProgress && maxSteps > 0 {
+		stepsPart = fmt.Sprintf("Steps: (%d/%d)", currentStep, maxSteps)
+	}
+
 	if queueCount > 0 {
 		// Highlight just the count number
 		countStr := m.styles.Status.Foreground(lipgloss.Color(ColorAccent)).Render(fmt.Sprintf("%d", queueCount))
-		if status != "" {
-			status = fmt.Sprintf("Queued(Ctrl-Q): %s | %s", countStr, status)
+		if stepsPart != "" {
+			if status != "" {
+				status = fmt.Sprintf("Queued(Ctrl-Q): %s | %s | %s", countStr, stepsPart, status)
+			} else {
+				status = fmt.Sprintf("Queued(Ctrl-Q): %s | %s", countStr, stepsPart)
+			}
 		} else {
-			status = fmt.Sprintf("Queued(Ctrl-Q): %s", countStr)
+			if status != "" {
+				status = fmt.Sprintf("Queued(Ctrl-Q): %s | %s", countStr, status)
+			} else {
+				status = fmt.Sprintf("Queued(Ctrl-Q): %s", countStr)
+			}
+		}
+	} else if stepsPart != "" {
+		if status != "" {
+			status = fmt.Sprintf("%s | %s", stepsPart, status)
+		} else {
+			status = stepsPart
 		}
 	}
 	m.status.SetStatus(status)
-	m.status.SetInProgress(m.out.IsInProgress())
+	m.status.SetInProgress(inProgress)
 }
 
 // View renders the complete terminal UI.

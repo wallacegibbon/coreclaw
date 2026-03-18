@@ -61,6 +61,10 @@ func (s *Session) processPrompt(ctx context.Context, _ string, history []llm.Mes
 	_, err := s.Agent.Stream(ctx, history, llm.StreamCallbacks{
 		OnStepStart: func(step int) error {
 			stepCount = step
+			s.mu.Lock()
+			s.currentStep = step
+			s.mu.Unlock()
+			s.sendSystemInfo()
 			return nil
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {

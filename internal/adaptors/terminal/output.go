@@ -36,6 +36,8 @@ type outputWriter struct {
 	activeModelName   string               // Name of active model
 	pendingQueueItems []QueueItem          // Queue items from taskqueue_get_all
 	queueCount        int                  // Number of items in the queue
+	currentStep       int                  // Current step in agent loop (1-indexed)
+	maxSteps          int                  // Maximum steps allowed
 }
 
 func NewTerminalOutput() *outputWriter { //nolint:revive // tests need access to internal methods
@@ -259,6 +261,10 @@ func (w *outputWriter) handleSystemTag(value string) {
 		}
 		w.pendingQueueItems = items
 
+		// Store step info
+		w.currentStep = info.CurrentStep
+		w.maxSteps = info.MaxSteps
+
 		// Signal update so tick handler picks up changes
 		select {
 		case w.updateChan <- struct{}{}:
@@ -330,6 +336,20 @@ func (w *outputWriter) IsInProgress() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.inProgress
+}
+
+// GetCurrentStep returns the current step in the agent loop
+func (w *outputWriter) GetCurrentStep() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.currentStep
+}
+
+// GetMaxSteps returns the maximum steps allowed
+func (w *outputWriter) GetMaxSteps() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.maxSteps
 }
 
 // renderMultiline applies a style to each line of text

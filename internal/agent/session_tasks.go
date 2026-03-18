@@ -100,6 +100,9 @@ func (s *Session) setInProgress(v bool) {
 	s.mu.Lock()
 	changed := s.inProgress != v
 	s.inProgress = v
+	if !v {
+		s.currentStep = 0
+	}
 	s.mu.Unlock()
 	if changed {
 		s.sendSystemInfo()

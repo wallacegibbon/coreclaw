@@ -25,6 +25,8 @@ type OutputWriter interface {
 	GetStatus() string
 	GetQueueCount() int
 	IsInProgress() bool
+	GetCurrentStep() int
+	GetMaxSteps() int
 
 	// Model management
 	GetModels() []agentpkg.ModelInfo

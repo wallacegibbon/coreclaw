@@ -120,6 +120,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 	contextTokens := s.ContextTokens
 	contextLimit := s.ContextLimit
 	totalTokens := s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens
+	currentStep := s.currentStep
 	s.mu.Unlock()
 
 	info := SystemInfo{
@@ -128,6 +129,8 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		TotalTokens:       totalTokens,
 		QueueItems:        queueItems,
 		InProgress:        inProgress,
+		CurrentStep:       currentStep,
+		MaxSteps:          s.maxSteps,
 		Models:            models,
 		ActiveModelID:     activeID,
 		ActiveModelConfig: activeModelConfig,
