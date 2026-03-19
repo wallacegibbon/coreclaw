@@ -18,31 +18,26 @@ type DiffLinePair struct {
 	New string
 }
 
-// renderDiffContent renders a diff container side by side
+// renderDiffContent renders a diff container side by side, showing only changed lines
 func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int, status string) string {
 	// Preallocate lines: header + diff lines
 	lines := make([]string, 0, 1+len(diff.Lines))
 
 	// Add header with file path and status indicator
-	// Diff windows always have a status indicator (they're tool windows)
 	var indicator string
 	if status == "success" {
-		// Green filled dot
 		indicator = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorSuccess)).
 			Render("• ")
 	} else if status == "error" {
-		// Red filled dot
 		indicator = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorError)).
 			Render("• ")
 	} else if status == "pending" {
-		// Dimmed filled dot for pending
 		indicator = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorDim)).
 			Render("• ")
 	} else {
-		// Default: dimmed hollow dot (for loaded sessions without status)
 		indicator = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorDim)).
 			Render("· ")
@@ -51,7 +46,8 @@ func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int, s
 	lines = append(lines, header)
 
 	// Calculate width for each side
-	// Line format: "= " + paddedOld + " " + "|" + " " + "+ " + newPart
+	// Line format: prefix + content + padding + " │ " + prefix + content
+	// Prefix can be: "= ", "- ", "+ ", or "  " (2 chars each)
 	// Total: 2 + sideWidth + 3 + 2 + sideWidth = 2*sideWidth + 7
 	// We need: 2*sideWidth + 7 <= innerWidth
 	// So: sideWidth <= (innerWidth - 7) / 2
@@ -82,23 +78,23 @@ func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int, s
 		var left, right string
 		switch {
 		case isSame:
-			// Unchanged content - use spaces, no sign
-			left = wb.styles.DiffSame.Render("  " + paddedOld)
-			right = wb.styles.DiffSame.Render("  " + newPart)
+			// Unchanged content - show = on both sides
+			left = wb.styles.DiffSame.Render("= " + paddedOld)
+			right = wb.styles.DiffSame.Render("= " + newPart)
 		case oldEmpty:
-			// Old side is empty (new has more lines) - use spaces, no sign
+			// Old side is empty (added line) - show spaces on left, + on right
 			left = "  " + paddedOld
 			right = wb.styles.DiffAdd.Render("+ " + newPart)
 		case newEmpty:
-			// New side is empty (old has more lines) - use spaces, no sign
+			// New side is empty (removed line) - show - on left, spaces on right
 			left = wb.styles.DiffRemove.Render("- " + paddedOld)
 			right = "  " + newPart
 		default:
-			// Colored style for changed content
+			// Both sides differ: show - on left, + on right
 			left = wb.styles.DiffRemove.Render("- " + paddedOld)
 			right = wb.styles.DiffAdd.Render("+ " + newPart)
 		}
-		sep := wb.styles.DiffSep.Render("|")
+		sep := wb.styles.DiffSep.Render("│")
 		lines = append(lines, left+" "+sep+" "+right)
 	}
 

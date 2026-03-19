@@ -194,11 +194,57 @@ func TestWindowBufferDiff(t *testing.T) {
 		// Render and check that it shows all lines
 		rendered := wb.GetAll(-1)
 
-		// Should show all 10 diff lines plus header
-		// Count the diff separators (|) to count diff lines
-		sepCount := strings.Count(rendered, "|")
-		if sepCount != 10 {
-			t.Errorf("Unwrapped diff should show 10 lines, found %d separators", sepCount)
+		// Should show all 10 lines with - prefix on left (changed content)
+		// Count the "-" prefixes on left side to count diff lines
+		removeCount := strings.Count(rendered, "- ")
+		if removeCount != 10 {
+			t.Errorf("Unwrapped diff should show 10 changed lines with - prefix, found %d", removeCount)
+		}
+	})
+
+	t.Run("diff window shows minimal prefixes", func(t *testing.T) {
+		wb := NewWindowBuffer(80)
+
+		// Create a diff with unchanged, added, and removed lines
+		lines := []DiffLinePair{
+			{Old: "unchanged line 1", New: "unchanged line 1"}, // unchanged
+			{Old: "old content", New: "new content"},           // changed
+			{Old: "unchanged line 2", New: "unchanged line 2"}, // unchanged
+			{Old: "removed line", New: ""},                     // removed
+			{Old: "", New: "added line"},                       // added
+		}
+
+		wb.AppendDiff("diff-1", "test.txt", lines)
+
+		// Unwrap to see all lines
+		wb.ToggleWrap(0)
+
+		rendered := wb.GetAll(-1)
+
+		// Check that unchanged lines have = prefix on both sides
+		if !strings.Contains(rendered, "= unchanged line 1") {
+			t.Error("Unchanged line 1 should have = prefix on both sides")
+		}
+		if !strings.Contains(rendered, "= unchanged line 2") {
+			t.Error("Unchanged line 2 should have = prefix on both sides")
+		}
+
+		// Check that changed line shows - on left, + on right
+		if !strings.Contains(rendered, "- old content") {
+			t.Error("Changed old content should have - prefix")
+		}
+		if !strings.Contains(rendered, "+ new content") {
+			t.Error("Changed new content should have + prefix")
+		}
+
+		// Check that removed line shows - on left
+		if !strings.Contains(rendered, "- removed line") {
+			t.Error("Removed line should have - prefix")
+		}
+
+		// Check that added line shows + on right
+		if !strings.Contains(rendered, "+ added line") {
+			t.Error("Added line should have + prefix")
 		}
 	})
 
@@ -218,9 +264,9 @@ func TestWindowBufferDiff(t *testing.T) {
 
 		// First render - should be folded (wrapped=true)
 		rendered1 := wb.GetAll(-1)
-		sepCount1 := strings.Count(rendered1, "|")
-		if sepCount1 >= 10 {
-			t.Errorf("Wrapped diff should fold lines, found %d separators", sepCount1)
+		removeCount1 := strings.Count(rendered1, "- ")
+		if removeCount1 >= 10 {
+			t.Errorf("Wrapped diff should fold lines, found %d - prefixes", removeCount1)
 		}
 
 		// Toggle wrap
@@ -228,9 +274,9 @@ func TestWindowBufferDiff(t *testing.T) {
 
 		// Second render - should be expanded (wrapped=false)
 		rendered2 := wb.GetAll(-1)
-		sepCount2 := strings.Count(rendered2, "|")
-		if sepCount2 != 20 {
-			t.Errorf("Unwrapped diff should show all 20 lines, found %d separators", sepCount2)
+		removeCount2 := strings.Count(rendered2, "- ")
+		if removeCount2 != 20 {
+			t.Errorf("Unwrapped diff should show all 20 lines with - prefix, found %d", removeCount2)
 		}
 
 		// Toggle back

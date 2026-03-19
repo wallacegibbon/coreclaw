@@ -57,7 +57,7 @@ func DefaultStyles() *Styles {
 		DiffRemove:  baseStyle.Foreground(lipgloss.Color(ColorError)),
 		DiffAdd:     baseStyle.Foreground(lipgloss.Color(ColorSuccess)),
 		DiffSame:    baseStyle.Foreground(lipgloss.Color(ColorMuted)),
-		DiffSep:     baseStyle.Foreground(lipgloss.Color(ColorMuted)),
+		DiffSep:     baseStyle.Foreground(lipgloss.Color(ColorBase)),
 
 		// Display styles
 		Input:       baseStyle,
