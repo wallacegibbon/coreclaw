@@ -41,6 +41,23 @@ func DefaultTheme() *Theme {
 	}
 }
 
+// themeFieldSetters maps config keys to functions that set theme fields
+var themeFieldSetters = map[string]func(*Theme, string){
+	"base":          func(t *Theme, v string) { t.Base = v },
+	"window_border": func(t *Theme, v string) { t.Base = v },
+	"surface1":      func(t *Theme, v string) { t.Surface1 = v },
+	"accent":        func(t *Theme, v string) { t.Accent = v },
+	"dim":           func(t *Theme, v string) { t.Dim = v },
+	"muted":         func(t *Theme, v string) { t.Muted = v },
+	"text_muted":    func(t *Theme, v string) { t.Muted = v },
+	"text":          func(t *Theme, v string) { t.Text = v },
+	"warning":       func(t *Theme, v string) { t.Warning = v },
+	"error":         func(t *Theme, v string) { t.Error = v },
+	"success":       func(t *Theme, v string) { t.Success = v },
+	"peach":         func(t *Theme, v string) { t.Peach = v },
+	"cursor":        func(t *Theme, v string) { t.Cursor = v },
+}
+
 // LoadTheme loads a theme from a configuration file
 // Returns the loaded theme or an error if the file cannot be read or parsed
 func LoadTheme(path string) (*Theme, error) {
@@ -50,12 +67,10 @@ func LoadTheme(path string) (*Theme, error) {
 	}
 	defer file.Close()
 
-	theme := DefaultTheme() // Start with defaults
+	theme := DefaultTheme()
 	scanner := bufio.NewScanner(file)
-	lineNum := 0
 
 	for scanner.Scan() {
-		lineNum++
 		line := strings.TrimSpace(scanner.Text())
 
 		// Skip empty lines and comments
@@ -66,7 +81,7 @@ func LoadTheme(path string) (*Theme, error) {
 		// Parse key: value
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) != 2 {
-			continue // Skip malformed lines silently
+			continue
 		}
 
 		key := strings.TrimSpace(parts[0])
@@ -74,33 +89,12 @@ func LoadTheme(path string) (*Theme, error) {
 
 		// Validate color format (must be #hex)
 		if !strings.HasPrefix(value, "#") {
-			continue // Skip invalid color values
+			continue
 		}
 
-		// Apply to theme
-		switch key {
-		case "base", "window_border":
-			theme.Base = value
-		case "surface1":
-			theme.Surface1 = value
-		case "accent":
-			theme.Accent = value
-		case "dim":
-			theme.Dim = value
-		case "muted", "text_muted":
-			theme.Muted = value
-		case "text":
-			theme.Text = value
-		case "warning":
-			theme.Warning = value
-		case "error":
-			theme.Error = value
-		case "success":
-			theme.Success = value
-		case "peach":
-			theme.Peach = value
-		case "cursor":
-			theme.Cursor = value
+		// Apply to theme using setter map
+		if setter, ok := themeFieldSetters[key]; ok {
+			setter(theme, value)
 		}
 	}
 

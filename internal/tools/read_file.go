@@ -72,7 +72,8 @@ func executeReadFile(_ context.Context, args ReadFileInput) (llm.ToolResultOutpu
 				info.Size(), maxFullReadSize,
 			)), nil
 		}
-		content, err := os.ReadFile(args.Path)
+		var content []byte
+		content, err = os.ReadFile(args.Path)
 		if err != nil {
 			return llm.NewTextErrorResponse(err.Error()), nil
 		}
@@ -188,8 +189,9 @@ func isBinaryFile(file *os.File) (bool, error) {
 		if b == '\t' || b == '\n' || b == '\r' {
 			continue
 		}
-		// Check for non-printable ASCII (below 32 or above 126, but allow extended ASCII 127-255 for UTF-8)
-		if b < 32 || b > 255 {
+		// Check for non-printable ASCII control characters (below 32)
+		// Extended ASCII 127-255 is allowed for UTF-8
+		if b < 32 {
 			nonPrintable++
 		}
 	}

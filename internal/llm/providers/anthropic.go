@@ -16,6 +16,10 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
+const (
+	blockTypeToolUse = "tool_use"
+)
+
 // AnthropicProvider implements the Anthropic API
 type AnthropicProvider struct {
 	apiKey      string
@@ -186,9 +190,9 @@ func (s *streamState) finishBlock() {
 			Type: "reasoning",
 			Text: s.currentText.String(),
 		})
-	case "tool_use":
+	case blockTypeToolUse:
 		s.contentParts = append(s.contentParts, llm.ToolCallPart{
-			Type:       "tool_use",
+			Type:       blockTypeToolUse,
 			ToolCallID: s.currentID,
 			ToolName:   s.currentName,
 			Input:      json.RawMessage(s.currentInput.String()),
@@ -227,20 +231,14 @@ func (s *streamState) setStopReason(reason string) {
 	s.stopReason = reason
 }
 
-func (s *streamState) getStopReason() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.stopReason
-}
-
 // lastToolCall returns the last tool call if the current block is a tool_use
 func (s *streamState) lastToolCall() *llm.ToolCallPart {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.currentType == "tool_use" {
+	if s.currentType == blockTypeToolUse {
 		return &llm.ToolCallPart{
-			Type:       "tool_use",
+			Type:       blockTypeToolUse,
 			ToolCallID: s.currentID,
 			ToolName:   s.currentName,
 			Input:      json.RawMessage(s.currentInput.String()),
@@ -287,7 +285,7 @@ func (p *AnthropicProvider) StreamMessages(
 				})
 			case llm.ToolCallPart:
 				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-					Type:  "tool_use",
+					Type:  blockTypeToolUse,
 					ID:    v.ToolCallID,
 					Name:  v.ToolName,
 					Input: v.Input,

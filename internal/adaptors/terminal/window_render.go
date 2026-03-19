@@ -115,8 +115,49 @@ func (wb *WindowBuffer) renderAndCacheWindow(i int, w *Window) string {
 	return styled
 }
 
+// isCacheValid checks if a window's cache is valid for the current width
+func (wb *WindowBuffer) isCacheValid(w *Window) bool {
+	if w.cachedWidth != wb.width {
+		return false
+	}
+	if w.IsDiffWindow() {
+		return w.Wrapped == w.lastWrapped
+	}
+	return len(w.Content) == w.lastContentLen
+}
+
+// renderWindowWithStyle renders a window's content and caches it with the given style
+func (wb *WindowBuffer) renderWindowWithStyle(w *Window, style lipgloss.Style) string {
+	innerWidth := max(0, wb.width-4)
+	innerContent := wb.renderWindowContent(w, innerWidth)
+	styled := style.Width(wb.width).Render(innerContent)
+
+	w.cachedRender = w.Style.Width(wb.width).Render(innerContent)
+	w.cachedInnerContent = innerContent
+	w.cachedWidth = wb.width
+	w.lastContentLen = len(w.Content)
+	w.lastWrapped = w.Wrapped
+
+	return styled
+}
+
+// renderNonCursorWindow renders a non-cursor window, using cache if valid
+func (wb *WindowBuffer) renderNonCursorWindow(w *Window) string {
+	if w.cachedRender != "" && wb.isCacheValid(w) {
+		return w.cachedRender
+	}
+	return wb.renderWindowWithStyle(w, w.Style)
+}
+
+// renderCursorWindow renders the cursor-highlighted window
+func (wb *WindowBuffer) renderCursorWindow(w *Window) string {
+	if w.cachedInnerContent != "" && wb.isCacheValid(w) {
+		return wb.cursorStyle.Width(wb.width).Render(w.cachedInnerContent)
+	}
+	return wb.renderWindowWithStyle(w, wb.cursorStyle)
+}
+
 // renderWithCursor renders all windows with cursor highlighting on the specified window.
-// For the cursor window: reuse cachedInnerContent, only swap border style (no lipgloss.Wrap).
 func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 	var sb strings.Builder
 
@@ -125,46 +166,10 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 			sb.WriteString("\n")
 		}
 
-		// Non-cursor window: use cached render if valid
 		if i != cursorIndex {
-			// Check cache validity
-			// For diff windows: check Wrapped state
-			// For content windows: check Content length
-			cacheValid := w.cachedRender != "" && w.cachedWidth == wb.width &&
-				(w.IsDiffWindow() && w.Wrapped == w.lastWrapped || !w.IsDiffWindow() && len(w.Content) == w.lastContentLen)
-			if cacheValid {
-				sb.WriteString(w.cachedRender)
-				continue
-			}
-			// Fallback: re-render and cache
-			innerWidth := max(0, wb.width-4)
-			innerContent := wb.renderWindowContent(w, innerWidth)
-			styled := w.Style.Width(wb.width).Render(innerContent)
-			w.cachedRender = styled
-			w.cachedInnerContent = innerContent
-			w.cachedWidth = wb.width
-			w.lastContentLen = len(w.Content)
-			w.lastWrapped = w.Wrapped
-			sb.WriteString(styled)
-			continue
-		}
-
-		// Cursor window: border swap - reuse cachedInnerContent, avoid renderWindowContent
-		// Check cache validity
-		cacheValid := w.cachedInnerContent != "" && w.cachedWidth == wb.width &&
-			(w.IsDiffWindow() && w.Wrapped == w.lastWrapped || !w.IsDiffWindow() && len(w.Content) == w.lastContentLen)
-		if cacheValid {
-			sb.WriteString(wb.cursorStyle.Width(wb.width).Render(w.cachedInnerContent))
+			sb.WriteString(wb.renderNonCursorWindow(w))
 		} else {
-			innerWidth := max(0, wb.width-4)
-			innerContent := wb.renderWindowContent(w, innerWidth)
-			styled := wb.cursorStyle.Width(wb.width).Render(innerContent)
-			w.cachedRender = w.Style.Width(wb.width).Render(innerContent) // cache dimmed for next time
-			w.cachedInnerContent = innerContent
-			w.cachedWidth = wb.width
-			w.lastContentLen = len(w.Content)
-			w.lastWrapped = w.Wrapped
-			sb.WriteString(styled)
+			sb.WriteString(wb.renderCursorWindow(w))
 		}
 	}
 	return sb.String()
@@ -202,22 +207,23 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 	if w.Tag == stream.TagFunctionNotify {
 		// Tool windows always have a status indicator
 		var indicator string
-		if w.Status == "success" {
+		switch w.Status {
+		case statusSuccess:
 			// Green filled dot
 			indicator = lipgloss.NewStyle().
 				Foreground(wb.styles.ColorSuccess).
 				Render("• ")
-		} else if w.Status == "error" {
+		case statusError:
 			// Red filled dot
 			indicator = lipgloss.NewStyle().
 				Foreground(wb.styles.ColorError).
 				Render("• ")
-		} else if w.Status == "pending" {
+		case statusPending:
 			// Dimmed filled dot for pending
 			indicator = lipgloss.NewStyle().
 				Foreground(wb.styles.ColorDim).
 				Render("• ")
-		} else {
+		default:
 			// Default: dimmed hollow dot (for loaded sessions without status)
 			indicator = lipgloss.NewStyle().
 				Foreground(wb.styles.ColorDim).

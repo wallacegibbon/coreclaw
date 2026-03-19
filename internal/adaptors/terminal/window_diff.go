@@ -6,6 +6,13 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+// Status constants for diff display
+const (
+	statusSuccess = "success"
+	statusError   = "error"
+	statusPending = "pending"
+)
+
 // DiffContainer holds two panes side by side for diff display
 type DiffContainer struct {
 	Path  string         // file path for header
@@ -25,19 +32,20 @@ func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int, s
 
 	// Add header with file path and status indicator
 	var indicator string
-	if status == "success" {
+	switch status {
+	case statusSuccess:
 		indicator = lipgloss.NewStyle().
 			Foreground(wb.styles.ColorSuccess).
 			Render("• ")
-	} else if status == "error" {
+	case statusError:
 		indicator = lipgloss.NewStyle().
 			Foreground(wb.styles.ColorError).
 			Render("• ")
-	} else if status == "pending" {
+	case statusPending:
 		indicator = lipgloss.NewStyle().
 			Foreground(wb.styles.ColorDim).
 			Render("• ")
-	} else {
+	default:
 		indicator = lipgloss.NewStyle().
 			Foreground(wb.styles.ColorDim).
 			Render("· ")

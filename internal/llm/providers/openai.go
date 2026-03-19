@@ -356,7 +356,7 @@ func (p *OpenAIProvider) convertMessages(msg llm.Message) []openAIMessage {
 
 // convertToolResults converts tool result content to multiple OpenAI messages
 func (p *OpenAIProvider) convertToolResults(content []llm.ContentPart) []openAIMessage {
-	var results []openAIMessage
+	results := make([]openAIMessage, 0, len(content))
 	for _, part := range content {
 		tr, ok := part.(llm.ToolResultPart)
 		if !ok {

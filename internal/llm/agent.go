@@ -137,7 +137,9 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 
 		// Notify callback with complete step messages (assistant + tool results)
 		if callbacks.OnStepFinish != nil {
-			stepWithResults := append(stepMessages, toolResultMsg)
+			stepWithResults := make([]Message, len(stepMessages), len(stepMessages)+1)
+			copy(stepWithResults, stepMessages)
+			stepWithResults = append(stepWithResults, toolResultMsg)
 			if err := callbacks.OnStepFinish(stepWithResults, stepUsage); err != nil {
 				return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
 			}

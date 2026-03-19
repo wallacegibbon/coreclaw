@@ -168,13 +168,14 @@ func computeLCS(a, b []string) []string {
 	var lcs []string
 	i, j := m, n
 	for i > 0 && j > 0 {
-		if a[i-1] == b[j-1] {
+		switch {
+		case a[i-1] == b[j-1]:
 			lcs = append([]string{a[i-1]}, lcs...)
 			i--
 			j--
-		} else if dp[i-1][j] > dp[i][j-1] {
+		case dp[i-1][j] > dp[i][j-1]:
 			i--
-		} else {
+		default:
 			j--
 		}
 	}

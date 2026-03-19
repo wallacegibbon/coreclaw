@@ -47,6 +47,79 @@ Example:
 		Build()
 }
 
+// streamEditor handles streaming search and replace on a file
+type streamEditor struct {
+	oldBytes    []byte
+	newBytes    []byte
+	buffer      []byte
+	chunk       []byte
+	occurrences int
+}
+
+func newStreamEditor(oldString, newString string) *streamEditor {
+	const chunkSize = 4096
+	oldBytes := []byte(oldString)
+	return &streamEditor{
+		oldBytes: oldBytes,
+		newBytes: []byte(newString),
+		buffer:   make([]byte, 0, len(oldBytes)*2+chunkSize),
+		chunk:    make([]byte, chunkSize),
+	}
+}
+
+// processChunk reads and processes a chunk, writing to tempFile
+// Returns (done, error)
+func (se *streamEditor) processChunk(file *os.File, tempFile *os.File) (bool, error) {
+	n, err := file.Read(se.chunk)
+	if err != nil && err.Error() != "EOF" {
+		return false, fmt.Errorf("failed to read file: %v", err)
+	}
+
+	se.buffer = append(se.buffer, se.chunk[:n]...)
+
+	// Search for old_string in buffer
+	for {
+		idx := bytes.Index(se.buffer, se.oldBytes)
+		if idx == -1 {
+			break
+		}
+
+		se.occurrences++
+		if se.occurrences > 1 {
+			return false, fmt.Errorf("old_string found multiple times in file. Include more surrounding context to make it unique, or use a different portion of text")
+		}
+
+		if _, err = tempFile.Write(se.buffer[:idx]); err != nil {
+			return false, fmt.Errorf("failed to write to temp file: %v", err)
+		}
+		if _, err = tempFile.Write(se.newBytes); err != nil {
+			return false, fmt.Errorf("failed to write to temp file: %v", err)
+		}
+		se.buffer = se.buffer[idx+len(se.oldBytes):]
+	}
+
+	// Keep enough data in buffer to handle matches spanning chunks
+	if len(se.buffer) > len(se.oldBytes) {
+		writeLen := len(se.buffer) - len(se.oldBytes)
+		if _, err = tempFile.Write(se.buffer[:writeLen]); err != nil {
+			return false, fmt.Errorf("failed to write to temp file: %v", err)
+		}
+		se.buffer = se.buffer[writeLen:]
+	}
+
+	return err != nil && err.Error() == "EOF", nil
+}
+
+// flushRemaining writes any remaining buffer content
+func (se *streamEditor) flushRemaining(tempFile *os.File) error {
+	if len(se.buffer) > 0 {
+		if _, err := tempFile.Write(se.buffer); err != nil {
+			return fmt.Errorf("failed to write to temp file: %v", err)
+		}
+	}
+	return nil
+}
+
 func executeEditFile(_ context.Context, args EditFileInput) (llm.ToolResultOutput, error) {
 	if args.Path == "" {
 		return llm.NewTextErrorResponse("path is required"), nil
@@ -54,9 +127,7 @@ func executeEditFile(_ context.Context, args EditFileInput) (llm.ToolResultOutpu
 	if args.OldString == "" {
 		return llm.NewTextErrorResponse("old_string is required"), nil
 	}
-	// Note: new_string can be empty (for removing content)
 
-	// Open the original file
 	file, err := os.Open(args.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -66,111 +137,51 @@ func executeEditFile(_ context.Context, args EditFileInput) (llm.ToolResultOutpu
 	}
 	defer file.Close()
 
-	// Create a temporary file in the same directory
 	tempFile, err := os.CreateTemp("", "edit_file_*.tmp")
 	if err != nil {
 		return llm.NewTextErrorResponse(fmt.Sprintf("failed to create temp file: %v", err)), nil
 	}
 	tempPath := tempFile.Name()
-	defer os.Remove(tempPath) // Clean up temp file on error
+	defer os.Remove(tempPath)
 
-	// Streaming search and replace
-	const chunkSize = 4096 // 4KB chunks
-	oldBytes := []byte(args.OldString)
-	newBytes := []byte(args.NewString)
-
-	buffer := make([]byte, 0, len(oldBytes)*2+chunkSize)
-	chunk := make([]byte, chunkSize)
-	occurrences := 0
+	editor := newStreamEditor(args.OldString, args.NewString)
 
 	for {
-		n, err := file.Read(chunk)
-		if err != nil && err.Error() != "EOF" {
+		var done bool
+		done, err = editor.processChunk(file, tempFile)
+		if err != nil {
 			tempFile.Close()
-			return llm.NewTextErrorResponse(fmt.Sprintf("failed to read file: %v", err)), nil
+			return llm.NewTextErrorResponse(err.Error()), nil
 		}
-
-		// Add new data to buffer
-		buffer = append(buffer, chunk[:n]...)
-
-		// Search for old_string in buffer
-		for {
-			idx := bytes.Index(buffer, oldBytes)
-			if idx == -1 {
-				break
-			}
-
-			occurrences++
-			if occurrences > 1 {
-				tempFile.Close()
-				return llm.NewTextErrorResponse(
-					fmt.Sprintf("old_string found multiple times in file. Include more surrounding context to make it unique, or use a different portion of text.")), nil
-			}
-
-			// Write everything before the match
-			if _, err := tempFile.Write(buffer[:idx]); err != nil {
-				tempFile.Close()
-				return llm.NewTextErrorResponse(fmt.Sprintf("failed to write to temp file: %v", err)), nil
-			}
-
-			// Write the replacement
-			if _, err := tempFile.Write(newBytes); err != nil {
-				tempFile.Close()
-				return llm.NewTextErrorResponse(fmt.Sprintf("failed to write to temp file: %v", err)), nil
-			}
-
-			// Remove processed part from buffer
-			buffer = buffer[idx+len(oldBytes):]
-		}
-
-		// Keep enough data in buffer to handle matches spanning chunks
-		if len(buffer) > len(oldBytes) {
-			// Write excess data, keeping oldBytes length in buffer
-			writeLen := len(buffer) - len(oldBytes)
-			if _, err := tempFile.Write(buffer[:writeLen]); err != nil {
-				tempFile.Close()
-				return llm.NewTextErrorResponse(fmt.Sprintf("failed to write to temp file: %v", err)), nil
-			}
-			buffer = buffer[writeLen:]
-		}
-
-		if err != nil && err.Error() == "EOF" {
+		if done {
 			break
 		}
 	}
 
-	// Write any remaining buffer content
-	if len(buffer) > 0 {
-		if _, err := tempFile.Write(buffer); err != nil {
-			tempFile.Close()
-			return llm.NewTextErrorResponse(fmt.Sprintf("failed to write to temp file: %v", err)), nil
-		}
+	if err = editor.flushRemaining(tempFile); err != nil {
+		tempFile.Close()
+		return llm.NewTextErrorResponse(err.Error()), nil
 	}
 
-	// Close temp file before renaming
-	if err := tempFile.Close(); err != nil {
+	if err = tempFile.Close(); err != nil {
 		return llm.NewTextErrorResponse(fmt.Sprintf("failed to close temp file: %v", err)), nil
 	}
 
-	// Check if we found the old_string
-	if occurrences == 0 {
+	if editor.occurrences == 0 {
 		return llm.NewTextErrorResponse(
 			fmt.Sprintf("old_string not found in file. Make sure to copy the exact text including all whitespace and indentation.\n\nSearched for:\n%q", args.OldString)), nil
 	}
 
-	// Get original file permissions
 	fileInfo, err := os.Stat(args.Path)
 	if err != nil {
 		return llm.NewTextErrorResponse(fmt.Sprintf("failed to get file info: %v", err)), nil
 	}
 
-	// Replace original file with temp file
-	if err := os.Rename(tempPath, args.Path); err != nil {
+	if err = os.Rename(tempPath, args.Path); err != nil {
 		return llm.NewTextErrorResponse(fmt.Sprintf("failed to replace file: %v", err)), nil
 	}
 
-	// Restore original permissions
-	if err := os.Chmod(args.Path, fileInfo.Mode()); err != nil {
+	if err = os.Chmod(args.Path, fileInfo.Mode()); err != nil {
 		return llm.NewTextErrorResponse(fmt.Sprintf("failed to restore file permissions: %v", err)), nil
 	}
 

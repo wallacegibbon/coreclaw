@@ -40,13 +40,9 @@ func (s *Session) submitTask(task Task) {
 	}
 
 	s.taskQueue = append(s.taskQueue, item)
-	inProgress := s.inProgress
 	s.signalTaskAvailable()
 	s.mu.Unlock()
 
-	if inProgress {
-		// Silent - queue is running, task will start automatically
-	}
 	// Always send system info so queue manager can update
 	s.sendSystemInfo()
 }
