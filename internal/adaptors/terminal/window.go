@@ -26,6 +26,7 @@ type Window struct {
 
 	// Cached rendering state
 	lastContentLen     int    // length of content when last rendered (for quick change detection)
+	lastWrapped        bool   // wrapped state when last rendered (for diff windows)
 	cachedRender       string // full output with border
 	cachedInnerContent string // inner content before border (for cursor border swap)
 	cachedWidth        int    // width used for cached render

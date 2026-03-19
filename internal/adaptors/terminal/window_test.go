@@ -201,4 +201,46 @@ func TestWindowBufferDiff(t *testing.T) {
 			t.Errorf("Unwrapped diff should show 10 lines, found %d separators", sepCount)
 		}
 	})
+
+	t.Run("diff window cache invalidates when wrapped changes", func(t *testing.T) {
+		wb := NewWindowBuffer(80)
+
+		// Create a diff with many lines
+		lines := make([]DiffLinePair, 20)
+		for i := 0; i < 20; i++ {
+			lines[i] = DiffLinePair{
+				Old: string(rune('a' + i%26)),
+				New: string(rune('b' + i%26)),
+			}
+		}
+
+		wb.AppendDiff("diff-1", "test.txt", lines)
+
+		// First render - should be folded (wrapped=true)
+		rendered1 := wb.GetAll(-1)
+		sepCount1 := strings.Count(rendered1, "|")
+		if sepCount1 >= 10 {
+			t.Errorf("Wrapped diff should fold lines, found %d separators", sepCount1)
+		}
+
+		// Toggle wrap
+		wb.ToggleWrap(0)
+
+		// Second render - should be expanded (wrapped=false)
+		rendered2 := wb.GetAll(-1)
+		sepCount2 := strings.Count(rendered2, "|")
+		if sepCount2 != 20 {
+			t.Errorf("Unwrapped diff should show all 20 lines, found %d separators", sepCount2)
+		}
+
+		// Toggle back
+		wb.ToggleWrap(0)
+
+		// Third render - should be folded again
+		rendered3 := wb.GetAll(-1)
+		sepCount3 := strings.Count(rendered3, "|")
+		if sepCount3 >= 10 {
+			t.Errorf("Re-wrapped diff should fold lines again, found %d separators", sepCount3)
+		}
+	})
 }

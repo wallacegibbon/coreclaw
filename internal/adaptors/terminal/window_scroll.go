@@ -47,6 +47,7 @@ func (wb *WindowBuffer) ensureLineHeights() {
 		w.cachedInnerContent = innerContent
 		w.cachedWidth = wb.width
 		w.lastContentLen = len(w.Content)
+		w.lastWrapped = w.Wrapped
 	}
 	wb.dirtyIndex = -1
 }
@@ -125,8 +126,10 @@ func (wb *WindowBuffer) renderWindowCached(i int, isCursor bool) string {
 	w := wb.Windows[i]
 
 	// Check cache validity
+	// For diff windows: check Wrapped state (affects line count via folding)
+	// For content windows: check Content length
 	cacheValid := w.cachedRender != "" && w.cachedWidth == wb.width &&
-		(w.IsDiffWindow() || len(w.Content) == w.lastContentLen)
+		(w.IsDiffWindow() && w.Wrapped == w.lastWrapped || !w.IsDiffWindow() && len(w.Content) == w.lastContentLen)
 
 	if cacheValid {
 		if isCursor {
@@ -146,6 +149,7 @@ func (wb *WindowBuffer) renderWindowCached(i int, isCursor bool) string {
 		w.cachedInnerContent = innerContent
 		w.cachedWidth = wb.width
 		w.lastContentLen = len(w.Content)
+		w.lastWrapped = w.Wrapped
 		return styled
 	}
 
@@ -154,5 +158,6 @@ func (wb *WindowBuffer) renderWindowCached(i int, isCursor bool) string {
 	w.cachedInnerContent = innerContent
 	w.cachedWidth = wb.width
 	w.lastContentLen = len(w.Content)
+	w.lastWrapped = w.Wrapped
 	return styled
 }

@@ -111,6 +111,7 @@ func (wb *WindowBuffer) renderAndCacheWindow(i int, w *Window) string {
 	w.cachedInnerContent = innerContent
 	w.cachedWidth = wb.width
 	w.lastContentLen = len(w.Content)
+	w.lastWrapped = w.Wrapped
 	return styled
 }
 
@@ -126,8 +127,12 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 
 		// Non-cursor window: use cached render if valid
 		if i != cursorIndex {
-			if w.cachedRender != "" && w.cachedWidth == wb.width &&
-				(w.IsDiffWindow() || len(w.Content) == w.lastContentLen) {
+			// Check cache validity
+			// For diff windows: check Wrapped state
+			// For content windows: check Content length
+			cacheValid := w.cachedRender != "" && w.cachedWidth == wb.width &&
+				(w.IsDiffWindow() && w.Wrapped == w.lastWrapped || !w.IsDiffWindow() && len(w.Content) == w.lastContentLen)
+			if cacheValid {
 				sb.WriteString(w.cachedRender)
 				continue
 			}
@@ -139,13 +144,16 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 			w.cachedInnerContent = innerContent
 			w.cachedWidth = wb.width
 			w.lastContentLen = len(w.Content)
+			w.lastWrapped = w.Wrapped
 			sb.WriteString(styled)
 			continue
 		}
 
 		// Cursor window: border swap - reuse cachedInnerContent, avoid renderWindowContent
-		if w.cachedInnerContent != "" && w.cachedWidth == wb.width &&
-			(w.IsDiffWindow() || len(w.Content) == w.lastContentLen) {
+		// Check cache validity
+		cacheValid := w.cachedInnerContent != "" && w.cachedWidth == wb.width &&
+			(w.IsDiffWindow() && w.Wrapped == w.lastWrapped || !w.IsDiffWindow() && len(w.Content) == w.lastContentLen)
+		if cacheValid {
 			sb.WriteString(wb.cursorStyle.Width(wb.width).Render(w.cachedInnerContent))
 		} else {
 			innerWidth := max(0, wb.width-4)
@@ -155,6 +163,7 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 			w.cachedInnerContent = innerContent
 			w.cachedWidth = wb.width
 			w.lastContentLen = len(w.Content)
+			w.lastWrapped = w.Wrapped
 			sb.WriteString(styled)
 		}
 	}
