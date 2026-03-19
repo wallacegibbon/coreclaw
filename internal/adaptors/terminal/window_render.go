@@ -181,14 +181,14 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 		if w.Wrapped {
 			lines := strings.Split(fullContent, "\n")
 			if len(lines) > 5 {
-				// Show: first line, dotted separator, last 3 lines (5 lines total)
+				// Show: first line, tricolon separator, last 3 lines (5 lines total)
 				firstLine := lines[0]
 				lastThreeLines := lines[len(lines)-3:]
 
-				// Create subtle dotted separator across full width
+				// Create full-width tricolon separator with border color
 				wrapIndicator := lipgloss.NewStyle().
-					Foreground(lipgloss.Color(ColorDim)).
-					Render(strings.Repeat("·", innerWidth))
+					Foreground(lipgloss.Color(ColorBase)).
+					Render(strings.Repeat("⁝", innerWidth))
 
 				// Show first line, separator, last 3 lines
 				return firstLine + "\n" + wrapIndicator + "\n" + strings.Join(lastThreeLines, "\n")
@@ -233,14 +233,14 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 		// Check if content spans more than 5 lines (needs truncation)
 		lines := strings.Split(wrappedContent, "\n")
 		if len(lines) > 5 {
-			// Show: first line, dotted separator, last 3 lines (5 lines total)
+			// Show: first line, tricolon separator, last 3 lines (5 lines total)
 			firstLine := lines[0]
 			lastThreeLines := lines[len(lines)-3:]
 
-			// Create subtle dotted separator across full width
+			// Create full-width tricolon separator with border color
 			wrapIndicator := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorDim)).
-				Render(strings.Repeat("·", innerWidth))
+				Foreground(lipgloss.Color(ColorBase)).
+				Render(strings.Repeat("⁝", innerWidth))
 
 			// Show first line, separator, last 3 lines
 			return firstLine + "\n" + wrapIndicator + "\n" + strings.Join(lastThreeLines, "\n")
