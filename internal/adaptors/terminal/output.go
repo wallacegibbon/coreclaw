@@ -242,9 +242,9 @@ func (w *outputWriter) handleSystemTag(value string) {
 		w.queueCount = len(info.QueueItems)
 		if info.ContextLimit > 0 {
 			pct := float64(info.ContextTokens) * 100.0 / float64(info.ContextLimit)
-			w.status = fmt.Sprintf("Context: %d/%d (%.1f%%) | Total: %d", info.ContextTokens, info.ContextLimit, pct, info.TotalTokens)
+			w.status = fmt.Sprintf("Context: %d/%d (%.1f%%)", info.ContextTokens, info.ContextLimit, pct)
 		} else {
-			w.status = fmt.Sprintf("Context: %d | Total: %d", info.ContextTokens, info.TotalTokens)
+			w.status = fmt.Sprintf("Context: %d", info.ContextTokens)
 		}
 		// Store model info
 		w.models = info.Models
