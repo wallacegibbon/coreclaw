@@ -22,6 +22,9 @@ alayacore-web --skill ./skills
 
 # With proxy
 alayacore-web --proxy socks5://127.0.0.1:1080
+
+# With custom max steps
+alayacore-web --max-steps 100
 ```
 
 ## Endpoints

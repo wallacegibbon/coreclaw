@@ -114,7 +114,7 @@ type toolResultData struct {
 	Output string `json:"output"`
 }
 
-// parseSessionMarkdown parses markdown format with TLV or legacy NUL separators.
+// parseSessionMarkdown parses markdown format with TLV encoding.
 func parseSessionMarkdown(data []byte) (*SessionData, error) {
 	content := string(data)
 

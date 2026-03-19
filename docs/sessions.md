@@ -85,5 +85,3 @@ Each message part is encoded as:
 - `FS` (Function State) - Function state indicator (pending/success/error)
 
 The TLV (Tag-Length-Value) encoding prevents recursion issues when session files contain tool results that include session-like content. The blank line separators make the file more readable when opened in a text editor.
-
-Backward compatibility: The parser can still read old NUL-separated format files.
