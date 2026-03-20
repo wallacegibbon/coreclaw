@@ -7,54 +7,72 @@ This document describes the architecture of AlayaCore, an AI assistant with term
 AlayaCore follows a layered architecture with clear separation of concerns:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Adaptors Layer                          │
-│  ┌─────────────────────┐     ┌──────────────────────────────┐   │
-│  │   Terminal Adaptor  │     │     WebSocket Adaptor        │   │
-│  │   (Bubble Tea TUI)  │     │     (HTTP/WebSocket)         │   │
-│  └──────────┬──────────┘     └───────────────┬──────────────┘   │
-└─────────────┼────────────────────────────────┼──────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            Entry Point                                  │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  main.go → config.Parse() → app.Setup() → terminal.NewAdaptor()  │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Adaptors Layer                                  │
+│  ┌─────────────────────┐     ┌──────────────────────────────────────┐   │
+│  │   Terminal Adaptor  │     │         WebSocket Adaptor            │   │
+│  │   (Bubble Tea TUI)  │     │         (HTTP/WebSocket)             │   │
+│  └──────────┬──────────┘     └───────────────┬──────────────────────┘   │
+└─────────────┼────────────────────────────────┼──────────────────────────┘
               │                                │
               │         TLV Protocol           │
               │  (Tag-Length-Value Messages)   │
               │                                │
-┌─────────────┼────────────────────────────────┼──────────────────┐
-│             ▼                                ▼                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    Session Layer                         │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │   │
-│  │  │ Task Queue  │  │   Model     │  │    Command      │   │   │
-│  │  │ (FIFO)      │  │  Manager    │  │    Registry     │   │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────────┘   │   │
-│  └──────────────────────────┬───────────────────────────────┘   │
-│                             │                                   │
-└─────────────────────────────┼───────────────────────────────────┘
+┌─────────────┼────────────────────────────────┼──────────────────────────┐
+│             ▼                                ▼                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                      Session Layer                               │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐   │   │
+│  │  │ Task Queue  │  │   Model     │  │      Runtime            │   │   │
+│  │  │ (FIFO)      │  │  Manager    │  │      Manager            │   │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────────────────┘   │   │
+│  └──────────────────────────┬───────────────────────────────────────┘   │
+│                             │                                           │
+└─────────────────────────────┼───────────────────────────────────────────┘
                               │
                               ▼
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    Agent Layer                           │   │
-│  │  ┌─────────────────────────────────────────────────────┐ │   │
-│  │  │              LLM Package                            │ │   │
-│  │  │  (Language Model + Tool Calling)                    │ │   │
-│  │  └─────────────────────────────────────────────────────┘ │   │
-│  └──────────────────────────┬───────────────────────────────┘   │
-│                             │                                   │
-└─────────────────────────────┼───────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Agent Layer                                     │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                        LLM Package                                │  │
+│  │   ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐   │  │
+│  │   │   Agent     │  │  Provider   │  │       Factory           │   │  │
+│  │   │ (Tool Loop) │  │  Interface  │  │  (Provider Creation)    │   │  │
+│  │   └─────────────┘  └─────────────┘  └─────────────────────────┘   │  │
+│  └──────────────────────────┬────────────────────────────────────────┘  │
+│                             │                                           │
+└─────────────────────────────┼───────────────────────────────────────────┘
                               │
                               ▼
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    Tools Layer                           │   │
-│  │  ┌──────────┐ ┌───────────┐ ┌──────────┐ ┌────────────┐  │   │
-│  │  │read_file │ │write_file │ │edit_file │ │posix_shell │  │   │
-│  │  └──────────┘ └───────────┘ └──────────┘ └────────────┘  │   │
-│  │  ┌──────────────┐                                        │   │
-│  │  │activate_skill│                                        │   │
-│  │  └──────────────┘                                        │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Tools Layer                                     │
+│  ┌──────────┐ ┌───────────┐ ┌──────────┐ ┌────────────┐ ┌────────────┐  │
+│  │read_file │ │write_file │ │edit_file │ │posix_shell │ │activate_   │  │
+│  │          │ │           │ │          │ │            │ │skill       │  │
+│  └──────────┘ └───────────┘ └──────────┘ └────────────┘ └────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Component Descriptions
+
+### Entry Point (`main.go`, `internal/config/`, `internal/app/`)
+
+The entry point wires together all components:
+
+1. **config.Parse()** - Parses CLI flags into `config.Settings`
+2. **app.Setup()** - Initializes shared components:
+   - Skills manager (loads skill metadata)
+   - Tools (read_file, edit_file, write_file, posix_shell, activate_skill)
+   - System prompt (default + skills fragment + AGENTS.md + cwd)
+3. **Adaptor creation** - Terminal or WebSocket adaptor starts
 
 ### Adaptors Layer
 
@@ -64,11 +82,12 @@ The adaptor layer handles user interaction and translates between user actions a
 - **Terminal**: Main Bubble Tea model composing all UI components
 - **DisplayModel**: Renders assistant output with virtual scrolling
 - **InputModel**: Handles user text input with external editor support
-- **StatusModel**: Shows session status (tokens, queue, model info)
+- **StatusModel**: Shows session status (tokens, queue, steps, model info)
 - **ModelSelector**: Modal for switching between AI models
 - **QueueManager**: Modal for managing the task queue
 - **OutputWriter**: Parses TLV from session and renders styled content
 - **WindowBuffer**: Virtual scrolling buffer for display windows
+- **Theme**: Customizable color scheme (Catppuccin Mocha default)
 
 #### WebSocket Adaptor (`internal/adaptors/websocket/`)
 - HTTP server with WebSocket upgrade
@@ -81,35 +100,32 @@ The session layer manages conversation state, task execution, and model interact
 
 - **Session**: Main session struct managing conversation state
 - **Task Queue**: FIFO queue for pending prompts/commands
-- **ModelManager**: Loads and manages AI model configurations
-- **RuntimeManager**: Persists runtime settings (active model)
-- **CommandRegistry**: Declarative command registration
+- **ModelManager**: Loads and manages AI model configurations (never writes to file)
+- **RuntimeManager**: Persists runtime settings (active model name)
 
 ### Agent Layer (`internal/llm/`)
 
 The agent layer handles language model interaction and tool-calling orchestration.
 
-- **Agent**: Tool-calling loop orchestration
+- **Agent**: Tool-calling loop orchestration with max steps limit
 - **Provider interface**: Streaming LLM abstraction
+- **Factory**: Creates providers based on protocol type
 - **Providers**: Anthropic, OpenAI implementations
 - **Types**: Message, ContentPart, StreamEvent definitions
+- **Typed helpers**: Type-safe tool execution via `TypedExecute`
 
 **Key Pattern - Callback Streaming:**
 ```go
 Agent.Stream(ctx, messages, llm.StreamCallbacks{
-    OnTextDelta:    func(delta string) error { ... },
-    OnToolCall:     func(id, name string, input json.RawMessage) error { ... },
-    OnStepFinish:   func(msgs []Message, usage Usage) error { ... },
+    OnTextDelta:      func(delta string) error { ... },
+    OnReasoningDelta: func(delta string) error { ... },  // For thinking tokens
+    OnToolCall:       func(id, name string, input json.RawMessage) error { ... },
+    OnToolResult:     func(id string, output ToolResultOutput) error { ... },
+    OnStepStart:      func(step int) error { ... },
+    OnStepFinish:     func(msgs []Message, usage Usage) error { ... },
 })
 ```
 Messages are appended incrementally in `OnStepFinish` so they're preserved even if user cancels.
-
-**Stream ID Format:** Content is tagged with IDs like `[:0-1-abc123:]`:
-- `0` = prompt counter (increments per user message)
-- `1` = step number within that prompt
-- `abc123` = tool call ID or `t` (text) / `r` (reasoning)
-
-This allows the terminal to route content to correct windows across multi-step tool calls.
 
 ### Tools Layer (`internal/tools/`)
 
@@ -117,7 +133,7 @@ Tools are functions the AI can call to interact with the system.
 
 | Tool | Description | Safety |
 |------|-------------|--------|
-| `read_file` | Read file contents | Safe |
+| `read_file` | Read file contents (supports line ranges) | Safe |
 | `edit_file` | Search/replace edits | Medium |
 | `write_file` | Create/overwrite files | Dangerous |
 | `activate_skill` | Load and execute skills | Medium |
@@ -143,7 +159,7 @@ Communication between adaptors and session uses a simple Tag-Length-Value (TLV) 
 | `TagFunctionNotify` | FN | Output | Function call for display |
 | `TagFunctionCall` | FC | Output | Function call for persistence |
 | `TagFunctionResult` | FR | Output | Function result for persistence |
-| `TagFunctionState` | FS | Output | Function state indicator (pending/success/error/default) |
+| `TagFunctionState` | FS | Output | Function state indicator (pending/success/error) |
 | `TagSystemError` | SE | Output | System error messages |
 | `TagSystemNotify` | SN | Output | System notifications |
 | `TagSystemData` | SD | Output | System data (JSON) |
@@ -159,49 +175,27 @@ Communication between adaptors and session uses a simple Tag-Length-Value (TLV) 
 6. Terminal adaptor parses TLV, renders styled content
 ```
 
-## Data Flow
+## System Prompt Architecture
 
-### User Prompt Flow
+AlayaCore uses a dual system prompt architecture:
 
+1. **Default System Prompt** (`app.DefaultSystemPrompt`): Base identity and rules
+2. **Extra System Prompt** (`--system` flag): User-provided additions
+
+The system prompt is built in layers:
 ```
-User Input → InputModel → ChanInput.EmitTLV(TU, prompt)
-                                    ↓
-Session.readFromInput() ← ReadTLV()
-                                    ↓
-submitTask(UserPrompt) → Task Queue
-                                    ↓
-taskRunner() → handleUserPrompt()
-                                    ↓
-processPrompt() → LLM Agent
-                                    ↓
-writeColored(TA, response) → Output
-                                    ↓
-OutputWriter.Write() → parse TLV
-                                    ↓
-WindowBuffer.AppendOrUpdate() → Render
-                                    ↓
-DisplayModel.View() → Terminal UI
+Default Prompt
+    ↓
++ Skills Fragment (if skills configured)
+    ↓
++ AGENTS.md content (if exists in cwd)
+    ↓
++ Current working directory
+    ↓
++ Extra System Prompt (from --system flag)
 ```
 
-### Command Flow
-
-```
-User types ":model_set gpt-4"
-                ↓
-InputModel → ChanInput.EmitTLV(TU, ":model_set gpt-4")
-                ↓
-Session.readFromInput() → detects ":" prefix
-                ↓
-submitTask(CommandPrompt) → Task Queue
-                ↓
-taskRunner() → handleCommandSync("model_set gpt-4")
-                ↓
-dispatchCommand() → CommandRegistry → handleModelSet()
-                ↓
-ModelManager.SetActive() → RuntimeManager.Persist()
-                ↓
-writeNotifyf("Switched to model...") → Output
-```
+For Anthropic APIs with `prompt_cache: true`, cache_control markers are applied to the default and extra system prompts separately for optimal caching.
 
 ## Configuration
 
@@ -223,6 +217,8 @@ model_name: "llama3"
 context_limit: 32768
 ```
 
+**Important**: The program NEVER writes to this file. Users must edit it manually.
+
 ### Runtime Configuration (`~/.alayacore/runtime.conf`)
 
 ```yaml
@@ -233,6 +229,72 @@ The active model is determined by:
 1. If `runtime.conf` has a saved `active_model`, that model is used
 2. Otherwise, the **first model** in `model.conf` becomes the active model
 
+### Theme Configuration (`~/.alayacore/theme.conf`)
+
+```
+base: "#1e1e2e"
+accent: "#89d4fa"
+text: "#cdd6f4"
+```
+
+## Data Flow
+
+### Startup Flow
+
+```
+main.go → config.Parse() → Settings
+                ↓
+        app.Setup(Settings)
+                ↓
+        ├── skills.NewManager(skillPaths)
+        ├── tools.NewReadFileTool(), etc.
+        └── Build system prompt
+                ↓
+        terminal.NewAdaptor(appConfig)
+                ↓
+        Session created with tools, system prompt
+```
+
+### User Prompt Flow
+
+```
+User Input → InputModel → ChanInput.EmitTLV(TU, prompt)
+                                    ↓
+Session.readFromInput() ← ReadTLV()
+                                    ↓
+submitTask(UserPrompt) → Task Queue
+                                    ↓
+taskRunner() → handleUserPrompt()
+                                    ↓
+processPrompt() → LLM Agent.Stream()
+                                    ↓
+Callbacks: OnTextDelta, OnToolCall, etc.
+                                    ↓
+writeColored(TA, response) → Output
+                                    ↓
+OutputWriter.Write() → parse TLV
+                                    ↓
+WindowBuffer.AppendOrUpdate() → Render
+                                    ↓
+DisplayModel.View() → Terminal UI
+```
+
+### Tool Execution Flow
+
+```
+Agent.Stream() receives tool_call event
+                ↓
+OnToolCall callback → TLV(FN, tool_info) → UI shows pending
+                ↓
+Agent executes tool: tool.Execute(ctx, input)
+                ↓
+OnToolResult callback → TLV(FS, result_status) → UI shows result
+                ↓
+Tool result added to messages
+                ↓
+Agent continues to next step (if under max_steps)
+```
+
 ## Key Design Decisions
 
 1. **TLV Protocol**: Simple binary protocol for clean separation between adaptors and session
@@ -241,6 +303,9 @@ The active model is determined by:
 4. **Domain Errors**: Structured error types with operation context for consistent error handling
 5. **Command Registry**: Declarative command registration for extensibility
 6. **Interface Abstraction**: OutputWriter interface for testability
+7. **Provider Factory**: Decoupled provider creation from session logic
+8. **Typed Tools**: `TypedExecute[T]` wrapper for type-safe tool implementations
+9. **Lazy Agent Init**: Agent/Provider created on first use, not at startup
 
 ## Critical Implementation Gotchas
 
@@ -262,8 +327,7 @@ Tool arguments arrive in chunks across multiple delta events:
 
 ### Anthropic Prompt Caching
 - System message must be ≥1024 tokens for caching to activate
-- Uses **automatic caching**: single `cache_control: {"type": "ephemeral"}` at top level of request
-- Anthropic automatically applies cache breakpoint to the last cacheable block and moves it forward as conversations grow
+- Uses **automatic caching**: single `cache_control: {"type": "ephemeral"}` applied to system prompts
 - Enabled per-model via `prompt_cache: true` in model.conf (other providers ignore)
 - Best for multi-turn conversations where growing message history should be cached automatically
 
@@ -273,31 +337,72 @@ Tool arguments arrive in chunks across multiple delta events:
 ### Incomplete Tool Calls on Cancel
 When user cancels mid-tool-call, messages may have `tool_use` without matching `tool_result`. `cleanIncompleteToolCalls()` removes these to prevent API errors on next request.
 
+### Tool Result Message Ordering
+`OnStepFinish` callback receives complete step messages. For tool-using steps, this includes both the assistant message (with tool calls) AND the tool result message. The `OnToolResult` callback should only send UI notifications, not append to session messages - the agent loop handles message assembly.
+
+### ANSI Escape Sequences Are Not Recursive
+When styling text with lipgloss, each segment must be rendered individually before concatenation. You cannot render a string that already contains ANSI codes with a new style and expect it to work.
+
 ## File Organization
 
 ```
 alayacore/
+├── main.go                    # Entry point
 ├── internal/
 │   ├── adaptors/
-│   │   ├── terminal/        # Terminal UI adaptor
-│   │   │   ├── terminal.go  # Main model
-│   │   │   ├── keys.go      # Keyboard handling
-│   │   │   ├── commands.go  # Command processing
-│   │   │   ├── output.go    # TLV parsing
-│   │   │   ├── window*.go   # Virtual scrolling
-│   │   │   ├── constants.go # Layout/colors
-│   │   │   └── styles.go    # Lipgloss styles
-│   │   └── websocket/       # WebSocket adaptor
+│   │   ├── terminal/          # Terminal UI adaptor
+│   │   │   ├── terminal.go    # Main model
+│   │   │   ├── keys.go        # Keyboard handling
+│   │   │   ├── keybinds.go    # Key binding definitions
+│   │   │   ├── commands.go    # Command processing
+│   │   │   ├── output.go      # TLV parsing
+│   │   │   ├── display.go     # Display rendering
+│   │   │   ├── window*.go     # Virtual scrolling
+│   │   │   ├── input_component.go  # Input handling
+│   │   │   ├── status.go      # Status bar
+│   │   │   ├── model_selector.go   # Model switching UI
+│   │   │   ├── queue_manager.go    # Task queue UI
+│   │   │   ├── theme.go       # Theme configuration
+│   │   │   ├── styles.go      # Lipgloss styles
+│   │   │   └── constants.go   # Layout/colors
+│   │   └── websocket/         # WebSocket adaptor
 │   ├── agent/
-│   │   ├── session.go       # Session management
-│   │   ├── session_*.go     # Session components
+│   │   ├── session.go         # Session management
+│   │   ├── session_*.go       # Session components
 │   │   ├── command_registry.go
-│   │   └── model_manager.go
-│   ├── stream/              # TLV protocol
-│   ├── errors/              # Domain errors
-│   └── tools/               # Agent tools
+│   │   ├── model_manager.go   # Model config loading
+│   │   └── runtime_manager.go # Active model persistence
+│   ├── app/
+│   │   └── app.go             # App initialization, system prompt
+│   ├── config/
+│   │   └── config.go          # CLI flag parsing
+│   ├── debug/
+│   │   └── http.go            # HTTP client with proxy/debug support
+│   ├── stream/                # TLV protocol
+│   ├── errors/                # Domain errors
+│   ├── skills/
+│   │   ├── loader.go          # Skill discovery/loading
+│   │   ├── manifest.go        # Skill metadata parsing
+│   │   └── types.go           # Skill types
+│   ├── tools/                 # Agent tools
+│   │   ├── read_file.go
+│   │   ├── edit_file.go
+│   │   ├── write_file.go
+│   │   ├── posix_shell.go
+│   │   └── activate_skill.go
+│   └── llm/
+│       ├── agent.go           # Tool-calling loop
+│       ├── types.go           # Message, ContentPart, StreamEvent
+│       ├── helpers.go         # Message constructors
+│       ├── typed.go           # TypedExecute wrapper
+│       ├── schema.go          # JSON schema generation
+│       ├── factory/           # Provider factory
+│       │   └── provider_factory.go
+│       └── providers/         # LLM provider implementations
+│           ├── anthropic.go
+│           └── openai.go
 ├── cmd/
-│   └── alayacore-web/       # Web server binary
+│   └── alayacore-web/         # Web server binary
 └── docs/
-    └── architecture.md      # This document
+    └── architecture.md        # This document
 ```
