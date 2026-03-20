@@ -167,13 +167,20 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 		wb.markDirty(idx)
 		return
 	}
+	// User and Assistant messages should NOT be wrapped (show full content)
+	// All other window types default to wrapped (folded/collapsed)
+	wrapped := true
+	if tag == stream.TagTextUser || tag == stream.TagTextAssistant {
+		wrapped = false
+	}
+
 	window := &Window{
 		ID:        id,
 		Tag:       tag,
 		Content:   content,
 		Style:     wb.borderStyle,
-		Wrapped:   false, // Will be set after content is complete
-		LineWidth: 0,     // Will be computed on first render
+		Wrapped:   wrapped,
+		LineWidth: 0, // Will be computed on first render
 	}
 	wb.Windows = append(wb.Windows, window)
 	wb.idIndex[id] = len(wb.Windows) - 1

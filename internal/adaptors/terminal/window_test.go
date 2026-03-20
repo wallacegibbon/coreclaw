@@ -291,4 +291,30 @@ func TestWindowBufferDiff(t *testing.T) {
 			t.Errorf("Re-wrapped diff should fold lines again, found %d - prefixes", removeCount3)
 		}
 	})
+
+	t.Run("user and assistant messages not wrapped by default", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+
+		// Create windows for different tag types
+		wb.AppendOrUpdate("user-1", stream.TagTextUser, "User message")
+		wb.AppendOrUpdate("assistant-1", stream.TagTextAssistant, "Assistant message")
+		wb.AppendOrUpdate("tool-1", stream.TagFunctionNotify, "Tool output")
+		wb.AppendOrUpdate("reasoning-1", stream.TagTextReasoning, "Reasoning content")
+
+		// User and Assistant should NOT be wrapped (show full content)
+		if wb.Windows[0].Wrapped {
+			t.Error("User window should NOT be wrapped by default")
+		}
+		if wb.Windows[1].Wrapped {
+			t.Error("Assistant window should NOT be wrapped by default")
+		}
+
+		// Other tags should be wrapped (folded/collapsed)
+		if !wb.Windows[2].Wrapped {
+			t.Error("Tool window should be wrapped by default")
+		}
+		if !wb.Windows[3].Wrapped {
+			t.Error("Reasoning window should be wrapped by default")
+		}
+	})
 }
