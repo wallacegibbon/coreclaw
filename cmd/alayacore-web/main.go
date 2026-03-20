@@ -65,16 +65,17 @@ Usage:
   alayacore-web [flags]
 
 Flags:
-  model-config string  Model config file path (default: ~/.alayacore/model.conf)
-  runtime-config string  Runtime config file path (default: ~/.alayacore/runtime.conf)
-  system string     Extra system prompt (can be specified multiple times)
-  skill strings     Skills directory path (can be specified multiple times)
-  addr string       Server address to listen on (default ":8080")
-  session string    Session file path to load/save conversations
-  proxy string      HTTP proxy URL (supports HTTP, HTTPS, and SOCKS5)
-  debug-api         Write raw API requests and responses to log file
-  version           Show version information
-  help              Show help information
+  --model-config string   Model config file path (default: ~/.alayacore/model.conf)
+  --runtime-config string Runtime config file path (default: ~/.alayacore/runtime.conf)
+  --system string         Extra system prompt (can be specified multiple times)
+  --skill strings         Skills directory path (can be specified multiple times)
+  --addr string           Server address to listen on (default: ":8080")
+  --session string        Session file path to load/save conversations
+  --proxy string          HTTP proxy URL (e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080)
+  --max-steps int         Maximum agent loop steps (default: 100)
+  --debug-api             Write raw API requests and responses to log file
+  --version               Show version information
+  --help                  Show help information
 
 Examples:
   alayacore-web --addr :9090
