@@ -37,17 +37,13 @@ func formatToolCall(toolName, input string) string {
 			return fmt.Sprintf("%s: %s", toolName, strings.Join(args, ", "))
 		}
 	case "write_file":
-		args := []string{}
-		if path, ok := fields["path"].(string); ok {
-			args = append(args, path)
+		path, _ := fields["path"].(string)
+		content, _ := fields["content"].(string)
+		if path == "" || content == "" {
+			return ""
 		}
-		if content, ok := fields["content"].(string); ok {
-			truncated := truncateString(content, 50)
-			args = append(args, truncated)
-		}
-		if len(args) > 0 {
-			return fmt.Sprintf("%s: %s", toolName, strings.Join(args, ", "))
-		}
+		// Format: tool name and path on first line, content on subsequent lines
+		return fmt.Sprintf("%s: %s\n%s", toolName, path, content)
 	case "edit_file":
 		path, _ := fields["path"].(string)         //nolint:errcheck // type assertion for optional field
 		oldStr, _ := fields["old_string"].(string) //nolint:errcheck // type assertion for optional field

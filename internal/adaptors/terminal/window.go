@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"strings"
 	"sync"
 
 	"charm.land/lipgloss/v2"
@@ -9,6 +10,12 @@ import (
 )
 
 const fullRebuild = -2 // dirtyIndex value meaning all windows need re-render
+
+// isWriteFileContent checks if the content is from a write_file tool call
+// (starts with "write_file:" prefix)
+func isWriteFileContent(content string) bool {
+	return strings.HasPrefix(content, "write_file:")
+}
 
 // Window represents a single display window with border and content.
 type Window struct {
@@ -131,7 +138,7 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 		Tag:       tag,
 		Content:   content,
 		Style:     wb.borderStyle,
-		Wrapped:   tag == stream.TagTextReasoning,
+		Wrapped:   tag == stream.TagTextReasoning || isWriteFileContent(content),
 		LineWidth: 0, // Will be computed on first render
 	}
 	wb.Windows = append(wb.Windows, window)
