@@ -166,6 +166,9 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		return m.handleTick()
 
+	case editorStartMsg:
+		return m.handleEditorStart(msg)
+
 	case editorFinishedMsg:
 		return m.handleEditorFinished(msg)
 
@@ -264,6 +267,34 @@ func (m *Terminal) handleEditorFinished(msg editorFinishedMsg) (tea.Model, tea.C
 		m.input.Focus()
 	}
 	return m, nil
+}
+
+// handleEditorStart handles the lazy start of the external editor.
+// This is where the temp file is actually created, ensuring cleanup happens properly.
+func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
+	// Create temp file lazily
+	tmpFileName, err := m.input.editor.createTempFile()
+	if err != nil {
+		m.out.AppendError("Failed to create temp file: %v", err)
+		return m, nil
+	}
+
+	cmd := exec.Command(msg.editorCmd, tmpFileName)
+
+	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+		defer os.Remove(tmpFileName)
+
+		if err != nil {
+			return editorFinishedMsg{content: "", err: err}
+		}
+
+		content, readErr := os.ReadFile(tmpFileName)
+		if readErr != nil {
+			return editorFinishedMsg{content: "", err: readErr}
+		}
+
+		return editorFinishedMsg{content: string(content), err: nil}
+	})
 }
 
 // handleFileEditorFinished handles completion of file editing (e.g., model config).
@@ -675,6 +706,12 @@ type editorFinishedMsg struct {
 	err     error
 }
 
+// editorStartMsg is sent to trigger actual editor execution (lazy temp file creation)
+type editorStartMsg struct {
+	editorCmd   string
+	tmpFileName string
+}
+
 // FileEditorFinishedMsg is sent when external editor closes for a specific file
 type FileEditorFinishedMsg struct {
 	Path string
@@ -684,6 +721,7 @@ type FileEditorFinishedMsg struct {
 // Editor handles external editor operations
 type Editor struct {
 	tempFilePrefix string
+	content        string
 }
 
 // NewEditor creates a new editor handler
@@ -693,7 +731,8 @@ func NewEditor() *Editor {
 	}
 }
 
-// Open opens an external editor for multi-line input
+// Open opens an external editor for multi-line input.
+// The temp file is created lazily when the command executes, not during construction.
 func (e *Editor) Open(currentContent string) tea.Cmd {
 	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
 
@@ -703,42 +742,37 @@ func (e *Editor) Open(currentContent string) tea.Cmd {
 		}
 	}
 
-	tmpFile, err := os.CreateTemp("", e.tempFilePrefix)
-	if err != nil {
-		return func() tea.Msg {
-			return editorFinishedMsg{content: "", err: err}
+	// Store content for lazy temp file creation
+	e.content = currentContent
+
+	// Return a command that creates the temp file and runs the editor
+	return func() tea.Msg {
+		return editorStartMsg{
+			editorCmd:   editorCmd,
+			tmpFileName: "", // Will be created in handleEditorStart
 		}
 	}
+}
 
+// createTempFile creates a temp file with the editor content.
+// This is called lazily when the editor is actually executed.
+func (e *Editor) createTempFile() (string, error) {
+	tmpFile, err := os.CreateTemp("", e.tempFilePrefix)
+	if err != nil {
+		return "", err
+	}
 	tmpFileName := tmpFile.Name()
 
-	if currentContent != "" {
-		if _, err := tmpFile.WriteString(currentContent); err != nil {
+	if e.content != "" {
+		if _, err := tmpFile.WriteString(e.content); err != nil {
 			tmpFile.Close()
 			os.Remove(tmpFileName)
-			return func() tea.Msg {
-				return editorFinishedMsg{content: "", err: err}
-			}
+			return "", err
 		}
 	}
 	tmpFile.Close()
 
-	cmd := exec.Command(editorCmd, tmpFileName)
-
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		defer os.Remove(tmpFileName)
-
-		if err != nil {
-			return editorFinishedMsg{content: "", err: err}
-		}
-
-		content, readErr := os.ReadFile(tmpFileName)
-		if readErr != nil {
-			return editorFinishedMsg{content: "", err: readErr}
-		}
-
-		return editorFinishedMsg{content: string(content), err: nil}
-	})
+	return tmpFileName, nil
 }
 
 // OpenFile opens an external editor for a specific file path
