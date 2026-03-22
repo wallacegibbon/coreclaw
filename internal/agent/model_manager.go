@@ -1,7 +1,7 @@
 package agent
 
 // ModelManager is responsible for loading model definitions from a
-// YAML-like config file (model.conf) and managing them in memory.
+// key-value config file (model.conf) and managing them in memory.
 // It never writes to the config file – all persistence is manual via
 // a text editor. The session layer uses ModelManager only through its
 // query/update methods and receives safe JSON-ready views via ModelInfo.
@@ -102,7 +102,7 @@ func defaultModelsConfigFile() (string, error) {
 	return filepath.Join(dir, "model.conf"), nil
 }
 
-// LoadFromFile loads models from a config file in YAML-like format
+// LoadFromFile loads models from a config file in key-value format
 // If the file doesn't exist or is empty, it creates the file with default config.
 //
 // File format:
@@ -169,7 +169,7 @@ func (mm *ModelManager) createDefaultConfig(path string) error {
 	return os.WriteFile(path, []byte(DefaultModelConfig), 0600)
 }
 
-// parseModelConfig parses the YAML-like model config format
+// parseModelConfig parses the key-value model config format
 func parseModelConfig(content string) []ModelConfig {
 	var models []ModelConfig
 

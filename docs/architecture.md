@@ -201,7 +201,7 @@ For Anthropic APIs with `prompt_cache: true`, cache_control markers are applied 
 
 ### Model Configuration (`~/.alayacore/model.conf`)
 
-```yaml
+```
 name: "OpenAI GPT-4o"
 protocol_type: "openai"
 base_url: "https://api.openai.com/v1"
@@ -221,7 +221,7 @@ context_limit: 32768
 
 ### Runtime Configuration (`~/.alayacore/runtime.conf`)
 
-```yaml
+```
 active_model: "OpenAI GPT-4o"
 ```
 

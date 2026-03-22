@@ -10,7 +10,7 @@ alayacore
 
 On first run, AlayaCore automatically creates a default model config at `~/.alayacore/model.conf` configured for Ollama:
 
-```yaml
+```
 ---
 name: "Ollama (127.0.0.1) / GPT OSS 20B"
 protocol_type: "anthropic"
@@ -83,7 +83,7 @@ alayacore --version
 
 ## Model Config File
 
-The model config file uses a simple YAML-like format. If the file doesn't exist or is empty, AlayaCore automatically creates it with a default Ollama configuration.
+The model config file uses a simple key-value format. If the file doesn't exist or is empty, AlayaCore automatically creates it with a default Ollama configuration.
 
 ```
 name: "Display Name"

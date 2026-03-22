@@ -10,79 +10,7 @@ For this project, simplicity is more important than efficiency.
 
 ```sh
 go install github.com/alayacore/alayacore@latest
-go install github.com/alayacore/alayacore/cmd/alayacore-web@latest
 ```
-
-Or build from source:
-
-```sh
-git clone https://github.com/alayacore/alayacore.git
-cd alayacore
-go build
-go build ./cmd/alayacore-web/
-```
-
-## Usage
-
-Simply run:
-
-```sh
-alayacore
-```
-
-On first run, AlayaCore automatically creates a default model config at `~/.alayacore/model.conf` configured for Ollama:
-
-```yaml
----
-name: "Ollama (127.0.0.1) / GPT OSS 20B"
-protocol_type: "anthropic"
-base_url: "http://127.0.0.1:11434"
-api_key: "no-key-by-default"
-model_name: "gpt-oss:20b"
-context_limit: 128000
----
-```
-
-To use other providers, edit the config file (press `Ctrl+L` then `e` in the terminal, or edit directly):
-
-```
-name: "OpenAI GPT-4o"
-protocol_type: "openai"
-base_url: "https://api.openai.com/v1"
-api_key: "your-api-key"
-model_name: "gpt-4o"
-context_limit: 128000
----
-name: "Ollama (127.0.0.1) / GPT OSS 20B"
-protocol_type: "anthropic"
-base_url: "http://127.0.0.1:11434"
-api_key: "no-key-by-default"
-model_name: "gpt-oss:20b"
-context_limit: 128000
-```
-
-The active model is determined by `runtime.conf` (persisted across sessions). If no active model is set, the first model in the list is used.
-
-Running with skills:
-```sh
-alayacore --skill ~/playground/alayacore/misc/samples/skills/
-```
-
-## Web Server
-
-`alayacore-web` runs a WebSocket server with a built-in chat UI.
-
-```sh
-# Start WebSocket server
-alayacore-web
-
-# Custom address
-alayacore-web --addr :9090
-```
-
-- **Web UI**: Open `http://localhost:8080` in browser
-- **WebSocket**: `ws://localhost:8080/ws`
-- Each browser tab gets its own independent agent session
 
 ## Flags
 
@@ -112,7 +40,6 @@ alayacore-web --addr :9090
 - Read prompts from files
 - API debug mode for HTTP requests and responses
 - Skills system (agentskills.io compatible)
-- Web server with WebSocket support and chat UI
 - Session file persistence
 - HTTP/HTTPS/SOCKS5 proxy support
 
@@ -129,7 +56,7 @@ AlayaCore uses a model configuration file to store model configurations.
 
 ### Model Config File Format
 
-The config file uses a simple YAML-like format with `---` as a separator between models:
+The config file uses a simple key-value format with `---` as a separator between models:
 
 ```
 name: "OpenAI GPT-4o"

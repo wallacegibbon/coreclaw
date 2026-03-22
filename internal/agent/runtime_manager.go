@@ -103,7 +103,7 @@ func (rm *RuntimeManager) saveLocked() error {
 	return os.WriteFile(rm.path, []byte(content), 0600)
 }
 
-// parseRuntimeConfig parses the YAML-like runtime config format
+// parseRuntimeConfig parses the key-value runtime config format
 func parseRuntimeConfig(content string) RuntimeConfig {
 	config := RuntimeConfig{}
 	lines := strings.Split(content, "\n")
@@ -129,7 +129,7 @@ func parseRuntimeConfig(content string) RuntimeConfig {
 	return config
 }
 
-// formatRuntimeConfig formats the runtime config as YAML-like text
+// formatRuntimeConfig formats the runtime config as key-value text
 func formatRuntimeConfig(config RuntimeConfig) string {
 	var sb strings.Builder
 	sb.WriteString("# AlayaCore runtime configuration\n")
