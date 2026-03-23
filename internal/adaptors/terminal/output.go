@@ -149,7 +149,7 @@ func (w *outputWriter) writeColored(tag string, value string) {
 	switch tag {
 	// Text content tags (delta messages with stream ID prefix)
 	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagFunctionNotify:
-		id, content, ok := w.parseStreamID(value)
+		id, content, ok := ParseStreamID(value)
 		if !ok {
 			// Should not happen, but fallback
 			id = w.generateWindowID()
@@ -163,27 +163,27 @@ func (w *outputWriter) writeColored(tag string, value string) {
 			styled = output(w.styles.Reasoning, content)
 		case stream.TagFunctionNotify:
 			// Check if this is a write_file with path and content
-			if wfPath, wfContent, ok := w.parseWriteFile(content); ok {
+			if wfPath, wfContent, ok := ParseWriteFile(content); ok {
 				w.windowBuffer.AppendWriteFile(id, wfPath, wfContent)
 				return
 			}
 			// Check if this is an edit_file with raw diff data
-			if diffPath, diffLines := w.parseRawDiff(content); diffLines != nil {
+			if diffPath, diffLines := ParseRawDiff(content); diffLines != nil {
 				w.windowBuffer.AppendDiff(id, diffPath, diffLines)
 				return
 			}
-			styled = strings.TrimRight(w.colorizeTool(content), " ")
+			styled = strings.TrimRight(ColorizeTool(content, w.styles), " ")
 		}
 		w.windowBuffer.AppendOrUpdate(id, tag, styled)
 
 	// Function output status indicator
 	case stream.TagFunctionState:
-		id, content, ok := w.parseStreamID(value)
+		id, content, ok := ParseStreamID(value)
 		if !ok {
 			return
 		}
 		// Update the tool window with status indicator
-		w.updateToolStatus(id, content)
+		w.windowBuffer.UpdateToolStatus(id, ParseToolStatus(content))
 
 	// System tags
 	case stream.TagSystemError:
@@ -398,144 +398,6 @@ func (w *outputWriter) renderMultiline(style lipgloss.Style, value string, trimR
 		lines[i] = rendered
 	}
 	return strings.Join(lines, "\n")
-}
-
-// colorizeTool applies tool-specific styling to tool output
-func (w *outputWriter) colorizeTool(value string) string {
-	// Expand tabs BEFORE styling to ensure correct column counting
-	value = expandTabs(value)
-
-	lines := strings.Split(value, "\n")
-	if len(lines) == 1 {
-		return w.colorizeSingleLineTool(value)
-	}
-	return w.colorizeMultiLineTool(lines)
-}
-
-func (w *outputWriter) colorizeSingleLineTool(value string) string {
-	colonIdx := strings.Index(value, ":")
-	if colonIdx > 0 {
-		toolName := value[:colonIdx]
-		rest := value[colonIdx:]
-		return strings.TrimRight(w.styles.Tool.Render(toolName), " ") + strings.TrimRight(w.styles.ToolContent.Render(rest), " ")
-	}
-	return strings.TrimRight(w.styles.Tool.Render(value), " ")
-}
-
-func (w *outputWriter) colorizeMultiLineTool(lines []string) string {
-	var result strings.Builder
-	firstLine := lines[0]
-	colonIdx := strings.Index(firstLine, ":")
-
-	if colonIdx > 0 {
-		toolName := firstLine[:colonIdx]
-		restFirst := firstLine[colonIdx:]
-		result.WriteString(strings.TrimRight(w.styles.Tool.Render(toolName), " "))
-		result.WriteString(strings.TrimRight(w.styles.ToolContent.Render(restFirst), " "))
-	} else {
-		result.WriteString(strings.TrimRight(w.styles.Tool.Render(firstLine), " "))
-	}
-
-	for _, line := range lines[1:] {
-		result.WriteString("\n")
-		// Fallback for other lines
-		switch {
-		case strings.HasPrefix(line, "- "):
-			result.WriteString(strings.TrimRight(w.styles.DiffRemove.Render(line), " "))
-		case strings.HasPrefix(line, "+ "):
-			result.WriteString(strings.TrimRight(w.styles.DiffAdd.Render(line), " "))
-		default:
-			result.WriteString(strings.TrimRight(w.styles.ToolContent.Render(line), " "))
-		}
-	}
-	return result.String()
-}
-
-// parseRawDiff checks if content is an edit_file with raw diff data.
-// Returns (path, lines) if it's a raw diff, or ("", nil) otherwise.
-func (w *outputWriter) parseRawDiff(content string) (string, []DiffLinePair) {
-	lines := strings.Split(content, "\n")
-	if len(lines) < 2 {
-		return "", nil
-	}
-
-	// Check first line is "edit_file: <path>"
-	if !strings.HasPrefix(lines[0], "edit_file: ") {
-		return "", nil
-	}
-	path := strings.TrimPrefix(lines[0], "edit_file: ")
-
-	// Check if remaining lines have raw diff format (\x00 prefix)
-	diffLines := make([]DiffLinePair, 0, len(lines)-1)
-	for _, line := range lines[1:] {
-		if !strings.HasPrefix(line, "\x00") {
-			return "", nil
-		}
-		// Parse: \x00old\x00new
-		parts := strings.SplitN(line[1:], "\x00", 2)
-		if len(parts) != 2 {
-			return "", nil
-		}
-		diffLines = append(diffLines, DiffLinePair{
-			Old: parts[0],
-			New: parts[1],
-		})
-	}
-
-	if len(diffLines) == 0 {
-		return "", nil
-	}
-
-	return path, diffLines
-}
-
-// parseWriteFile checks if content is a write_file with path and content.
-// Returns (path, content, true) if it's a write_file, or ("", "", false) otherwise.
-func (w *outputWriter) parseWriteFile(content string) (string, string, bool) {
-	lines := strings.SplitN(content, "\n", 2)
-	if len(lines) < 2 {
-		return "", "", false
-	}
-
-	// Check first line is "write_file: <path>"
-	if !strings.HasPrefix(lines[0], "write_file: ") {
-		return "", "", false
-	}
-	path := strings.TrimPrefix(lines[0], "write_file: ")
-	return path, lines[1], true
-}
-
-// parseStreamID extracts stream ID prefix from value.
-// Format: "[:id:]content". Returns id, content, true if prefix found.
-func (w *outputWriter) parseStreamID(value string) (string, string, bool) {
-	const prefixStart = "[:"
-	const prefixEnd = ":]"
-	if !strings.HasPrefix(value, prefixStart) {
-		return "", value, false
-	}
-	endIdx := strings.Index(value, prefixEnd)
-	if endIdx == -1 {
-		return "", value, false
-	}
-	id := value[len(prefixStart):endIdx]
-	content := value[endIdx+len(prefixEnd):]
-	return id, content, true
-}
-
-// updateToolStatus adds a status indicator to a tool window
-func (w *outputWriter) updateToolStatus(toolCallID string, status string) {
-	var ts ToolStatus
-	switch status {
-	case "success":
-		ts = ToolStatusSuccess
-	case "error":
-		ts = ToolStatusError
-	case "pending":
-		ts = ToolStatusPending
-	default:
-		ts = ToolStatusNone
-	}
-	w.windowBuffer.UpdateToolStatus(toolCallID, ts)
 }
 
 // generateWindowID returns a unique window ID for non-delta messages.

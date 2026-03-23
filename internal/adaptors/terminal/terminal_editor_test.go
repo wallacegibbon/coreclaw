@@ -201,10 +201,10 @@ func TestRenderMultiline(t *testing.T) {
 func TestColorizeToolMultiline(t *testing.T) {
 	// Note: lipgloss.SetColorProfile is no longer needed in v2
 
-	output := NewTerminalOutput(DefaultStyles())
+	styles := DefaultStyles()
 	// Test multiline tool output with colon on first line
 	value := "tool_name: first line\nsecond line\nthird line"
-	result := output.colorizeTool(value)
+	result := ColorizeTool(value, styles)
 	lines := strings.Split(result, "\n")
 	if len(lines) != 3 {
 		t.Errorf("Expected 3 lines, got %d", len(lines))

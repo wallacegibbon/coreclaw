@@ -25,34 +25,6 @@ const (
 	rebuildOne                       // Only one window needs re-rendering
 )
 
-// ============================================================================
-// Tool Status (type-safe status indicator)
-// ============================================================================
-
-// ToolStatus represents the execution status of a tool window.
-type ToolStatus int
-
-const (
-	ToolStatusNone    ToolStatus = iota // No status indicator (dimmed hollow dot)
-	ToolStatusSuccess                   // Tool completed successfully (green dot)
-	ToolStatusError                     // Tool failed (red dot)
-	ToolStatusPending                   // Tool is running (dimmed dot)
-)
-
-// Indicator returns the styled status indicator string.
-func (s ToolStatus) Indicator(styles *Styles) string {
-	switch s {
-	case ToolStatusSuccess:
-		return lipgloss.NewStyle().Foreground(styles.ColorSuccess).Render("• ")
-	case ToolStatusError:
-		return lipgloss.NewStyle().Foreground(styles.ColorError).Render("• ")
-	case ToolStatusPending:
-		return lipgloss.NewStyle().Foreground(styles.ColorDim).Render("• ")
-	default:
-		return lipgloss.NewStyle().Foreground(styles.ColorDim).Render("· ")
-	}
-}
-
 // Window represents a single display window with border and content.
 type Window struct {
 	ID      string         // stream ID or generated unique ID
@@ -80,24 +52,6 @@ type Window struct {
 	cachedRender    string // full output with border
 	cachedInnerCont string // inner content before border (for cursor border swap)
 	cachedWidth     int    // width used for cached render
-}
-
-// DiffContainer holds two panes side by side for diff display
-type DiffContainer struct {
-	Path  string         // file path for header
-	Lines []DiffLinePair // raw line pairs
-}
-
-// DiffLinePair represents a pair of old/new lines in a diff
-type DiffLinePair struct {
-	Old string
-	New string
-}
-
-// WriteFileContainer holds the path and content for write_file display
-type WriteFileContainer struct {
-	Path    string // file path for header
-	Content string // file content
 }
 
 // IsDiffWindow returns true if the window is a diff window
@@ -741,9 +695,9 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 
 	switch {
 	case w.IsWriteFileWindow():
-		fullContent = wb.renderWriteFileContent(w.WriteFile, w.Status)
+		fullContent = RenderWriteFileContent(w.WriteFile, w.Status, wb.styles)
 	case w.IsDiffWindow():
-		fullContent = wb.renderDiffContent(w.Diff, w.Status)
+		fullContent = RenderDiffContent(w.Diff, w.Status, wb.styles)
 	default:
 		fullContent = wb.renderGenericContent(w, innerWidth)
 	}
@@ -781,78 +735,6 @@ func (wb *WindowBuffer) renderGenericContent(w *Window, innerWidth int) string {
 
 	lines := w.getOrBuildLines(content, innerWidth)
 	return strings.Join(lines, "\n")
-}
-
-// ============================================================================
-// Diff Rendering
-// ============================================================================
-
-// renderWriteFileContent renders a write_file container
-func (wb *WindowBuffer) renderWriteFileContent(wf *WriteFileContainer, status ToolStatus) string {
-	lines := make([]string, 0, 2)
-
-	header := status.Indicator(wb.styles) + wb.styles.Tool.Render("write_file: ") + wb.styles.ToolContent.Render(wf.Path)
-	lines = append(lines, header)
-
-	// Render content lines with Text style
-	contentLines := strings.Split(wf.Content, "\n")
-	for _, line := range contentLines {
-		lines = append(lines, wb.styles.Text.Render(expandTabs(line)))
-	}
-
-	return strings.Join(lines, "\n")
-}
-
-// renderDiffContent renders a diff container in unified diff style
-func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, status ToolStatus) string {
-	lines := make([]string, 0, 1+len(diff.Lines))
-
-	header := status.Indicator(wb.styles) + wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)
-	lines = append(lines, header)
-
-	for _, pair := range diff.Lines {
-		oldPart := strings.ReplaceAll(expandTabs(pair.Old), "\n", "\\n")
-		newPart := strings.ReplaceAll(expandTabs(pair.New), "\n", "\\n")
-
-		oldEmpty := pair.Old == ""
-		newEmpty := pair.New == ""
-		isSame := pair.Old == pair.New
-
-		switch {
-		case isSame:
-			lines = append(lines, wb.styles.Text.Render("  "+oldPart))
-		case oldEmpty:
-			lines = append(lines, wb.styles.DiffAdd.Render("+ "+newPart))
-		case newEmpty:
-			lines = append(lines, wb.styles.DiffRemove.Render("- "+oldPart))
-		default:
-			lines = append(lines, wb.styles.DiffRemove.Render("- "+oldPart))
-			lines = append(lines, wb.styles.DiffAdd.Render("+ "+newPart))
-		}
-	}
-
-	return strings.Join(lines, "\n")
-}
-
-// expandTabs converts tabs to spaces, treating tabs as 8-space width
-func expandTabs(s string) string {
-	var result strings.Builder
-	col := 0
-	for _, r := range s {
-		if r == '\t' {
-			next := ((col / 8) + 1) * 8
-			spaces := next - col
-			result.WriteString(strings.Repeat(" ", spaces))
-			col = next
-		} else if r == '\n' {
-			result.WriteRune(r)
-			col = 0
-		} else {
-			result.WriteRune(r)
-			col++
-		}
-	}
-	return result.String()
 }
 
 // ============================================================================
