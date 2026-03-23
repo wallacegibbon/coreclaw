@@ -769,11 +769,6 @@ func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int, s
 	header := indicator + wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)
 	lines = append(lines, header)
 
-	contentWidth := innerWidth - 2
-	if contentWidth < 10 {
-		contentWidth = 10
-	}
-
 	for _, pair := range diff.Lines {
 		oldPart := strings.ReplaceAll(expandTabs(pair.Old), "\n", "\\n")
 		newPart := strings.ReplaceAll(expandTabs(pair.New), "\n", "\\n")
@@ -781,9 +776,6 @@ func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int, s
 		oldEmpty := pair.Old == ""
 		newEmpty := pair.New == ""
 		isSame := pair.Old == pair.New
-
-		oldPart = truncateByWidth(oldPart, contentWidth)
-		newPart = truncateByWidth(newPart, contentWidth)
 
 		switch {
 		case isSame:
@@ -820,25 +812,6 @@ func expandTabs(s string) string {
 		}
 	}
 	return result.String()
-}
-
-// truncateByWidth truncates a string to fit within maxDisplayWidth
-func truncateByWidth(s string, maxDisplayWidth int) string {
-	if lipgloss.Width(s) <= maxDisplayWidth {
-		return s
-	}
-
-	var result strings.Builder
-	for _, r := range s {
-		test := result.String() + string(r)
-		w := lipgloss.Width(test)
-		if w > maxDisplayWidth-3 {
-			break
-		}
-		result.WriteRune(r)
-	}
-
-	return result.String() + "..."
 }
 
 // ============================================================================
