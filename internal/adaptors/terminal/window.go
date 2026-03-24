@@ -65,18 +65,13 @@ func (w *Window) IsDiffWindow() bool {
 	return w.ToolName == "edit_file"
 }
 
-// IsToolWithTextContent returns true if the window should render content with text style
-func (w *Window) IsToolWithTextContent() bool {
-	return w.ToolName == "write_file" || w.ToolName == "read_file" || w.ToolName == "posix_shell"
-}
-
 // Render returns the window with border, using cache if valid.
 // This is the single entry point for rendering a window.
 func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, cursorStyle lipgloss.Style) string {
 	// Check if cache is valid
 	if w.cache.valid && w.cache.width == width && w.cache.folded == w.Folded {
-		if w.IsDiffWindow() || w.IsToolWithTextContent() {
-			// Special windows: folded state determines validity
+		if w.IsDiffWindow() {
+			// Diff windows: folded state determines validity
 		} else if len(w.Content) == w.cache.contentLen {
 			// Regular windows: content length determines validity
 		} else {
@@ -107,8 +102,6 @@ func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.St
 	switch {
 	case w.IsDiffWindow():
 		inner = RenderDiffContent(w.Content, w.Status, styles)
-	case w.IsToolWithTextContent():
-		inner = RenderToolContent(w.Content, w.Status, styles)
 	default:
 		inner = w.renderGenericContent(innerWidth, styles)
 	}
@@ -211,7 +204,8 @@ func (w *Window) AppendContent(delta string, innerWidth int) {
 	w.Content += delta
 
 	// Try incremental update if we have cached wrapped lines and styles
-	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 && w.styles != nil && !w.IsDiffWindow() && !w.IsToolWithTextContent() {
+	// Skip incremental updates for diff windows as they need special rendering
+	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 && w.styles != nil && !w.IsDiffWindow() {
 		styledDelta := w.styleContent(delta, w.styles)
 		w.cache.wrappedLines = appendDeltaToLines(w.cache.wrappedLines, styledDelta, innerWidth)
 		// Mark cache as needing rebuild for rendered output, but wrappedLines is updated

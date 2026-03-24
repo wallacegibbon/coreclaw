@@ -114,45 +114,20 @@ func colorizeMultiLineTool(lines []string, styles *Styles) string {
 
 	for _, line := range lines[1:] {
 		result.WriteString("\n")
-		// Fallback for other lines
-		switch {
-		case strings.HasPrefix(line, "- "):
-			result.WriteString(styles.DiffRemove.Render(line))
-		case strings.HasPrefix(line, "+ "):
-			result.WriteString(styles.DiffAdd.Render(line))
-		default:
-			result.WriteString(styles.ToolContent.Render(line))
-		}
+		// Content lines use Text style for readability
+		// Note: Diff coloring is handled by RenderDiffContent for edit_file windows
+		// Note: Tabs already expanded in ColorizeTool
+		result.WriteString(styles.Text.Render(line))
 	}
 	return result.String()
-}
-
-// RenderToolContent renders a tool window with header + text content.
-// Used for write_file, read_file, posix_shell, etc. where output should be styled as text.
-func RenderToolContent(content string, status ToolStatus, styles *Styles) string {
-	lines := strings.Split(content, "\n")
-	if len(lines) == 0 {
-		return ""
-	}
-
-	result := make([]string, 0, len(lines))
-	for i, line := range lines {
-		if i == 0 {
-			// Header line: "tool_name: args"
-			// Colorize the tool name and the rest
-			result = append(result, status.Indicator(styles)+ColorizeTool(line, styles))
-			continue
-		}
-		// Content lines - apply text style
-		result = append(result, styles.Text.Render(expandTabs(line)))
-	}
-
-	return strings.Join(result, "\n")
 }
 
 // RenderDiffContent renders a diff window from its raw Content.
 // The Content already has `- `, `+ `, `  ` prefixes - we just apply colors.
 func RenderDiffContent(content string, status ToolStatus, styles *Styles) string {
+	// Expand tabs before processing
+	content = expandTabs(content)
+
 	lines := strings.Split(content, "\n")
 	if len(lines) == 0 {
 		return ""
