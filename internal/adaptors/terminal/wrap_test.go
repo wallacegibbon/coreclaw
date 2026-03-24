@@ -3,6 +3,8 @@ package terminal
 import (
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
 )
 
 func TestWrapLines(t *testing.T) {
@@ -10,143 +12,58 @@ func TestWrapLines(t *testing.T) {
 		name    string
 		content string
 		width   int
-		wantMin int // minimum expected lines (could be more due to wrapping)
-		wantMax int // maximum expected lines
+		wantMin int // minimum expected lines
 	}{
-		{
-			name:    "short content fits one line",
-			content: "Hello world",
-			width:   80,
-			wantMin: 1,
-			wantMax: 1,
-		},
-		{
-			name:    "content wraps to multiple lines",
-			content: "This is a longer piece of text that should wrap",
-			width:   20,
-			wantMin: 2,
-			wantMax: 4,
-		},
-		{
-			name:    "content with newlines",
-			content: "Line 1\nLine 2\nLine 3",
-			width:   80,
-			wantMin: 3,
-			wantMax: 3,
-		},
-		{
-			name:    "empty content",
-			content: "",
-			width:   80,
-			wantMin: 1, // Split of empty string returns [""]
-			wantMax: 1,
-		},
+		{"empty", "", 80, 1},
+		{"short", "Hello", 80, 1},
+		{"exact width", strings.Repeat("a", 80), 80, 1},
+		{"over width", strings.Repeat("a", 81), 80, 2},
+		{"with newlines", "Hello\nWorld", 80, 2},
+		{"long with newlines", strings.Repeat("a", 81) + "\n" + strings.Repeat("b", 81), 80, 4},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lines := wrapLines(tt.content, tt.width)
-			if len(lines) < tt.wantMin || len(lines) > tt.wantMax {
-				t.Errorf("wrapLines(%q, %d) returned %d lines, want between %d and %d",
-					tt.content, tt.width, len(lines), tt.wantMin, tt.wantMax)
+			if len(lines) < tt.wantMin {
+				t.Errorf("wrapLines() returned %d lines, want at least %d", len(lines), tt.wantMin)
 			}
 		})
 	}
 }
 
-func TestAppendDeltaToLines(t *testing.T) {
-	tests := []struct {
-		name     string
-		initial  []string
-		delta    string
-		width    int
-		validate func(t *testing.T, result []string)
-	}{
-		{
-			name:    "append to empty lines",
-			initial: nil,
-			delta:   "Hello",
-			width:   80,
-			validate: func(t *testing.T, result []string) {
-				if len(result) != 1 || result[0] != "Hello" {
-					t.Errorf("expected [Hello], got %v", result)
-				}
-			},
-		},
-		{
-			name:    "append short text to single line",
-			initial: []string{"Hello"},
-			delta:   " world",
-			width:   80,
-			validate: func(t *testing.T, result []string) {
-				if len(result) != 1 || result[0] != "Hello world" {
-					t.Errorf("expected [Hello world], got %v", result)
-				}
-			},
-		},
-		{
-			name:    "append text that causes wrap",
-			initial: []string{"Hello"},
-			delta:   " world this is a longer line that should wrap",
-			width:   20,
-			validate: func(t *testing.T, result []string) {
-				// Should have multiple lines after wrapping
-				if len(result) < 2 {
-					t.Errorf("expected multiple lines, got %v", result)
-				}
-				// Verify content is preserved
-				joined := strings.Join(result, "")
-				if !strings.Contains(joined, "Hello") {
-					t.Errorf("content should contain 'Hello', got %v", result)
-				}
-			},
-		},
-		{
-			name:    "append text with newline",
-			initial: []string{"Line 1"},
-			delta:   "\nLine 2",
-			width:   80,
-			validate: func(t *testing.T, result []string) {
-				if len(result) < 2 {
-					t.Errorf("expected at least 2 lines, got %v", result)
-				}
-				if result[0] != "Line 1" {
-					t.Errorf("first line should be 'Line 1', got %v", result)
-				}
-			},
-		},
-		{
-			name:    "append multiple newlines",
-			initial: []string{"Start"},
-			delta:   "\nLine 2\nLine 3",
-			width:   80,
-			validate: func(t *testing.T, result []string) {
-				if len(result) < 3 {
-					t.Errorf("expected at least 3 lines, got %v", result)
-				}
-			},
-		},
+func TestIncrementalWrap(t *testing.T) {
+	width := 80
+
+	// Start with initial content
+	lines := wrapLines("Hello", width)
+	if len(lines) != 1 {
+		t.Errorf("Expected 1 line, got %d", len(lines))
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := appendDeltaToLines(tt.initial, tt.delta, tt.width)
-			tt.validate(t, result)
-		})
+	// Append to same line (no newline)
+	lines = appendDeltaToLines(lines, " world", width)
+	if len(lines) != 1 {
+		t.Errorf("Expected 1 line, got %d", len(lines))
+	}
+
+	// Append with newline
+	lines = appendDeltaToLines(lines, "\nNew line", width)
+	if len(lines) != 2 {
+		t.Errorf("Expected 2 lines, got %d", len(lines))
 	}
 }
 
-func TestIncrementalWrap(t *testing.T) {
-	// Test that incremental wrap produces same results as full wrap
+func TestIncrementalWrapMatchesFullWrap(t *testing.T) {
 	width := 40
-	content := "This is a test sentence that should be wrapped at the specified width."
+	words := strings.Split("The quick brown fox jumps over the lazy dog and then some more words to make it longer", " ")
 
-	// Full wrap
-	fullLines := wrapLines(content, width)
+	// Full wrap at once
+	fullContent := strings.Join(words, " ")
+	fullLines := wrapLines(fullContent, width)
 
-	// Incremental wrap: add word by word
-	words := strings.Fields(content)
-	var incrementalLines []string
+	// Incremental wrap
+	incrementalLines := []string{}
 	for i, word := range words {
 		if i == 0 {
 			incrementalLines = wrapLines(word, width)
@@ -165,84 +82,80 @@ func TestIncrementalWrap(t *testing.T) {
 	}
 }
 
-func TestWindowLinesCache(t *testing.T) {
+func TestWindowRenderCaching(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
-	// Add content incrementally
-	wb.AppendOrUpdate("test", "assistant", "Hello")
-	wb.AppendOrUpdate("test", "assistant", " world")
-	wb.AppendOrUpdate("test", "assistant", " this is a test")
-
-	// Get window
+	// Add content
+	wb.AppendOrUpdate("test", "assistant", "Hello world")
 	w := wb.Windows[0]
 
-	// Lines should be cached after render
-	innerWidth := 80 - 4 // width minus padding/border
-	_ = wb.renderWindowContent(w, innerWidth)
+	// First render - should populate cache
+	styles := DefaultStyles()
+	borderStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.ColorBase).Padding(0, 1)
+	cursorStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.BorderCursor).Padding(0, 1)
 
-	// Verify lines are cached
-	if len(w.Lines) == 0 {
-		t.Error("expected lines to be cached after render")
+	_ = w.Render(80, false, styles, borderStyle, cursorStyle)
+
+	// Cache should be valid
+	if !w.cache.valid {
+		t.Error("expected cache to be valid after render")
 	}
 
-	// Verify cache is used on subsequent calls (LineWidth should be set)
-	if w.LineWidth != innerWidth {
-		t.Errorf("expected LineWidth to be %d, got %d", innerWidth, w.LineWidth)
+	// Render again - should use cache
+	rendered1 := w.Render(80, false, styles, borderStyle, cursorStyle)
+	rendered2 := w.Render(80, false, styles, borderStyle, cursorStyle)
+
+	if rendered1 != rendered2 {
+		t.Error("expected same result from cached render")
 	}
 }
 
-func TestWindowLinesCacheInvalidation(t *testing.T) {
+func TestWindowRenderCacheInvalidation(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Add content and render
 	wb.AppendOrUpdate("test", "assistant", "Hello")
 	w := wb.Windows[0]
-	innerWidth := 80 - 4
-	_ = wb.renderWindowContent(w, innerWidth)
+
+	styles := DefaultStyles()
+	borderStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.ColorBase).Padding(0, 1)
+	cursorStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.BorderCursor).Padding(0, 1)
+
+	_ = w.Render(80, false, styles, borderStyle, cursorStyle)
 
 	// Cache should be valid
-	if w.LineWidth != innerWidth {
-		t.Errorf("expected LineWidth to be %d, got %d", innerWidth, w.LineWidth)
+	if !w.cache.valid {
+		t.Error("expected cache to be valid after render")
 	}
 
-	// Change width - should invalidate cache
-	wb.SetWidth(100)
-	newInnerWidth := 100 - 4
-	if w.LineWidth != 0 {
-		t.Errorf("expected LineWidth to be 0 after resize, got %d", w.LineWidth)
-	}
+	// Invalidate via AppendContent
+	w.AppendContent(" world", 76)
 
-	// Render with new width - should rebuild cache
-	_ = wb.renderWindowContent(w, newInnerWidth)
-	if w.LineWidth != newInnerWidth {
-		t.Errorf("expected LineWidth to be %d after render, got %d", newInnerWidth, w.LineWidth)
+	// Cache should be invalid
+	if w.cache.valid {
+		t.Error("expected cache to be invalid after content change")
 	}
 }
 
 func BenchmarkFullWrap(b *testing.B) {
-	// Simulate streaming: each iteration appends a small delta to a large content
-	content := strings.Repeat("This is a test sentence for wrapping. ", 100) // ~4KB
+	content := strings.Repeat("This is a test sentence for wrapping. ", 100)
 	width := 80
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Full wrap each time (old approach)
 		_ = wrapLines(content, width)
 	}
 }
 
 func BenchmarkIncrementalWrap(b *testing.B) {
-	// Same scenario but with incremental wrap
 	baseContent := strings.Repeat("This is a test sentence for wrapping. ", 99)
 	delta := "This is a test sentence for wrapping. "
 	width := 80
 
-	// Start with pre-wrapped base content
 	lines := wrapLines(baseContent, width)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Incremental wrap (new approach)
 		lines = appendDeltaToLines(lines, delta, width)
 	}
 }

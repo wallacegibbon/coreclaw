@@ -13,37 +13,37 @@ func TestUpdateToolStatus(t *testing.T) {
 	wb.AppendOrUpdate("tool123", stream.TagFunctionNotify, "posix_shell: git status")
 
 	// Verify window was created
-	if len(wb.Windows) != 1 {
-		t.Fatalf("Expected 1 window, got %d", len(wb.Windows))
+	if wb.GetWindowCount() != 1 {
+		t.Fatalf("Expected 1 window, got %d", wb.GetWindowCount())
 	}
 
 	// Initially no status
-	if wb.Windows[0].Status != ToolStatusNone {
-		t.Errorf("Expected ToolStatusNone, got %v", wb.Windows[0].Status)
+	if wb.GetWindow(0).Status != ToolStatusNone {
+		t.Errorf("Expected ToolStatusNone, got %v", wb.GetWindow(0).Status)
 	}
 
 	// Update with pending status
 	wb.UpdateToolStatus("tool123", ToolStatusPending)
 
 	// Check status was updated
-	if wb.Windows[0].Status != ToolStatusPending {
-		t.Errorf("Expected ToolStatusPending, got %v", wb.Windows[0].Status)
+	if wb.GetWindow(0).Status != ToolStatusPending {
+		t.Errorf("Expected ToolStatusPending, got %v", wb.GetWindow(0).Status)
 	}
 
 	// Update with success status
 	wb.UpdateToolStatus("tool123", ToolStatusSuccess)
 
 	// Check status was updated
-	if wb.Windows[0].Status != ToolStatusSuccess {
-		t.Errorf("Expected ToolStatusSuccess, got %v", wb.Windows[0].Status)
+	if wb.GetWindow(0).Status != ToolStatusSuccess {
+		t.Errorf("Expected ToolStatusSuccess, got %v", wb.GetWindow(0).Status)
 	}
 
 	// Update with error status
 	wb.UpdateToolStatus("tool123", ToolStatusError)
 
 	// Check status was updated
-	if wb.Windows[0].Status != ToolStatusError {
-		t.Errorf("Expected ToolStatusError, got %v", wb.Windows[0].Status)
+	if wb.GetWindow(0).Status != ToolStatusError {
+		t.Errorf("Expected ToolStatusError, got %v", wb.GetWindow(0).Status)
 	}
 
 	// Try to update non-existent window (should not crash)
@@ -57,7 +57,8 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb.AppendOrUpdate("tool123", stream.TagFunctionNotify, "posix_shell: git status")
 
 	// Test rendering without status (default for loaded sessions)
-	content := wb.renderWindowContent(wb.Windows[0], 76)
+	w := wb.GetWindow(0)
+	content := wb.RenderWindowContent(w, 76)
 	if content == "" {
 		t.Error("Expected non-empty content")
 	}
@@ -70,7 +71,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb.UpdateToolStatus("tool123", ToolStatusPending)
 
 	// Test rendering with pending status
-	content = wb.renderWindowContent(wb.Windows[0], 76)
+	content = wb.RenderWindowContent(w, 76)
 	if content == "" {
 		t.Error("Expected non-empty content")
 	}
@@ -83,7 +84,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb.UpdateToolStatus("tool123", ToolStatusSuccess)
 
 	// Test rendering with success status
-	content = wb.renderWindowContent(wb.Windows[0], 76)
+	content = wb.RenderWindowContent(w, 76)
 	if content == "" {
 		t.Error("Expected non-empty content")
 	}
@@ -96,7 +97,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb.UpdateToolStatus("tool123", ToolStatusError)
 
 	// Test rendering with error status
-	content = wb.renderWindowContent(wb.Windows[0], 76)
+	content = wb.RenderWindowContent(w, 76)
 	if content == "" {
 		t.Error("Expected non-empty content")
 	}
