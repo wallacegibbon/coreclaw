@@ -1020,32 +1020,70 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 	return false
 }
 
-// MoveWindowCursorToCenter moves cursor to middle visible window
+// MoveWindowCursorToCenter moves cursor to the window at the visual center of the screen.
+// It finds the window that contains the center line of the visible viewport.
+// If no window contains the center line, it finds the window closest to the center.
 func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 	windowCount := m.windowBuffer.GetWindowCount()
 	if windowCount == 0 {
 		return false
 	}
 
+	// Calculate the center line of the visible viewport
+	viewportHeight := m.viewport.Height()
 	viewportTop := m.viewport.YOffset()
-	viewportBottom := viewportTop + m.viewport.Height()
+	viewportCenter := viewportTop + viewportHeight/2
 
-	var visible []int
+	// First, try to find the window that contains the viewport center line
+	// endLine is exclusive, so we use < for the upper bound
 	for i := 0; i < windowCount; i++ {
 		startLine := m.windowBuffer.GetWindowStartLine(i)
 		endLine := m.windowBuffer.GetWindowEndLine(i)
-		if startLine < viewportBottom && endLine > viewportTop {
-			visible = append(visible, i)
+
+		// Check if viewport center line falls within this window
+		if viewportCenter >= startLine && viewportCenter < endLine {
+			m.windowCursor = i
+			m.userMovedCursorAway = m.windowCursor < windowCount-1
+			return true
 		}
 	}
 
-	if len(visible) == 0 {
-		return false
+	// If center line falls in a gap (or all windows are above/below center),
+	// find the visible window whose center is closest to the viewport center
+	var bestWindow int
+	bestDistance := -1
+
+	for i := 0; i < windowCount; i++ {
+		startLine := m.windowBuffer.GetWindowStartLine(i)
+		endLine := m.windowBuffer.GetWindowEndLine(i)
+
+		// Only consider visible windows
+		if startLine >= viewportTop+viewportHeight || endLine <= viewportTop {
+			continue
+		}
+
+		// Calculate window center
+		windowCenter := (startLine + endLine) / 2
+
+		// Calculate absolute distance from window center to viewport center
+		distance := windowCenter - viewportCenter
+		if distance < 0 {
+			distance = -distance
+		}
+
+		if bestDistance < 0 || distance < bestDistance {
+			bestWindow = i
+			bestDistance = distance
+		}
 	}
 
-	m.windowCursor = visible[len(visible)/2]
-	m.userMovedCursorAway = m.windowCursor < windowCount-1
-	return true
+	if bestDistance >= 0 {
+		m.windowCursor = bestWindow
+		m.userMovedCursorAway = m.windowCursor < windowCount-1
+		return true
+	}
+
+	return false
 }
 
 var _ tea.Model = (*DisplayModel)(nil)
