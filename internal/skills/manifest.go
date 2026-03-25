@@ -16,19 +16,20 @@ func ParseSkillMarkdown(content string) (Metadata, string, error) {
 	}
 
 	// Find the closing delimiter
-	lines := strings.Split(content, "\n")
 	startIdx := -1
 	endIdx := -1
+	lineNum := 0
 
-	for i, line := range lines {
+	for line := range strings.SplitSeq(content, "\n") {
 		if strings.TrimSpace(line) == "---" {
 			if startIdx == -1 {
-				startIdx = i
+				startIdx = lineNum
 			} else {
-				endIdx = i
+				endIdx = lineNum
 				break
 			}
 		}
+		lineNum++
 	}
 
 	if startIdx == -1 || endIdx == -1 || endIdx <= startIdx {
@@ -36,6 +37,7 @@ func ParseSkillMarkdown(content string) (Metadata, string, error) {
 	}
 
 	// Extract frontmatter YAML
+	lines := strings.Split(content, "\n")
 	frontmatter := strings.Join(lines[startIdx+1:endIdx], "\n")
 
 	// Parse YAML

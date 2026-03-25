@@ -26,39 +26,6 @@ func ParseKeyValueBlocks(content string) []string {
 	return strings.Split(content, "\n---\n")
 }
 
-// ParseKeyValueIntoMap parses key-value content and returns a map
-func ParseKeyValueIntoMap(content string) map[string]string {
-	result := make(map[string]string)
-	lines := strings.Split(content, "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		key, value, found := strings.Cut(line, ":")
-		if !found {
-			continue
-		}
-
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-
-		// Remove surrounding quotes if present
-		if len(value) >= 2 {
-			if (value[0] == '"' && value[len(value)-1] == '"') ||
-				(value[0] == '\'' && value[len(value)-1] == '\'') {
-				value = value[1 : len(value)-1]
-			}
-		}
-
-		result[key] = value
-	}
-
-	return result
-}
-
 // parseKeyValue is the internal implementation
 func parseKeyValue(content string, target interface{}, skipHyphens bool) {
 	v := reflect.ValueOf(target)
@@ -78,8 +45,7 @@ func parseKeyValue(content string, target interface{}, skipHyphens bool) {
 	}
 
 	// Parse lines
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(content, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue

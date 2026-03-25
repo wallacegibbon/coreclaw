@@ -165,8 +165,7 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 		chunkStr := string(chunk)
 
 		// Handle Server-Sent Events (SSE) format: "data: {...}\n"
-		lines := strings.Split(chunkStr, "\n")
-		for _, line := range lines {
+		for line := range strings.SplitSeq(chunkStr, "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" {
 				continue
