@@ -535,8 +535,8 @@ func (m *Terminal) switchToSelectedModel() {
 	}
 
 	// Send model_set command to session
-	if selectedModel.ID != "" {
-		_ = m.streamInput.EmitTLV(stream.TagTextUser, ":model_set "+selectedModel.ID) //nolint:errcheck // best-effort input
+	if selectedModel.ID != 0 {
+		_ = m.streamInput.EmitTLV(stream.TagTextUser, fmt.Sprintf(":model_set %d", selectedModel.ID)) //nolint:errcheck // best-effort input
 	}
 }
 

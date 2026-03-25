@@ -14,13 +14,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/google/uuid"
 )
 
 // ModelConfig represents a model configuration
 type ModelConfig struct {
-	ID           string `json:"id"`                // Runtime ID (generated, not persisted)
+	ID           int    `json:"id"`                // Runtime ID (generated, not persisted)
 	Name         string `json:"name"`              // Display name
 	ProtocolType string `json:"protocol_type"`     // "openai" or "anthropic"
 	BaseURL      string `json:"base_url"`          // API server URL
@@ -32,7 +30,7 @@ type ModelConfig struct {
 
 // ModelInfo is the safe version for JSON responses (no API key)
 type ModelInfo struct {
-	ID           string `json:"id"`
+	ID           int    `json:"id"`
 	Name         string `json:"name"`
 	ProtocolType string `json:"protocol_type"`
 	BaseURL      string `json:"base_url"`
@@ -47,7 +45,8 @@ type ModelInfo struct {
 // Users must edit the file with a text editor (press 'e' in model selector).
 type ModelManager struct {
 	models   []ModelConfig
-	activeID string
+	activeID int
+	nextID   int
 	mu       sync.RWMutex
 	filePath string
 }
@@ -142,11 +141,10 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 
 	models := parseModelConfig(string(data))
 
-	// Generate IDs for models that don't have one
+	// Generate IDs for models
 	for i := range models {
-		if models[i].ID == "" {
-			models[i].ID = uuid.New().String()[:8]
-		}
+		models[i].ID = mm.nextID
+		mm.nextID++
 	}
 
 	mm.models = models
@@ -260,13 +258,12 @@ func (mm *ModelManager) HasModels() bool {
 }
 
 // AddModel adds a new model to the runtime list (does NOT persist to file)
-func (mm *ModelManager) AddModel(m ModelConfig) string {
+func (mm *ModelManager) AddModel(m ModelConfig) int {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 
-	if m.ID == "" {
-		m.ID = uuid.New().String()[:8]
-	}
+	m.ID = mm.nextID
+	mm.nextID++
 	mm.models = append(mm.models, m)
 	return m.ID
 }
@@ -293,7 +290,7 @@ func (mm *ModelManager) GetModels() []ModelInfo {
 }
 
 // GetModel returns a model by ID (includes API key for internal use)
-func (mm *ModelManager) GetModel(id string) *ModelConfig {
+func (mm *ModelManager) GetModel(id int) *ModelConfig {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 
@@ -306,7 +303,7 @@ func (mm *ModelManager) GetModel(id string) *ModelConfig {
 }
 
 // SetActive sets the active model by ID (does NOT persist to file)
-func (mm *ModelManager) SetActive(id string) error {
+func (mm *ModelManager) SetActive(id int) error {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 
@@ -317,7 +314,7 @@ func (mm *ModelManager) SetActive(id string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("model not found: %s", id)
+	return fmt.Errorf("model not found: %d", id)
 }
 
 // SetActiveToFirst sets the active model to the first one in the list.
@@ -329,7 +326,9 @@ func (mm *ModelManager) SetActiveToFirst() bool {
 	if len(mm.models) == 0 {
 		return false
 	}
-	mm.activeID = mm.models[0].ID
+	if len(mm.models) > 0 {
+		mm.activeID = mm.models[0].ID
+	}
 	return true
 }
 
@@ -347,14 +346,14 @@ func (mm *ModelManager) GetActive() *ModelConfig {
 }
 
 // GetActiveID returns the active model ID
-func (mm *ModelManager) GetActiveID() string {
+func (mm *ModelManager) GetActiveID() int {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 	return mm.activeID
 }
 
 // DeleteModel removes a model by ID from runtime list (does NOT persist to file)
-func (mm *ModelManager) DeleteModel(id string) error {
+func (mm *ModelManager) DeleteModel(id int) error {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 
@@ -362,7 +361,7 @@ func (mm *ModelManager) DeleteModel(id string) error {
 		if m.ID == id {
 			mm.models = append(mm.models[:i], mm.models[i+1:]...)
 			if mm.activeID == id {
-				mm.activeID = ""
+				mm.activeID = 0
 				if len(mm.models) > 0 {
 					mm.activeID = mm.models[0].ID
 				}
@@ -370,11 +369,11 @@ func (mm *ModelManager) DeleteModel(id string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("model not found: %s", id)
+	return fmt.Errorf("model not found: %d", id)
 }
 
 // UpdateModel updates a model by ID in runtime list (does NOT persist to file)
-func (mm *ModelManager) UpdateModel(id string, m ModelConfig) error {
+func (mm *ModelManager) UpdateModel(id int, m ModelConfig) error {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 
@@ -385,7 +384,7 @@ func (mm *ModelManager) UpdateModel(id string, m ModelConfig) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("model not found: %s", id)
+	return fmt.Errorf("model not found: %d", id)
 }
 
 // GetFilePath returns the current file path
@@ -403,7 +402,7 @@ func (mm *ModelManager) ModelCount() int {
 }
 
 // FindModelByName finds a model by its name and returns its ID
-func (mm *ModelManager) FindModelByName(name string) string {
+func (mm *ModelManager) FindModelByName(name string) int {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 
@@ -412,13 +411,13 @@ func (mm *ModelManager) FindModelByName(name string) string {
 			return m.ID
 		}
 	}
-	return ""
+	return 0
 }
 
 // SetActiveByName sets the active model by name (does NOT persist to file)
 func (mm *ModelManager) SetActiveByName(name string) error {
 	id := mm.FindModelByName(name)
-	if id == "" {
+	if id == 0 {
 		return fmt.Errorf("model not found: %s", name)
 	}
 	return mm.SetActive(id)

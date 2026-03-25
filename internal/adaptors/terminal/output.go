@@ -34,7 +34,7 @@ type outputWriter struct {
 	lastUpdate        time.Time            // Last time an update was sent
 	updateMu          sync.Mutex           // Mutex for update throttling
 	models            []agentpkg.ModelInfo // Current model list
-	activeModelID     string               // Current active model ID
+	activeModelID     int                  // Current active model ID
 	hasModels         bool                 // Whether models are configured
 	modelConfigPath   string               // Path to model.conf
 	activeModelName   string               // Name of active model
@@ -316,7 +316,7 @@ func (w *outputWriter) GetModels() []agentpkg.ModelInfo {
 }
 
 // GetActiveModelID returns the current active model ID
-func (w *outputWriter) GetActiveModelID() string {
+func (w *outputWriter) GetActiveModelID() int {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.activeModelID

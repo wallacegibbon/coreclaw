@@ -4,6 +4,7 @@ package agent
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
@@ -109,10 +110,15 @@ func (s *Session) handleModelSet(args []string) {
 		return
 	}
 
-	modelID := args[0]
+	modelIDStr := args[0]
+	modelID, err := strconv.Atoi(modelIDStr)
+	if err != nil {
+		s.writeError(domainerrors.NewSessionErrorf("model_set", "invalid model ID: %s", modelIDStr).Error())
+		return
+	}
 	model := s.ModelManager.GetModel(modelID)
 	if model == nil {
-		s.writeError(domainerrors.NewSessionErrorf("model_set", "model not found: %s", modelID).Error())
+		s.writeError(domainerrors.NewSessionErrorf("model_set", "model not found: %d", modelID).Error())
 		return
 	}
 

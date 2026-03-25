@@ -16,7 +16,7 @@ import (
 
 // ModelConfig represents a model configuration for display in the selector.
 type ModelConfig struct {
-	ID           string `json:"id,omitempty"`
+	ID           int    `json:"id,omitempty"`
 	Name         string `json:"name"`
 	ProtocolType string `json:"protocol_type"`
 	BaseURL      string `json:"base_url"`
@@ -162,7 +162,7 @@ func (ms *ModelSelector) SetModels(models []ModelConfig) {
 	ms.updateFilteredModels()
 }
 
-func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID string) tea.Cmd {
+func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) tea.Cmd {
 	// Skip update if model list hasn't changed
 	//nolint:gocritic // checking both conditions is intentional for early exit optimization
 	if len(models) == len(ms.models) && len(models) == ms.lastModelCount {
@@ -417,12 +417,24 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 		content.WriteString(ms.styles.System.Render("No models match your search."))
 	default:
 		ms.ensureVisible(listHeight)
+
+		// Find max ID width across ALL models for stable alignment
+		maxID := 0
+		for _, m := range ms.filteredModels {
+			if m.ID > maxID {
+				maxID = m.ID
+			}
+		}
+		idWidth := len(fmt.Sprintf("%d", maxID))
+
 		for i := ms.scrollIdx; i < min(ms.scrollIdx+listHeight, len(ms.filteredModels)); i++ {
 			m := ms.filteredModels[i]
 			if i == ms.selectedIdx && !ms.searchInputFocused {
-				content.WriteString(fmt.Sprintf("> %s", ms.styles.Text.Render(m.Name)))
+				idStr := fmt.Sprintf("%*d.", idWidth, m.ID)
+				content.WriteString(fmt.Sprintf("> %s %s", ms.styles.Text.Render(idStr), ms.styles.Text.Render(m.Name)))
 			} else {
-				content.WriteString(fmt.Sprintf("  %s", ms.styles.System.Render(m.Name)))
+				idStr := fmt.Sprintf("%*d.", idWidth, m.ID)
+				content.WriteString(fmt.Sprintf("  %s %s", ms.styles.System.Render(idStr), ms.styles.System.Render(m.Name)))
 			}
 			if i < min(ms.scrollIdx+listHeight, len(ms.filteredModels))-1 {
 				content.WriteString("\n")

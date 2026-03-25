@@ -382,7 +382,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 
 	// Add a test model to the manager
 	testModel := ModelConfig{
-		ID:           "test-model-1",
+		ID:           1,
 		Name:         "Test Model",
 		ProtocolType: "openai",
 		BaseURL:      "https://api.test.com/v1",

@@ -31,7 +31,7 @@ type OutputWriter interface {
 
 	// Model management
 	GetModels() []agentpkg.ModelInfo
-	GetActiveModelID() string
+	GetActiveModelID() int
 	GetActiveModelName() string
 	HasModels() bool
 	GetModelConfigPath() string

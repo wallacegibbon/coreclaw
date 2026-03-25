@@ -92,7 +92,7 @@ type SystemInfo struct {
 	CurrentStep       int             `json:"current_step,omitempty"`
 	MaxSteps          int             `json:"max_steps,omitempty"`
 	Models            []ModelInfo     `json:"models,omitempty"`
-	ActiveModelID     string          `json:"active_model_id,omitempty"`
+	ActiveModelID     int             `json:"active_model_id,omitempty"`
 	ActiveModelConfig *ModelConfig    `json:"active_model_config,omitempty"`
 	ActiveModelName   string          `json:"active_model_name,omitempty"`
 	HasModels         bool            `json:"has_models"`
@@ -732,7 +732,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 	}
 
 	var models []ModelInfo
-	var activeID string
+	var activeID int
 	var activeModelName string
 	var modelConfigPath string
 	var hasModels bool
