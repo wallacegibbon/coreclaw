@@ -15,7 +15,7 @@
 //	  - Terminal: The main model that composes all components
 //	  - DisplayModel: Renders assistant output with virtual scrolling
 //	  - InputModel: Handles user text input with external editor support
-//	  - StatusModel: Shows session status (tokens, queue, model info)
+//	  - Status bar: Shows session status (tokens, queue, model info)
 //	  - ModelSelector: Modal for switching between AI models
 //	  - QueueManager: Modal for managing the task queue
 //
@@ -25,14 +25,16 @@
 //
 // Key Files:
 //
-//   - terminal.go: Main Terminal model and message routing
-//   - keys.go: Keyboard handling and focus management
-//   - commands.go: Command processing (:quit, :model_set, etc.)
-//   - output.go: TLV parsing and styled rendering
-//   - window_*.go: Virtual scrolling and diff display
-//   - constants.go: Layout and timing constants, color palette
-//   - styles.go: Lipgloss style definitions
+//   - terminal.go: Main Terminal model, message routing, and status bar
 //   - keybinds.go: Declarative key binding configuration
+//   - output.go: TLV parsing and styled rendering
+//   - window.go: Virtual scrolling, DisplayModel, and diff display
+//   - styles.go: Lipgloss style definitions
+//   - input_component.go: Input handling and external editor support
+//   - model_selector.go: Model switching UI
+//   - queue_manager.go: Task queue UI
+//   - theme_test.go: Theme configuration
+//   - tool.go, tool_handler.go: Tool execution display
 //
 // Usage:
 //

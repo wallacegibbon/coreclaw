@@ -146,9 +146,7 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 		return false
 	}
 
-	// Dispatch to the existing handler methods
-	// Note: We keep the actual handlers in session_commands.go for now
-	// This provides a transition path while maintaining the registry
+	// Dispatch to the handler methods (defined in session.go)
 	switch commandName {
 	case "summarize":
 		s.summarize(ctx)

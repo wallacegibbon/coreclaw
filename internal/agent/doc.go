@@ -35,10 +35,9 @@
 //
 // Key Files:
 //
-//   - session.go: Session struct and main loop
-//   - session_prompt.go: Prompt processing and auto-summarization
-//   - session_commands.go: Command handlers
-//   - session_output.go: Output helpers (writeErrorf, writeNotifyf)
+//   - session.go: Session struct, main loop, and command handling
+//   - session_io.go: TLV input/output handling
+//   - session_persist.go: Session save/load functionality
 //   - command_registry.go: Declarative command registration
 //   - model_manager.go: Model configuration management
 //   - runtime_manager.go: Runtime persistence

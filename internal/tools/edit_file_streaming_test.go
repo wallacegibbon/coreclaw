@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -75,7 +76,7 @@ func TestEditFileStreamingMemory(t *testing.T) {
 	runtime.ReadMemStats(&m1)
 
 	// Test the edit
-	result, err := executeEditFile(nil, EditFileInput{
+	result, err := executeEditFile(context.TODO(), EditFileInput{
 		Path:      testFile,
 		OldString: string(pattern),
 		NewString: "REPLACED_SUCCESSFULLY",
@@ -200,7 +201,7 @@ func TestEditFileStreamingEdgeCases(t *testing.T) {
 			}
 
 			// Execute edit
-			result, err := executeEditFile(nil, EditFileInput{
+			result, err := executeEditFile(context.TODO(), EditFileInput{
 				Path:      testFile,
 				OldString: tt.oldString,
 				NewString: tt.newString,
@@ -241,8 +242,4 @@ func TestEditFileStreamingEdgeCases(t *testing.T) {
 			}
 		})
 	}
-}
-
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (len(s) == 0 && len(substr) == 0 || strings.Contains(s, substr))
 }
