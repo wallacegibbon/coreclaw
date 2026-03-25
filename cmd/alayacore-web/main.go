@@ -76,12 +76,5 @@ Flags:
   --debug-api             Write raw API requests and responses to log file
   --version               Show version information
   --help                  Show help information
-
-Examples:
-  alayacore-web --addr :9090
-  alayacore-web --model-config ./my-model.conf
-  alayacore-web --session ~/my-session.md
-  alayacore-web --skill ./skills1 --skill ./skills2
-  alayacore-web --proxy socks5://127.0.0.1:1080
 `)
 }
