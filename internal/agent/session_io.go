@@ -41,6 +41,37 @@ func (s *Session) cancelTask() {
 	s.writeError(domainerrors.ErrNothingToCancel.Error())
 }
 
+func (s *Session) cancelAllTasks() {
+	// Clear the task queue first (while holding lock)
+	s.mu.Lock()
+	queueLen := len(s.taskQueue)
+	s.taskQueue = make([]QueueItem, 0)
+	inProgress := s.inProgress
+	cancelCurrent := s.cancelCurrent
+	s.mu.Unlock()
+
+	// Then cancel current task (if running)
+	currentCanceled := false
+	if inProgress && cancelCurrent != nil {
+		cancelCurrent()
+		currentCanceled = true
+	}
+
+	// Send notification
+	if currentCanceled && queueLen > 0 {
+		s.writeNotifyf("Canceled current task and cleared %d queued tasks", queueLen)
+	} else if currentCanceled {
+		s.writeNotify("Canceled current task")
+	} else if queueLen > 0 {
+		s.writeNotifyf("Cleared %d queued tasks", queueLen)
+	} else {
+		s.writeError(domainerrors.ErrNothingToCancel.Error())
+		return
+	}
+
+	s.sendSystemInfo()
+}
+
 func (s *Session) summarize(ctx context.Context) {
 	prompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
 

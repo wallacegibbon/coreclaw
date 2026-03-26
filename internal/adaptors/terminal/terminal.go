@@ -81,15 +81,16 @@ type Terminal struct {
 	inProgress bool
 
 	// State
-	quitting            bool
-	confirmDialog       bool
-	cancelConfirmDialog bool
-	cancelFromCommand   bool
-	focusedWindow       string // "input" or "display"
-	windowWidth         int
-	windowHeight        int
-	styles              *Styles
-	hasFocus            bool // tracks whether the terminal has application focus
+	quitting               bool
+	confirmDialog          bool
+	cancelConfirmDialog    bool
+	cancelAllConfirmDialog bool
+	cancelFromCommand      bool   // tracks if cancel came from :cancel command (vs Ctrl+G)
+	focusedWindow          string // "input" or "display"
+	windowWidth            int
+	windowHeight           int
+	styles                 *Styles
+	hasFocus               bool // tracks whether the terminal has application focus
 }
 
 // NewTerminal creates a new Terminal model with all components initialized.
@@ -399,8 +400,10 @@ func (m *Terminal) View() tea.View {
 		confirmText = "Confirm exit? Press y/n"
 	} else if m.cancelConfirmDialog {
 		confirmText = "Confirm cancel? Press y/n"
+	} else if m.cancelAllConfirmDialog {
+		confirmText = "Confirm cancel all? Press y/n"
 	}
-	sb.WriteString(m.input.RenderWithBorder(m.confirmDialog || m.cancelConfirmDialog, confirmText))
+	sb.WriteString(m.input.RenderWithBorder(m.confirmDialog || m.cancelConfirmDialog || m.cancelAllConfirmDialog, confirmText))
 
 	// Status bar (simplified - just render directly)
 	sb.WriteString("\n")

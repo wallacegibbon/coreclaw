@@ -354,6 +354,46 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 	}
 }
 
+func TestCancelAllCommandRequiresConfirm(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal.input.SetValue(":cancel_all")
+
+	// Press Enter to submit the command
+	terminal.focusedWindow = "input"
+	terminal.input.Focus()
+	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
+
+	model, cmd := terminal.Update(msg)
+
+	// Should return a model and no command (just shows dialog)
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	if cmd != nil {
+		t.Fatal(":cancel_all should not emit command immediately, should show confirm dialog")
+	}
+
+	// Cancel all confirmation dialog should be shown
+	if !terminal.cancelAllConfirmDialog {
+		t.Error(":cancel_all should set cancelAllConfirmDialog to true")
+	}
+
+	// Test confirming the dialog by pressing 'y'
+	msg = tea.KeyPressMsg(tea.Key{Code: 'y'})
+	_, cmd = terminal.Update(msg)
+
+	// Now should emit cancel_all command
+	if cmd == nil {
+		t.Fatal("Pressing 'y' should emit cancel_all command")
+	}
+
+	// Cancel dialog should be closed
+	if terminal.cancelAllConfirmDialog {
+		t.Error("Cancel dialog should be closed after confirming")
+	}
+}
+
 func TestCtrlUDoesNothingInInput(t *testing.T) {
 	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("test input text")

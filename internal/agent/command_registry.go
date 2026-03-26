@@ -77,6 +77,15 @@ func init() {
 	})
 
 	commandRegistry.Register(&Command{
+		Name:        "cancel_all",
+		Description: "Cancel current task and clear the task queue",
+		Usage:       "",
+		Handler: func(_ context.Context, _ []string) {
+			// Handler is resolved at runtime via Session method
+		},
+	})
+
+	commandRegistry.Register(&Command{
 		Name:        "save",
 		Description: "Save the current session",
 		Usage:       "[filename]",
@@ -152,6 +161,8 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 		s.summarize(ctx)
 	case "cancel":
 		s.cancelTask()
+	case "cancel_all":
+		s.cancelAllTasks()
 	case "save":
 		s.saveSession(args)
 	case "model_set":

@@ -280,6 +280,10 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return m.handleCancelConfirm(msg)
 	}
 
+	if m.cancelAllConfirmDialog {
+		return m.handleCancelAllConfirm(msg)
+	}
+
 	return nil, false
 }
 
@@ -310,6 +314,25 @@ func (m *Terminal) handleCancelConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return m.submitCommand("cancel", m.cancelFromCommand), true
 	case KeyN, "N", KeyEsc, KeyCtrlC:
 		m.cancelConfirmDialog = false
+		if m.cancelFromCommand {
+			m.input.SetValue("")
+		}
+		return nil, true
+	}
+	return nil, true
+}
+
+// handleCancelAllConfirm handles the cancel_all confirmation dialog.
+func (m *Terminal) handleCancelAllConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.String() {
+	case KeyY, "Y":
+		m.cancelAllConfirmDialog = false
+		if m.cancelFromCommand {
+			m.input.SetValue("")
+		}
+		return m.submitCommand("cancel_all", m.cancelFromCommand), true
+	case KeyN, "N", KeyEsc, KeyCtrlC:
+		m.cancelAllConfirmDialog = false
 		if m.cancelFromCommand {
 			m.input.SetValue("")
 		}
@@ -503,6 +526,13 @@ func (m *Terminal) handleCommand(command string) tea.Cmd {
 	// Cancel command
 	if command == "cancel" {
 		m.cancelConfirmDialog = true
+		m.cancelFromCommand = true
+		return nil
+	}
+
+	// Cancel all command
+	if command == "cancel_all" {
+		m.cancelAllConfirmDialog = true
 		m.cancelFromCommand = true
 		return nil
 	}

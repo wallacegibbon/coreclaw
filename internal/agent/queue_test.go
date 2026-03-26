@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -148,5 +149,108 @@ func TestQueueTimestamps(t *testing.T) {
 	// Verify timestamp is within expected range
 	if items[0].CreatedAt.Before(before) || items[0].CreatedAt.After(after) {
 		t.Errorf("Timestamp %v is not between %v and %v", items[0].CreatedAt, before, after)
+	}
+}
+
+func TestCancelAllTasks(t *testing.T) {
+	tests := []struct {
+		name           string
+		inProgress     bool
+		queueSize      int
+		expectError    bool
+		expectMessages int // number of expected notification messages
+	}{
+		{
+			name:           "no task running, empty queue",
+			inProgress:     false,
+			queueSize:      0,
+			expectError:    true,
+			expectMessages: 1, // error message
+		},
+		{
+			name:           "task running, empty queue",
+			inProgress:     true,
+			queueSize:      0,
+			expectError:    false,
+			expectMessages: 1, // "Canceled current task"
+		},
+		{
+			name:           "no task running, queue has items",
+			inProgress:     false,
+			queueSize:      3,
+			expectError:    false,
+			expectMessages: 1, // "Cleared X queued tasks"
+		},
+		{
+			name:           "task running, queue has items",
+			inProgress:     true,
+			queueSize:      5,
+			expectError:    false,
+			expectMessages: 1, // "Canceled current task and cleared X queued tasks"
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := &MockOutput{}
+			session := &Session{
+				taskQueue:     make([]QueueItem, 0),
+				taskAvailable: make(chan struct{}, 1),
+				done:          make(chan struct{}),
+				Input:         &stream.ChanInput{},
+				Output:        output,
+				inProgress:    tt.inProgress,
+			}
+
+			// Add mock cancel function if task is in progress
+			if tt.inProgress {
+				canceled := false
+				session.cancelCurrent = func() {
+					canceled = true
+				}
+				defer func() {
+					if !canceled {
+						t.Error("Expected cancelCurrent to be called")
+					}
+				}()
+			}
+
+			// Add items to queue
+			for i := 0; i < tt.queueSize; i++ {
+				session.taskQueue = append(session.taskQueue, QueueItem{
+					Task:      UserPrompt{Text: "test"},
+					QueueID:   "Q" + string(rune('1'+i)),
+					CreatedAt: time.Now(),
+				})
+			}
+
+			// Execute cancelAllTasks
+			session.cancelAllTasks()
+
+			// Verify queue is cleared
+			if len(session.taskQueue) != 0 {
+				t.Errorf("Expected empty queue, got %d items", len(session.taskQueue))
+			}
+
+			// Verify output
+			if tt.expectError {
+				// Should have error message (TLV format: "SE\x00\x00\x00\x11nothing to cancel")
+				found := false
+				for _, msg := range output.Messages {
+					if strings.Contains(msg, "nothing to cancel") {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected error message, but none found. Messages: %v", output.Messages)
+				}
+			} else {
+				// Should have success message
+				if len(output.Messages) < tt.expectMessages {
+					t.Errorf("Expected at least %d message(s), got %d", tt.expectMessages, len(output.Messages))
+				}
+			}
+		})
 	}
 }
