@@ -154,8 +154,8 @@ func (w *Window) renderGenericContent(innerWidth int, styles *Styles) string {
 		// No styling for unknown tags
 	}
 
-	// Expand tabs and wrap
-	content = expandTabs(content)
+	// Prepare content and wrap
+	content = prepareContent(content)
 	if innerWidth <= 0 {
 		return content
 	}
