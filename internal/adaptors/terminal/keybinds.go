@@ -247,6 +247,9 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 
+	// Track if selector was open before handling key
+	wasOpen := m.themeSelector.IsOpen()
+
 	previewTheme, handled := m.themeSelector.HandleKeyMsg(msg, m.themeManager)
 	if !handled {
 		return m, nil
@@ -257,7 +260,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.applyTheme(previewTheme)
 	}
 
-	// Check if theme was selected
+	// Check if theme was selected (Enter key)
 	if m.themeSelector.ConsumeThemeSelected() {
 		selectedTheme := m.themeSelector.GetSelectedTheme()
 		if selectedTheme != nil {
@@ -265,10 +268,14 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			_ = m.session.GetRuntimeManager().SetActiveTheme(selectedTheme.Name) //nolint:errcheck // best-effort save
 		}
 		m.restoreFocusAfterThemeSelector()
+		return m, nil
 	}
 
-	// Restore focus when theme selector closes
-	if !m.themeSelector.IsOpen() {
+	// If selector closed without selection (ESC/q), restore original theme
+	if wasOpen && !m.themeSelector.IsOpen() {
+		originalThemeName := m.themeSelector.GetOriginalThemeName()
+		originalTheme := m.themeManager.LoadTheme(originalThemeName)
+		m.applyTheme(originalTheme)
 		m.restoreFocusAfterThemeSelector()
 	}
 

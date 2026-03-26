@@ -38,6 +38,7 @@ type ThemeSelector struct {
 
 	// Selection state
 	themeJustSelected bool
+	originalThemeName string // Theme name when selector was opened (for cancel)
 
 	// App focus state
 	hasFocus bool
@@ -65,6 +66,9 @@ func (ts *ThemeSelector) Open(themes []ThemeInfo, activeTheme string) {
 	ts.state = ThemeSelectorOpen
 	ts.scrollIdx = 0
 	ts.selectedIdx = 0
+	ts.originalThemeName = activeTheme // Save original theme for cancel
+	ts.previewTheme = nil
+	ts.previewThemeName = ""
 
 	// Find active theme and position cursor
 	for i, theme := range ts.themes {
@@ -114,6 +118,10 @@ func (ts *ThemeSelector) GetSelectedTheme() *ThemeInfo {
 
 func (ts *ThemeSelector) GetPreviewTheme() *Theme {
 	return ts.previewTheme
+}
+
+func (ts *ThemeSelector) GetOriginalThemeName() string {
+	return ts.originalThemeName
 }
 
 func (ts *ThemeSelector) ConsumeThemeSelected() bool {
@@ -185,6 +193,10 @@ func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager
 }
 
 func (ts *ThemeSelector) getPreviewTheme(themeManager *ThemeManager) *Theme {
+	if themeManager == nil {
+		return nil
+	}
+
 	if len(ts.themes) == 0 || ts.selectedIdx < 0 || ts.selectedIdx >= len(ts.themes) {
 		return nil
 	}
