@@ -255,13 +255,11 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 
-	// Apply preview theme if changed
-	if previewTheme != nil {
-		m.applyTheme(previewTheme)
-	}
-
 	// Check if theme was selected (Enter key)
 	if m.themeSelector.ConsumeThemeSelected() {
+		if previewTheme != nil {
+			m.applyTheme(previewTheme)
+		}
 		selectedTheme := m.themeSelector.GetSelectedTheme()
 		if selectedTheme != nil {
 			// Save to runtime.conf
@@ -277,8 +275,35 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		originalTheme := m.themeManager.LoadTheme(originalThemeName)
 		m.applyTheme(originalTheme)
 		m.restoreFocusAfterThemeSelector()
+		return m, nil
 	}
 
+	// Apply preview theme if changed
+	if previewTheme != nil {
+		// For navigation keys, delay theme application to keep cursor responsive
+		key := msg.String()
+		if key == "j" || key == "k" || key == "up" || key == "down" {
+			// Return a command that will apply the theme after a delay
+			// This allows the cursor to update immediately
+			theme := previewTheme
+			return m, tea.Tick(100*time.Millisecond, func(_ time.Time) tea.Msg {
+				return themePreviewMsg{theme: theme}
+			})
+		}
+		// Apply immediately for other keys
+		m.applyTheme(previewTheme)
+	}
+
+	return m, nil
+}
+
+// themePreviewMsg is sent when a theme preview should be applied
+type themePreviewMsg struct {
+	theme *Theme
+}
+
+func (m *Terminal) handleThemePreview(msg themePreviewMsg) (tea.Model, tea.Cmd) {
+	m.applyTheme(msg.theme)
 	return m, nil
 }
 

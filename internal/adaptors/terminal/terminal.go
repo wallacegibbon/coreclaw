@@ -174,6 +174,9 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		return m.handleTick()
 
+	case themePreviewMsg:
+		return m.handleThemePreview(msg)
+
 	case editorStartMsg:
 		return m.handleEditorStart(msg)
 
