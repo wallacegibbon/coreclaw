@@ -81,6 +81,7 @@ func NewModelManager(configPath string) *ModelManager {
 
 	mm := &ModelManager{
 		filePath: path,
+		nextID:   1, // IDs start from 1; 0 is reserved as "no model"
 	}
 	if path != "" {
 		_ = mm.LoadFromFile(path) //nolint:errcheck // best-effort load on init
@@ -141,8 +142,8 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 
 	models := parseModelConfig(string(data))
 
-	// Reset ID counter and generate IDs for models
-	mm.nextID = 0
+	// Reset ID counter and generate IDs for models (start from 1; 0 is reserved as "no model")
+	mm.nextID = 1
 	for i := range models {
 		models[i].ID = mm.nextID
 		mm.nextID++

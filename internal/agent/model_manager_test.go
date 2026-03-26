@@ -235,16 +235,16 @@ model_name: "model-b"
 
 	mm := NewModelManager(configPath)
 
-	// Check initial IDs
+	// Check initial IDs (IDs start from 1; 0 is reserved as "no model")
 	models := mm.GetModels()
 	if len(models) != 2 {
 		t.Fatalf("expected 2 models, got %d", len(models))
 	}
-	if models[0].ID != 0 {
-		t.Errorf("expected first model ID to be 0, got %d", models[0].ID)
+	if models[0].ID != 1 {
+		t.Errorf("expected first model ID to be 1, got %d", models[0].ID)
 	}
-	if models[1].ID != 1 {
-		t.Errorf("expected second model ID to be 1, got %d", models[1].ID)
+	if models[1].ID != 2 {
+		t.Errorf("expected second model ID to be 2, got %d", models[1].ID)
 	}
 
 	// Add a model to bump the nextID counter
@@ -255,11 +255,11 @@ model_name: "model-b"
 		APIKey:       "key3",
 		ModelName:    "model-c",
 	})
-	if newID != 2 {
-		t.Errorf("expected new model ID to be 2, got %d", newID)
+	if newID != 3 {
+		t.Errorf("expected new model ID to be 3, got %d", newID)
 	}
 
-	// Now reload from file - IDs should reset to 0, 1
+	// Now reload from file - IDs should reset to 1, 2
 	if err := mm.Reload(); err != nil {
 		t.Fatalf("failed to reload: %v", err)
 	}
@@ -268,10 +268,10 @@ model_name: "model-b"
 	if len(models) != 2 {
 		t.Fatalf("expected 2 models after reload, got %d", len(models))
 	}
-	if models[0].ID != 0 {
-		t.Errorf("expected first model ID to be 0 after reload, got %d", models[0].ID)
+	if models[0].ID != 1 {
+		t.Errorf("expected first model ID to be 1 after reload, got %d", models[0].ID)
 	}
-	if models[1].ID != 1 {
-		t.Errorf("expected second model ID to be 1 after reload, got %d", models[1].ID)
+	if models[1].ID != 2 {
+		t.Errorf("expected second model ID to be 2 after reload, got %d", models[1].ID)
 	}
 }
