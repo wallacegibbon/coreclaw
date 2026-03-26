@@ -57,12 +57,6 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		systemPrompt = systemPrompt + "\n\n" + skillsFragment
 	}
 
-	// Load AGENTS.md from current directory if it exists
-	agentsContent, err := os.ReadFile("AGENTS.md")
-	if err == nil {
-		systemPrompt = systemPrompt + "\n\n" + string(agentsContent)
-	}
-
 	// Add current working directory to system prompt (at the end for better API cache reuse)
 	cwd, err := os.Getwd()
 	if err == nil && cwd != "" {

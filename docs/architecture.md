@@ -188,8 +188,6 @@ Default Prompt
     ↓
 + Skills Fragment (if skills configured)
     ↓
-+ AGENTS.md content (if exists in cwd)
-    ↓
 + Current working directory
     ↓
 + Extra System Prompt (from --system flag)
