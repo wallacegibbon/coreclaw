@@ -238,6 +238,11 @@ func (ts *ThemeSelector) renderList() string {
 		}
 	}
 
+	// Pad lines to fill the list height (for consistent box height)
+	for len(lines) < listHeight {
+		lines = append(lines, "")
+	}
+
 	// Join lines
 	content := strings.Join(lines, "\n")
 
@@ -247,7 +252,7 @@ func (ts *ThemeSelector) renderList() string {
 		borderColor = ts.styles.BorderBlurred
 	}
 
-	sb.WriteString(ts.styles.RenderBorderedBox(content, ts.width, borderColor))
+	sb.WriteString(ts.styles.RenderBorderedBox(content, ts.width, borderColor, listHeight))
 
 	// Compact command help
 	sb.WriteString("\n")
