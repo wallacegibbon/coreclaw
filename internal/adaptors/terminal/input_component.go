@@ -54,6 +54,7 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.editorContent = msg.content
 			m.input.SetValue(FormatEditorContent(msg.content))
 			m.input.CursorEnd()
+			m.focused = true
 			m.input.Focus()
 		}
 	}

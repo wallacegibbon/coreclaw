@@ -267,7 +267,7 @@ func (m *Terminal) handleEditorFinished(msg editorFinishedMsg) (tea.Model, tea.C
 		m.input.editorContent = msg.content
 		m.input.SetValue(FormatEditorContent(msg.content))
 		m.input.CursorEnd()
-		m.input.Focus()
+		m.focusInput()
 	}
 	return m, nil
 }
@@ -496,9 +496,9 @@ func (m *Terminal) openModelSelector() {
 // restoreFocusAfterSelector restores focus after model selector closes.
 func (m *Terminal) restoreFocusAfterSelector() {
 	if m.focusedWindow == focusDisplay {
-		m.display.SetDisplayFocused(true)
+		m.focusDisplay()
 	} else {
-		m.input.Focus()
+		m.focusInput()
 	}
 	m.display.updateContent()
 }
@@ -516,9 +516,9 @@ func (m *Terminal) openQueueManager() {
 // restoreFocusAfterQueueManager restores focus after queue manager closes.
 func (m *Terminal) restoreFocusAfterQueueManager() {
 	if m.focusedWindow == focusDisplay {
-		m.display.SetDisplayFocused(true)
+		m.focusDisplay()
 	} else {
-		m.input.Focus()
+		m.focusInput()
 	}
 	m.display.updateContent()
 }
@@ -552,9 +552,9 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	}
 
 	if m.focusedWindow == focusDisplay {
-		m.display.SetDisplayFocused(true)
+		m.focusDisplay()
 	} else {
-		m.input.Focus()
+		m.focusInput()
 	}
 	m.display.updateContent()
 

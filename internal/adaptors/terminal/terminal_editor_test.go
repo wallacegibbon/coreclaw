@@ -261,8 +261,7 @@ func TestCtrlCClearsInput(t *testing.T) {
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in input window
-	terminal.focusedWindow = "input"
-	terminal.input.Focus()
+	terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
@@ -288,8 +287,7 @@ func TestCtrlCInDisplayWindow(t *testing.T) {
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in display window
-	terminal.focusedWindow = "display"
-	terminal.input.Blur()
+	terminal.focusDisplay()
 	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
@@ -315,7 +313,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+G (should work regardless of focus)
-	terminal.focusedWindow = "input"
+	terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: 'g', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
@@ -359,8 +357,7 @@ func TestCancelAllCommandRequiresConfirm(t *testing.T) {
 	terminal.input.SetValue(":cancel_all")
 
 	// Press Enter to submit the command
-	terminal.focusedWindow = "input"
-	terminal.input.Focus()
+	terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
 
 	model, cmd := terminal.Update(msg)
@@ -399,8 +396,7 @@ func TestCtrlUDoesNothingInInput(t *testing.T) {
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+U while in input window
-	terminal.focusedWindow = "input"
-	terminal.input.Focus()
+	terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: 'u', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
@@ -639,7 +635,7 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 
 func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
 	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
-	terminal.focusedWindow = focusDisplay
+	terminal.focusDisplay()
 
 	// Add a window with content
 	terminal.out.WindowBuffer().AppendOrUpdate("test1", stream.TagTextAssistant, "Hello from display")
@@ -664,7 +660,7 @@ func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
 
 func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
 	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
-	terminal.focusedWindow = focusDisplay
+	terminal.focusDisplay()
 
 	// No windows in buffer
 	terminal.display.SetWindowCursor(-1)
@@ -686,7 +682,7 @@ func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
 
 func TestEKeyDoesNothingInInputWindow(t *testing.T) {
 	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
-	terminal.focusedWindow = focusInput
+	terminal.focusInput()
 
 	// Add a window with content
 	terminal.out.WindowBuffer().AppendOrUpdate("test1", stream.TagTextAssistant, "Hello from display")

@@ -412,8 +412,7 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 	case KeyColon:
 		// Switch to input with ":" prefix for command mode
-		m.focusedWindow = focusInput
-		m.input.Focus()
+		m.focusInput()
 		m.input.SetValue(":")
 		m.input.CursorEnd()
 		return nil, true
