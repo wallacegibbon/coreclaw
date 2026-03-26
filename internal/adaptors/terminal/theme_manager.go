@@ -26,6 +26,7 @@ type ThemeManager struct {
 
 // NewThemeManager creates a new theme manager.
 // If themesFolder is empty, it defaults to ~/.alayacore/themes.
+// If the themes folder doesn't exist, it creates it with default themes.
 func NewThemeManager(themesFolder string) *ThemeManager {
 	tm := &ThemeManager{
 		themesFolder: themesFolder,
@@ -39,10 +40,136 @@ func NewThemeManager(themesFolder string) *ThemeManager {
 		}
 	}
 
+	// Initialize themes folder with default themes if needed
+	tm.initializeThemesFolder()
+
 	// Load theme list
 	tm.ReloadThemes()
 
 	return tm
+}
+
+// initializeThemesFolder creates the themes folder and populates it with default themes
+func (tm *ThemeManager) initializeThemesFolder() {
+	if tm.themesFolder == "" {
+		return
+	}
+
+	// Check if folder exists
+	if _, err := os.Stat(tm.themesFolder); os.IsNotExist(err) {
+		// Create the folder
+		if err := os.MkdirAll(tm.themesFolder, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to create themes folder: %v\n", err)
+			return
+		}
+
+		// Create default themes
+		tm.createDefaultThemes()
+	}
+}
+
+// createDefaultThemes creates the default theme-dark.conf and theme-light.conf files
+func (tm *ThemeManager) createDefaultThemes() {
+	// theme-dark.conf - using default Catppuccin Mocha colors
+	darkTheme := `# AlayaCore Dark Theme
+# Based on Catppuccin Mocha color palette
+
+# Background color - used for invisible borders, separator backgrounds
+base: #1e1e2e
+
+# Surface color - used for subtle backgrounds
+surface1: #585b70
+
+# Primary accent color (blue) - used for focused borders, prompts, highlights
+accent: #89d4fa
+
+# Dimmed color - used for unfocused borders, blurred text
+dim: #45475a
+
+# Muted color - used for placeholder text, system messages, tool content
+muted: #6c7086
+
+# Primary text color (white)
+text: #cdd6f4
+
+# Warning/accent color (yellow) - used for warnings, tool names
+warning: #f9e2af
+
+# Error color (red) - used for errors, diff removals
+error: #f38ba8
+
+# Success color (green) - used for success indicators, diff additions
+success: #a6e3a1
+
+# Peach color - used for window cursor border highlight (when navigating windows with j/k)
+peach: #fab387
+
+# Cursor color - text input cursor in the input box
+cursor: #cdd6f4
+
+# Diff colors
+# Added lines in diff output (green)
+diff_add: #a6e3a1
+
+# Removed lines in diff output (red)
+diff_remove: #f38ba8
+`
+	darkPath := filepath.Join(tm.themesFolder, "theme-dark.conf")
+	if err := os.WriteFile(darkPath, []byte(darkTheme), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to create default dark theme: %v\n", err)
+	}
+
+	// theme-light.conf - using Catppuccin Latte colors
+	lightTheme := `# AlayaCore Light Theme
+# Based on Catppuccin Latte color palette
+# Optimized for white/light terminal backgrounds
+
+# Background color - use a light gray that blends with light terminal background
+base: #e6e6e6
+
+# Surface color - slightly darker for subtle backgrounds
+surface1: #ccd0da
+
+# Primary accent color - deep blue for visibility on light backgrounds
+accent: #1e66f5
+
+# Dimmed color - medium gray for unfocused borders, blurred text
+dim: #acb0be
+
+# Muted color - for placeholder text, system messages
+muted: #6c6f85
+
+# Primary text color - dark for readability on light backgrounds
+text: #4c4f69
+
+# Warning/accent color - orange for visibility
+warning: #df8e1d
+
+# Error color - deep red for errors
+error: #d20f39
+
+# Success color - deep green for success indicators
+success: #40a02b
+
+# Peach color - cursor border highlight (when navigating windows with j/k)
+# Dark maroon/burgundy for maximum visibility on light backgrounds
+peach: #881337
+
+# Cursor color - text input cursor in the input box
+# Dark color for visibility on light backgrounds
+cursor: #1e1e2e
+
+# Diff colors
+# Added lines in diff output (deep green)
+diff_add: #40a02b
+
+# Removed lines in diff output (deep red)
+diff_remove: #d20f39
+`
+	lightPath := filepath.Join(tm.themesFolder, "theme-light.conf")
+	if err := os.WriteFile(lightPath, []byte(lightTheme), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to create default light theme: %v\n", err)
+	}
 }
 
 // ReloadThemes reloads the list of available themes from the themes folder.

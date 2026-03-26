@@ -63,8 +63,11 @@ func (a *Adaptor) Start() {
 		a.Config.Cfg.Proxy,
 	)
 
-	// Load active theme from runtime.conf
+	// Load active theme from runtime.conf (default to "theme-dark" if not set)
 	activeThemeName := session.GetRuntimeManager().GetActiveTheme()
+	if activeThemeName == "" {
+		activeThemeName = "theme-dark"
+	}
 	theme := themeManager.LoadTheme(activeThemeName)
 	styles := NewStyles(theme)
 
