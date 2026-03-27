@@ -233,13 +233,17 @@ Themes are stored as `.conf` files in the themes folder. Each file defines a col
 
 ```
 # ~/.alayacore/themes/theme-dark.conf
-background: #1e1e2e
 primary: #89d4fa
+dim: #313244
+muted: #6c7086
 text: #cdd6f4
 warning: #f9e2af
 error: #f38ba8
 success: #a6e3a1
-...
+selection: #fab387
+cursor: #cdd6f4
+added: #a6e3a1
+removed: #f38ba8
 ```
 
 - **Default location**: `~/.alayacore/themes/`
