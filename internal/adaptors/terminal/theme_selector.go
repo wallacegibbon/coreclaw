@@ -223,8 +223,7 @@ func (ts *ThemeSelector) renderList() string {
 
 	switch {
 	case len(ts.themes) == 0:
-		lines = append(lines, ts.styles.System.Render("No themes found."))
-		lines = append(lines, ts.styles.System.Render("Add .conf files to your themes folder."))
+		lines = append(lines, ts.styles.System.Render("  No Theme"))
 	default:
 		ts.ensureVisible(listHeight)
 

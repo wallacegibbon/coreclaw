@@ -39,7 +39,7 @@ alayacore --skill ~/playground/alayacore/misc/samples/skills/
 | `--skill strings` | Skill path (can be specified multiple times) |
 | `--session string` | Session file path to load/save conversations |
 | `--proxy string` | HTTP proxy URL (e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`) |
-| `--theme string` | Theme config file path (default: `~/.alayacore/theme.conf`) |
+| `--themes string` | Themes folder path (default: `~/.alayacore/themes`) |
 | `--max-steps int` | Maximum agent loop steps (default: 100) |
 | `--debug-api` | Write raw API requests and responses to log file |
 | `--version` | Show version information |
@@ -70,8 +70,8 @@ alayacore --proxy http://127.0.0.1:7890
 # With SOCKS5 proxy
 alayacore --proxy socks5://127.0.0.1:1080
 
-# With custom theme
-alayacore --theme ./my-theme.conf
+# With custom themes folder
+alayacore --themes ./my-themes
 
 # Debug API requests
 alayacore --debug-api
@@ -139,6 +139,7 @@ The first model in the file becomes the active model on startup (unless `runtime
 | `Ctrl+S` | Save session to file |
 | `Ctrl+O` | Open external editor for multi-line input |
 | `Ctrl+L` | Open model selector UI |
+| `Ctrl+P` | Open theme selector UI |
 | `Ctrl+Q` | Open task queue manager UI |
 | `:` | Switch to input with ":" prefix (when display focused) |
 | `Space` | Toggle wrap mode for active window (when display focused) |

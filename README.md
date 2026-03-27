@@ -20,7 +20,7 @@ go install github.com/alayacore/alayacore@latest
 - `--skill strings` - Skill path (can be specified multiple times)
 - `--session string` - Session file path to load/save conversations
 - `--proxy string` - HTTP proxy URL (e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`)
-- `--theme string` - Theme config file path (default: `~/.alayacore/theme.conf`)
+- `--themes string` - Themes folder path (default: `~/.alayacore/themes`)
 - `--max-steps int` - Maximum agent loop steps (default: 100)
 - `--debug-api` - Write raw API requests and responses to log file
 - `--version` - Show version information
@@ -107,6 +107,7 @@ When running the Terminal version:
 | `Ctrl+S` | Save session to file |
 | `Ctrl+O` | Open external editor for multi-line input |
 | `Ctrl+L` | Open model selector UI |
+| `Ctrl+P` | Open theme selector UI |
 | `Ctrl+Q` | Open task queue manager UI |
 | `j` | Move window cursor down (when display focused) |
 | `k` | Move window cursor up (when display focused) |

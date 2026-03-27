@@ -227,13 +227,25 @@ The active model is determined by:
 1. If `runtime.conf` has a saved `active_model`, that model is used
 2. Otherwise, the **first model** in `model.conf` becomes the active model
 
-### Theme Configuration (`~/.alayacore/theme.conf`)
+### Theme Configuration (`~/.alayacore/themes/`)
+
+Themes are stored as `.conf` files in the themes folder. Each file defines a color scheme:
 
 ```
-base: "#1e1e2e"
-accent: "#89d4fa"
-text: "#cdd6f4"
+# ~/.alayacore/themes/theme-dark.conf
+background: #1e1e2e
+primary: #89d4fa
+text: #cdd6f4
+warning: #f9e2af
+error: #f38ba8
+success: #a6e3a1
+...
 ```
+
+- **Default location**: `~/.alayacore/themes/`
+- **Custom location**: Use `--themes /path/to/themes` to specify a different folder
+- **Auto-initialization**: If the themes folder doesn't exist, AlayaCore creates it with default `theme-dark.conf` and `theme-light.conf`
+- **Switching themes**: Press `Ctrl+P` in the terminal to open the theme selector
 
 ## Data Flow
 
@@ -360,7 +372,9 @@ alayacore/
 │   │   │   ├── status.go      # Status bar
 │   │   │   ├── model_selector.go   # Model switching UI
 │   │   │   ├── queue_manager.go    # Task queue UI
-│   │   │   ├── theme.go       # Theme configuration
+│   │   │   ├── theme.go           # Theme definitions
+│   │   │   ├── theme_manager.go   # Theme loading/management
+│   │   │   ├── theme_selector.go  # Theme switching UI
 │   │   │   ├── styles.go      # Lipgloss styles
 │   │   │   └── constants.go   # Layout/colors
 │   │   └── websocket/         # WebSocket adaptor
