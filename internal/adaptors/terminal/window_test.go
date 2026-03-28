@@ -325,3 +325,159 @@ func TestWindowBufferDiff(t *testing.T) {
 		}
 	})
 }
+
+func TestWindowBufferVisibility(t *testing.T) {
+	t.Run("tool windows are always visible", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+		wb.AppendToolCall("tool-1", "posix_shell", "")
+
+		if len(wb.Windows) != 1 {
+			t.Fatalf("len(Windows) = %d, want 1", len(wb.Windows))
+		}
+		if !wb.Windows[0].Visible {
+			t.Error("Tool window should always be visible, even with empty content")
+		}
+	})
+
+	t.Run("delta window with content is visible", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "Hello")
+
+		if len(wb.Windows) != 1 {
+			t.Fatalf("len(Windows) = %d, want 1", len(wb.Windows))
+		}
+		if !wb.Windows[0].Visible {
+			t.Error("Delta window with non-whitespace content should be visible")
+		}
+	})
+
+	t.Run("delta window with only whitespace is not visible", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "   \n\t  ")
+
+		if len(wb.Windows) != 1 {
+			t.Fatalf("len(Windows) = %d, want 1", len(wb.Windows))
+		}
+		if wb.Windows[0].Visible {
+			t.Error("Delta window with only whitespace should NOT be visible")
+		}
+	})
+
+	t.Run("delta window with empty content is not visible", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "")
+
+		if len(wb.Windows) != 1 {
+			t.Fatalf("len(Windows) = %d, want 1", len(wb.Windows))
+		}
+		if wb.Windows[0].Visible {
+			t.Error("Delta window with empty content should NOT be visible")
+		}
+	})
+
+	t.Run("delta window becomes visible when non-whitespace added", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+
+		// Start with whitespace-only content
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "\n\n")
+		if wb.Windows[0].Visible {
+			t.Error("Delta window with only newlines should NOT be visible initially")
+		}
+
+		// Add actual content
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "Hello")
+		if !wb.Windows[0].Visible {
+			t.Error("Delta window should become visible when non-whitespace content is added")
+		}
+	})
+
+	t.Run("whitespace before content preserves visibility", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+
+		// Start with whitespace
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "  \n  ")
+		if wb.Windows[0].Visible {
+			t.Error("Delta window with only whitespace should NOT be visible")
+		}
+
+		// Add more whitespace - still not visible
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "\t")
+		if wb.Windows[0].Visible {
+			t.Error("Delta window should still not be visible with only whitespace")
+		}
+
+		// Add actual content
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "World")
+		if !wb.Windows[0].Visible {
+			t.Error("Delta window should be visible after adding non-whitespace")
+		}
+
+		// Content should include all the whitespace
+		expected := "  \n  \tWorld"
+		if wb.Windows[0].Content != expected {
+			t.Errorf("Content = %q, want %q", wb.Windows[0].Content, expected)
+		}
+	})
+
+	t.Run("non-visible windows are not rendered", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+
+		// Create visible and non-visible windows
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "\n\n")  // Not visible
+		wb.AppendOrUpdate("delta-2", stream.TagTextAssistant, "Hello") // Visible
+		wb.AppendOrUpdate("delta-3", stream.TagTextAssistant, "  ")    // Not visible
+		wb.AppendOrUpdate("delta-4", stream.TagTextAssistant, "World") // Visible
+
+		rendered := wb.GetAll(-1)
+
+		// Should contain Hello and World, but not placeholders for invisible windows
+		if !strings.Contains(rendered, "Hello") {
+			t.Error("Rendered content should contain 'Hello'")
+		}
+		if !strings.Contains(rendered, "World") {
+			t.Error("Rendered content should contain 'World'")
+		}
+
+		// Count windows - should only have 2 visible ones
+		visibleCount := wb.GetVisibleWindowCount()
+		if visibleCount != 2 {
+			t.Errorf("GetVisibleWindowCount() = %d, want 2", visibleCount)
+		}
+	})
+
+	t.Run("line heights only count visible windows", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+
+		// Create visible and non-visible windows
+		wb.AppendOrUpdate("delta-1", stream.TagTextAssistant, "Hello\nWorld") // Visible, 2 lines
+		wb.AppendOrUpdate("delta-2", stream.TagTextAssistant, "\n\n\n")       // Not visible
+
+		lines := wb.GetTotalLines()
+		// Only delta-1 contributes to total lines (plus border = ~4 lines)
+		if lines <= 0 {
+			t.Errorf("GetTotalLines() = %d, should be > 0 (only visible windows)", lines)
+		}
+
+		// The invisible window should have 0 line height
+		wb.ensureLineHeights()
+		if wb.lineHeights[1] != 0 {
+			t.Errorf("Invisible window lineHeight = %d, want 0", wb.lineHeights[1])
+		}
+	})
+
+	t.Run("user message windows follow same visibility rules", func(t *testing.T) {
+		wb := NewWindowBuffer(80, DefaultStyles())
+		wb.AppendOrUpdate("user-1", stream.TagTextUser, "  ") // whitespace only
+
+		// User messages are delta windows (not tool windows), so they follow the same visibility rules
+		if wb.Windows[0].Visible {
+			t.Error("User message window should NOT be visible with only whitespace content")
+		}
+
+		// But should become visible when actual content is added
+		wb.AppendOrUpdate("user-1", stream.TagTextUser, "Hello")
+		if !wb.Windows[0].Visible {
+			t.Error("User message window should be visible when it has non-whitespace content")
+		}
+	})
+}

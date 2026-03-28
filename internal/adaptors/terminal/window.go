@@ -42,6 +42,7 @@ type Window struct {
 	Content  string     // accumulated content (raw, unstyled)
 	Folded   bool       // true if window is in folded (collapsed) mode
 	Status   ToolStatus // status indicator for tool windows
+	Visible  bool       // true if window should be rendered (tool windows always true; delta windows only when has non-whitespace content)
 	styles   *Styles    // reference to styles for incremental updates
 
 	// Internal cache - updated on render, invalidated on content change
@@ -63,6 +64,26 @@ type windowCache struct {
 // IsDiffWindow returns true if the window is a diff window
 func (w *Window) IsDiffWindow() bool {
 	return w.ToolName == "edit_file"
+}
+
+// IsToolWindow returns true if the window is a tool call/result window
+func (w *Window) IsToolWindow() bool {
+	return w.ToolName != ""
+}
+
+// hasVisibleContent returns true if content contains at least one non-whitespace character
+func hasVisibleContent(content string) bool {
+	for _, r := range content {
+		if !isWhitespace(r) {
+			return true
+		}
+	}
+	return false
+}
+
+// isWhitespace returns true if the character is a whitespace character
+func isWhitespace(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 }
 
 // Render returns the window with border, using cache if valid.
@@ -324,6 +345,12 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.Windows[idx]
 		w.AppendContent(content, innerWidth)
+		// Update visibility for delta windows when new content arrives
+		// Only need to check the delta (not accumulated content) since if Visible=false,
+		// we know all previous content was whitespace
+		if !w.IsToolWindow() && !w.Visible && hasVisibleContent(content) {
+			w.Visible = true
+		}
 		wb.markDirty(idx)
 		return
 	}
@@ -335,7 +362,12 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 		Tag:     tag,
 		Content: content,
 		Folded:  folded,
+		Visible: true, // Will be updated below for delta windows
 		styles:  wb.styles,
+	}
+	// Tool windows are always visible; delta windows only when has visible content
+	if !w.IsToolWindow() {
+		w.Visible = hasVisibleContent(content)
 	}
 	wb.Windows = append(wb.Windows, w)
 	wb.idIndex[id] = len(wb.Windows) - 1
@@ -360,6 +392,7 @@ func (wb *WindowBuffer) AppendToolCall(id string, toolName string, content strin
 		ToolName: toolName,
 		Content:  content,
 		Folded:   true,
+		Visible:  true, // Tool windows are always visible
 		styles:   wb.styles,
 	}
 	wb.Windows = append(wb.Windows, w)
@@ -421,6 +454,19 @@ func (wb *WindowBuffer) GetWindowCount() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	return len(wb.Windows)
+}
+
+// GetVisibleWindowCount returns the number of visible windows.
+func (wb *WindowBuffer) GetVisibleWindowCount() int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	count := 0
+	for _, w := range wb.Windows {
+		if w.Visible {
+			count++
+		}
+	}
+	return count
 }
 
 // GetWindow returns the window at the given index (for testing).
@@ -496,18 +542,32 @@ func (wb *WindowBuffer) ensureLineHeights() {
 	// Incremental update: only re-render the dirty window
 	if wb.dirtyIndex >= 0 && wb.dirtyIndex < len(wb.Windows) {
 		w := wb.Windows[wb.dirtyIndex]
-		w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
-		oldHeight := wb.lineHeights[wb.dirtyIndex]
-		newHeight := w.LineCount()
-		wb.lineHeights[wb.dirtyIndex] = newHeight
-		wb.totalLines += newHeight - oldHeight
+		// Only render and count lines for visible windows
+		if w.Visible {
+			w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
+			oldHeight := wb.lineHeights[wb.dirtyIndex]
+			newHeight := w.LineCount()
+			wb.lineHeights[wb.dirtyIndex] = newHeight
+			wb.totalLines += newHeight - oldHeight
+		} else {
+			// Non-visible windows contribute 0 lines
+			oldHeight := wb.lineHeights[wb.dirtyIndex]
+			wb.lineHeights[wb.dirtyIndex] = 0
+			wb.totalLines -= oldHeight
+		}
 	} else {
 		// Full rebuild (dirtyIndex == dirtyFullRebuild or first init)
 		wb.totalLines = 0
 		for i, w := range wb.Windows {
-			w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
-			wb.lineHeights[i] = w.LineCount()
-			wb.totalLines += wb.lineHeights[i]
+			// Only render and count lines for visible windows
+			if w.Visible {
+				w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
+				wb.lineHeights[i] = w.LineCount()
+				wb.totalLines += wb.lineHeights[i]
+			} else {
+				// Non-visible windows contribute 0 lines
+				wb.lineHeights[i] = 0
+			}
 		}
 	}
 	wb.dirty = false
@@ -625,8 +685,14 @@ func (wb *WindowBuffer) renderVirtual(cursorIndex int) string {
 	endWindow = min(len(wb.Windows)-1, endWindow+bufferWindows)
 
 	var sb strings.Builder
+	firstWritten := false
 	for i := range wb.Windows {
-		if i > 0 {
+		// Skip non-visible windows entirely
+		if !wb.Windows[i].Visible {
+			continue
+		}
+
+		if firstWritten {
 			sb.WriteString("\n")
 		}
 
@@ -642,18 +708,26 @@ func (wb *WindowBuffer) renderVirtual(cursorIndex int) string {
 				sb.WriteString(" ")
 			}
 		}
+		firstWritten = true
 	}
 	return sb.String()
 }
 
-// renderAll renders all windows
+// renderAll renders all visible windows
 func (wb *WindowBuffer) renderAll(cursorIndex int) string {
 	var sb strings.Builder
+	firstWritten := false
 	for i, w := range wb.Windows {
-		if i > 0 {
+		// Skip non-visible windows entirely
+		if !w.Visible {
+			continue
+		}
+
+		if firstWritten {
 			sb.WriteString("\n")
 		}
 		sb.WriteString(w.Render(wb.width, cursorIndex == i, wb.styles, wb.borderStyle, wb.cursorStyle))
+		firstWritten = true
 	}
 	return sb.String()
 }
